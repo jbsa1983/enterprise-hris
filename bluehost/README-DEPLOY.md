@@ -99,12 +99,22 @@ docker compose -f docker-compose.test.yml down    # stop
 - Passwords use PHP `password_hash` (bcrypt); tokens are HS256 JWT (`hash_hmac`).
 
 ## Status & roadmap
-**Working now (tested):** MySQL schema, PHP API foundation (router, PDO, JWT
-auth, RBAC, org-scoping), auth (`/auth/login|refresh|me`), enterprise & org
-dashboards, organizations, people, storage monitoring, audit logging; a
-GEEK-branded front-end page that logs in and shows the dashboard.
+**Working now (tested on PHP 8 + MySQL 8):**
+- Auth (`/auth/login|refresh|me`), RBAC + org-scoping, audit logging
+- Enterprise & organization dashboards, organizations, people, storage monitoring
+- **Payroll**: periods, runs, **compute** (idempotent, statutory + loan ledger),
+  approve/lock
+- **Payslips**: generate (versioned), list, and a **printable payslip** with
+  historical obligation balances (open it and use the browser's *Save as PDF*)
+- **Employee Self-Service** (`/me/*`): profile, payslips (self-generate + print),
+  leave, attendance, loans, contributions, change password
+- **Admin**: users, roles & permission scopes, **bulk-provision employee logins**,
+  organizations
+- GEEK-branded front-end (login → dashboard) proving the stack
 
-**Porting next (in progress):** the remaining modules (payroll compute, payslips
-+ PDF via mPDF, bank export, loans, projects/budget, attendance import, 13th
-month, recruitment, assets, ESS, reports, full admin) and swapping the
-foundation page for the **full React SPA** built from the existing UI.
+**Porting next:** bank export, loans/projects-budget/attendance-import/13th-month/
+recruitment/assets/reports controllers, and swapping the foundation page for the
+**full React SPA** built from the existing UI.
+
+> Payslips are delivered as a **printable HTML page** (Save-as-PDF) in this shared-
+> hosting build. A true binary-PDF path (mPDF via cron for bulk) can be added.

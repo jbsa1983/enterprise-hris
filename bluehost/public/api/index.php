@@ -25,6 +25,10 @@ AuthController::routes($router);
 OrganizationController::routes($router);
 DashboardController::routes($router);
 PeopleController::routes($router);
+PayrollController::routes($router);
+PayslipController::routes($router);
+EssController::routes($router);
+AdminController::routes($router);
 StorageController::routes($router);
 
 try {
