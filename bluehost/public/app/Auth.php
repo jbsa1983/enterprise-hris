@@ -81,6 +81,15 @@ class Auth
         }
     }
 
+    /** Controller helper: require a permission AND org access; returns [user, orgId]. */
+    public static function org(array $p, string $perm): array
+    {
+        $u = self::requirePerm($perm);
+        $orgId = (int) ($p['organization_id'] ?? 0);
+        self::requireOrg($u, $orgId);
+        return [$u, $orgId];
+    }
+
     public static function accessibleOrgIds(array $user): array
     {
         if ($user['is_superadmin']) {

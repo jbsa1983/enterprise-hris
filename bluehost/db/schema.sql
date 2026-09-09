@@ -497,4 +497,183 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   INDEX (user_id), INDEX (organization_id), INDEX (action)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- --- Leave config / timekeeping ---------------------------------------------
+CREATE TABLE IF NOT EXISTS leave_types (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  name VARCHAR(80) NOT NULL,
+  default_credits DECIMAL(6,2) DEFAULT 0,
+  paid TINYINT(1) DEFAULT 1,
+  INDEX (organization_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS leave_balances (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  engagement_id INT NOT NULL,
+  leave_type VARCHAR(80) NOT NULL,
+  credits DECIMAL(6,2) DEFAULT 0,
+  used DECIMAL(6,2) DEFAULT 0,
+  INDEX (organization_id), INDEX (engagement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --- Performance -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS performance_cycles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  cycle_type VARCHAR(30) DEFAULT 'ANNUAL',
+  period_start DATE NULL, period_end DATE NULL,
+  status VARCHAR(20) DEFAULT 'OPEN',
+  INDEX (organization_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS performance_reviews (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  cycle_id INT NOT NULL,
+  engagement_id INT NOT NULL,
+  self_score DECIMAL(5,2) NULL,
+  supervisor_score DECIMAL(5,2) NULL,
+  final_rating DECIMAL(5,2) NULL,
+  status VARCHAR(20) DEFAULT 'DRAFT',
+  comments TEXT NULL,
+  INDEX (organization_id), INDEX (cycle_id), INDEX (engagement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --- Training ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS training_courses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  title VARCHAR(150) NOT NULL,
+  category VARCHAR(80) NULL,
+  provider VARCHAR(120) NULL,
+  INDEX (organization_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS training_assignments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  course_id INT NOT NULL,
+  engagement_id INT NOT NULL,
+  status VARCHAR(20) DEFAULT 'ASSIGNED',
+  completed_date DATE NULL,
+  certificate_expiry DATE NULL,
+  INDEX (organization_id), INDEX (course_id), INDEX (engagement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --- Service desk ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS service_tickets (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  uuid CHAR(36) NOT NULL UNIQUE,
+  organization_id INT NOT NULL,
+  ticket_number VARCHAR(40) NOT NULL UNIQUE,
+  engagement_id INT NULL,
+  category VARCHAR(60) NOT NULL,
+  priority VARCHAR(20) DEFAULT 'NORMAL',
+  assigned_hr VARCHAR(120) NULL,
+  status VARCHAR(20) DEFAULT 'OPEN',
+  subject VARCHAR(200) NOT NULL,
+  description TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (organization_id), INDEX (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --- Onboarding / offboarding ------------------------------------------------
+CREATE TABLE IF NOT EXISTS lifecycle_checklists (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  engagement_id INT NOT NULL,
+  kind VARCHAR(20) DEFAULT 'ONBOARDING',
+  item VARCHAR(150) NOT NULL,
+  completed TINYINT(1) DEFAULT 0,
+  completed_date DATE NULL,
+  INDEX (organization_id), INDEX (engagement_id), INDEX (kind)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --- Approval workflow -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS approval_workflows (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  transaction_type VARCHAR(40) NOT NULL,
+  conditions_json JSON NULL,
+  active TINYINT(1) DEFAULT 1,
+  INDEX (organization_id), INDEX (transaction_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS approval_workflow_steps (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  workflow_id INT NOT NULL,
+  step_order INT DEFAULT 1,
+  name VARCHAR(80) NOT NULL,
+  approver_role VARCHAR(80) NULL,
+  INDEX (workflow_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS approval_instances (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  uuid CHAR(36) NOT NULL UNIQUE,
+  organization_id INT NOT NULL,
+  workflow_id INT NULL,
+  transaction_type VARCHAR(40) NOT NULL,
+  entity VARCHAR(60) NOT NULL,
+  entity_id INT NOT NULL,
+  amount DECIMAL(14,2) NULL,
+  current_step INT DEFAULT 1,
+  status VARCHAR(20) DEFAULT 'PENDING',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (organization_id), INDEX (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS approval_actions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  instance_id INT NOT NULL,
+  step_order INT DEFAULT 1,
+  action VARCHAR(20) NOT NULL,
+  actor_user_id INT NULL,
+  remarks TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (instance_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --- Bank export runs / report templates ------------------------------------
+CREATE TABLE IF NOT EXISTS bank_export_runs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  uuid CHAR(36) NOT NULL UNIQUE,
+  organization_id INT NOT NULL,
+  payroll_run_id INT NOT NULL,
+  template_id INT NOT NULL,
+  template_version INT NOT NULL,
+  file_name VARCHAR(160) NOT NULL,
+  file_hash VARCHAR(64) NOT NULL,
+  row_count INT DEFAULT 0,
+  total_amount DECIMAL(16,2) DEFAULT 0,
+  object_key VARCHAR(255) NULL,
+  filters_json JSON NULL,
+  generated_by INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (organization_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS report_templates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  uuid CHAR(36) NOT NULL UNIQUE,
+  organization_id INT NULL,
+  name VARCHAR(120) NOT NULL,
+  dataset VARCHAR(60) NOT NULL,
+  config_json JSON NOT NULL,
+  created_by INT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS interviews (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  application_id INT NOT NULL,
+  scheduled_date DATE NULL,
+  interviewer VARCHAR(150) NULL,
+  result VARCHAR(20) NULL,
+  remarks TEXT NULL,
+  INDEX (application_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;

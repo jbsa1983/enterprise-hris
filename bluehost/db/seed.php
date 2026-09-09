@@ -109,6 +109,19 @@ foreach ($orgs as $oi => $oid) {
     $run = Database::insert('payroll_runs', ['uuid' => uuid(), 'organization_id' => $oid, 'period_id' => $period,
         'reference' => 'RUN-' . date('Ym'), 'status' => 'APPROVED',
         'rule_version_snapshot' => json_encode(['SSS' => 'PROTO-2024.1', 'PHIC' => 'PROTO-2024.1', 'HDMF' => 'PROTO-2024.1', 'BIR' => 'PROTO-2024.1'])]);
+    // Bank export template (BDO CSV) for this org.
+    $tplId = Database::insert('bank_export_templates', ['uuid' => uuid(), 'organization_id' => $oid,
+        'template_name' => 'BDO Payroll Corporate', 'bank_name' => 'BDO', 'file_type' => 'CSV', 'delimiter' => ',',
+        'header_required' => 1, 'date_format' => '%m/%d/%Y', 'decimal_places' => 2, 'filename_pattern' => '{bank}_{org}_{date}', 'template_version' => 1]);
+    foreach ([['bank_account', 'ACCOUNT_NO', null], ['account_name', 'ACCOUNT_NAME', 'upper'], ['net_pay', 'AMOUNT', 'amount'],
+              ['employee_number', 'REFERENCE', null], ['payroll_date', 'VALUE_DATE', 'date']] as $ci => $col) {
+        Database::insert('bank_export_columns', ['template_id' => $tplId, 'order_index' => $ci, 'system_field' => $col[0],
+            'output_header' => $col[1], 'formatting' => $col[2], 'required' => $col[0] === 'bank_account' ? 1 : 0]);
+    }
+    foreach (['Vacation' => 15, 'Sick' => 15, 'Emergency' => 5] as $lt => $cr)
+        Database::insert('leave_types', ['organization_id' => $oid, 'name' => $lt, 'default_credits' => $cr, 'paid' => 1]);
+
+    $engIds = [];
     $gt = $dt = $nt = 0.0;
     for ($i = 0; $i < 10; $i++) {
         $pid = Database::insert('people', ['uuid' => uuid(),
@@ -123,6 +136,7 @@ foreach ($orgs as $oi => $oid) {
             'engagement_type' => $type, 'employee_number' => ($isCon ? 'CON-' : 'EMP-') . (++$empNo),
             'salary_basis' => 'MONTHLY', 'base_rate' => $base, 'department_id' => $deptId, 'position_id' => $posId,
             'start_date' => date('Y-m-d', strtotime('-1 year')), 'status' => 'ACTIVE']);
+        $engIds[] = $eid;
 
         // simple compute
         $earn = ['basic' => $base, 'allowance' => $isCon ? 0 : 2000];
@@ -149,6 +163,27 @@ foreach ($orgs as $oi => $oid) {
             'date_to' => date('Y-m-d', strtotime('+6 days')), 'days' => 2, 'status' => 'PENDING']);
     }
     Database::update('payroll_runs', $run, ['gross_total' => round($gt, 2), 'deduction_total' => round($dt, 2), 'net_total' => round($nt, 2)]);
+
+    // --- Module demo data (attendance, service desk, performance, training) --
+    foreach (array_slice($engIds, 0, 6) as $eid2) {
+        for ($d = 1; $d <= 3; $d++)
+            Database::insert('attendance_logs', ['organization_id' => $oid, 'engagement_id' => $eid2,
+                'log_date' => date('Y-m-d', strtotime("-$d day")), 'hours_worked' => 8,
+                'late_minutes' => [0, 0, 10, 25][array_rand([0, 0, 10, 25])], 'overtime_hours' => [0, 0, 1, 2][array_rand([0, 0, 1, 2])],
+                'source' => 'WEB', 'status' => 'PRESENT']);
+    }
+    foreach (['Certificate of Employment', 'Payroll concern', 'HMO'] as $ti => $cat)
+        Database::insert('service_tickets', ['uuid' => uuid(), 'organization_id' => $oid, 'ticket_number' => 'TKT-' . $oid . '-' . str_pad((string) ($ti + 1), 4, '0', STR_PAD_LEFT),
+            'engagement_id' => $engIds[$ti] ?? null, 'category' => $cat, 'priority' => 'NORMAL', 'status' => 'OPEN', 'subject' => "$cat request"]);
+    $cycleId = Database::insert('performance_cycles', ['organization_id' => $oid, 'name' => date('Y') . ' Annual Review', 'cycle_type' => 'ANNUAL', 'status' => 'OPEN']);
+    foreach (array_slice($engIds, 0, 5) as $eid2) {
+        $ss = [3.5, 4.0, 4.5][array_rand([3.5, 4.0, 4.5])]; $sp = [3.0, 4.0, 5.0][array_rand([3.0, 4.0, 5.0])];
+        Database::insert('performance_reviews', ['organization_id' => $oid, 'cycle_id' => $cycleId, 'engagement_id' => $eid2,
+            'self_score' => $ss, 'supervisor_score' => $sp, 'final_rating' => round(($ss + $sp) / 2, 2), 'status' => 'COMPLETED']);
+    }
+    $courseId = Database::insert('training_courses', ['organization_id' => $oid, 'title' => 'Data Privacy Act Orientation', 'category' => 'Compliance', 'provider' => 'Internal']);
+    foreach (array_slice($engIds, 0, 6) as $eid2)
+        Database::insert('training_assignments', ['organization_id' => $oid, 'course_id' => $courseId, 'engagement_id' => $eid2, 'status' => ['ASSIGNED', 'COMPLETED'][array_rand(['ASSIGNED', 'COMPLETED'])]]);
 }
 $pdo->commit();
 echo "[seed] demo data committed (2 orgs, ~20 people, payroll).\n";

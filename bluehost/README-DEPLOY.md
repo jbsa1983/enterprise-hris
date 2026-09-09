@@ -110,13 +110,17 @@ docker compose -f docker-compose.test.yml down    # stop
   leave, attendance, loans, contributions, change password
 - **Admin**: users, roles & permission scopes, **bulk-provision employee logins**,
   organizations
-- **Full React SPA** front-end (the same GEEK UI as the Docker build) — static
-  files talking to the PHP API. Pages whose backend is ported (dashboards, people,
-  payroll, payslips, ESS, admin) are fully live; the rest render and light up as
-  their controllers are ported.
+- **Full React SPA** front-end (the same GEEK UI as the Docker build), static
+  files talking to the PHP API.
+- **All modules ported and live:** dashboards, people (add/edit/archive),
+  org structure, projects + budget/report, payroll (compute/approve/lock),
+  payslips (printable), **bank export** (templates/preview/generate),
+  loans & advances, attendance (+ CSV/device import), leave & overtime,
+  13th-month & bonuses, recruitment, assets, HR modules (service desk,
+  performance, training, approvals), reports, ESS, and admin.
 
-**Porting next:** bank export, loans/projects-budget/attendance-import/13th-month/
-recruitment/assets/reports controllers (the SPA pages already exist and call them).
+Feature parity with the Docker build. Remaining niceties (true binary PDF via
+mPDF, XLSX via PhpSpreadsheet) are optional upgrades — see the payslip note below.
 
 ### Rebuilding the SPA (optional; only if you change the UI source in `spa/`)
 ```bash
