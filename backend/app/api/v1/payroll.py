@@ -3,17 +3,18 @@ from __future__ import annotations
 
 import io
 import zipfile
+from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_org_access, require_permission
 from app.models.enums import PayrollStatus
-from app.models.payroll import PayrollRun
+from app.models.payroll import PayrollPeriod, PayrollRun
 from app.models.payslip import Payslip
 from app.models.user import User
-from app.payroll import payslip_service
+from app.payroll import payslip_service, run_service
 from app.services import audit_service
 
 router = APIRouter(prefix="/organizations/{organization_id}/payroll", tags=["payroll"])
@@ -56,6 +57,72 @@ def list_runs(
             }
         )
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Periods + run creation + compute
+# --------------------------------------------------------------------------- #
+@router.get("/periods", dependencies=[Depends(require_permission("payroll.view"))])
+def list_periods(organization_id: int, _: int = Depends(require_org_access), db: Session = Depends(get_db)):
+    rows = (
+        db.query(PayrollPeriod).filter(PayrollPeriod.organization_id == organization_id)
+        .order_by(PayrollPeriod.period_start.desc()).all()
+    )
+    return [{"id": p.id, "name": p.name, "frequency": p.frequency,
+             "period_start": p.period_start.isoformat(), "period_end": p.period_end.isoformat(),
+             "pay_date": p.pay_date.isoformat() if p.pay_date else None} for p in rows]
+
+
+@router.post("/periods", dependencies=[Depends(require_permission("payroll.prepare"))])
+def create_period(organization_id: int, payload: dict = Body(...), _: int = Depends(require_org_access),
+                  db: Session = Depends(get_db)):
+    p = PayrollPeriod(
+        organization_id=organization_id, name=payload["name"], frequency=payload.get("frequency", "MONTHLY"),
+        period_start=date.fromisoformat(payload["period_start"]), period_end=date.fromisoformat(payload["period_end"]),
+        pay_date=date.fromisoformat(payload["pay_date"]) if payload.get("pay_date") else None,
+    )
+    db.add(p)
+    db.commit()
+    return {"id": p.id, "name": p.name}
+
+
+@router.post("/runs", dependencies=[Depends(require_permission("payroll.prepare"))])
+def create_run(organization_id: int, request: Request, payload: dict = Body(...),
+               _: int = Depends(require_org_access),
+               user: User = Depends(require_permission("payroll.prepare")),
+               db: Session = Depends(get_db)):
+    period = db.get(PayrollPeriod, payload["period_id"])
+    if not period or period.organization_id != organization_id:
+        raise HTTPException(status_code=404, detail="Payroll period not found")
+    ref = payload.get("reference") or f"RUN-{organization_id}-{period.period_start.strftime('%Y%m')}"
+    run = PayrollRun(organization_id=organization_id, period_id=period.id, reference=ref,
+                     status=PayrollStatus.DRAFT)
+    db.add(run)
+    db.flush()
+    audit_service.record(db, action="payroll.create", user=user, organization_id=organization_id,
+                         entity="payroll_run", entity_id=run.id, after={"reference": ref},
+                         ip_address=request.client.host if request.client else None, commit=False)
+    db.commit()
+    return {"id": run.id, "reference": run.reference, "status": run.status}
+
+
+@router.post("/runs/{run_id}/compute")
+def compute(organization_id: int, run_id: int, request: Request, payload: dict = Body(default={}),
+            _: int = Depends(require_org_access),
+            user: User = Depends(require_permission("payroll.compute")),
+            db: Session = Depends(get_db)):
+    run = _get_run(db, organization_id, run_id)
+    try:
+        run_service.compute_run(db, run, allowance=float(payload.get("allowance", 0)))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    audit_service.record(db, action="payroll.compute", user=user, organization_id=organization_id,
+                         entity="payroll_run", entity_id=run.id,
+                         after={"gross": float(run.gross_total), "net": float(run.net_total)},
+                         ip_address=request.client.host if request.client else None, commit=False)
+    db.commit()
+    return {"id": run.id, "status": run.status, "gross_total": float(run.gross_total),
+            "deduction_total": float(run.deduction_total), "net_total": float(run.net_total)}
 
 
 def _transition(db, run, request, user, new_status, action):

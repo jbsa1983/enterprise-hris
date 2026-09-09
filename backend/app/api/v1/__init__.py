@@ -2,6 +2,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    admin,
     assets,
     attendance,
     audit,
@@ -9,6 +10,7 @@ from app.api.v1 import (
     bank,
     dashboard,
     hrmodules,
+    orgadmin,
     organizations,
     payroll,
     payslips,
@@ -23,7 +25,9 @@ from app.api.v1 import (
 api_router = APIRouter()
 # Core
 api_router.include_router(auth.router)
+api_router.include_router(admin.router)
 api_router.include_router(organizations.router)
+api_router.include_router(orgadmin.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(people.router)
 api_router.include_router(projects.router)

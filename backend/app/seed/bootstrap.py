@@ -568,17 +568,42 @@ def already_seeded(db: Session) -> bool:
     return db.query(User).count() > 0
 
 
+def seed_minimal(db: Session) -> None:
+    """RBAC + a single Superadmin only — for real (non-demo) deployments."""
+    roles = seed_rbac(db)
+    seed_statutory(db)  # effective-dated statutory rules (edit via Admin UI)
+    admin = User(
+        email=settings.default_admin_email.lower(),
+        full_name="System Administrator",
+        hashed_password=hash_password(settings.default_admin_password),
+        is_superadmin=True,
+    )
+    admin.roles = [roles["Super Admin"]]
+    db.add(admin)
+    db.flush()
+    print(f"[seed] minimal: RBAC + Superadmin ({settings.default_admin_email}). "
+          "Statutory values are illustrative — review before running real payroll.")
+
+
 def run() -> None:
     wait_for_db()
     print("[seed] creating tables (if not present)...")
     Base.metadata.create_all(bind=engine)
 
+    mode = (settings.seed_mode or "demo").lower()
     db = SessionLocal()
     try:
-        if already_seeded(db):
-            print("[seed] database already seeded — skipping demo data.")
+        if mode == "none":
+            print("[seed] SEED_MODE=none — tables only, no data.")
+        elif already_seeded(db):
+            print("[seed] database already has users — skipping seeding.")
+        elif mode == "minimal":
+            print("[seed] SEED_MODE=minimal — seeding RBAC + Superadmin only...")
+            seed_minimal(db)
+            db.commit()
+            print("[seed] minimal seed committed.")
         else:
-            print("[seed] seeding demo data...")
+            print("[seed] SEED_MODE=demo — seeding full demo dataset...")
             roles = seed_rbac(db)
             _, orgs = seed_enterprise_and_orgs(db)
             seed_users(db, roles, orgs)

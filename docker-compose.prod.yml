@@ -1,0 +1,53 @@
+# =============================================================================
+# Production overrides for the Enterprise HRIS.
+#
+# Use ALONGSIDE the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Differences from development:
+#   - Backend runs with multiple Uvicorn workers, no --reload.
+#   - Frontend is built and served in production mode (no dev server).
+#   - SEED_MODE=minimal → a clean system: RBAC + one Superadmin, NO demo data.
+#     The Superadmin then creates organizations, users, roles, and people.
+#
+# BEFORE DEPLOYING, in your .env set strong values for:
+#   JWT_SECRET_KEY (long random), POSTGRES_PASSWORD, MINIO_ROOT_PASSWORD,
+#   DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, and SEED_MODE=minimal.
+#   On a dedicated server, also map nginx to 80/443 and terminate TLS there.
+# =============================================================================
+
+services:
+  backend:
+    environment:
+      ENV: production
+      SEED_MODE: ${SEED_MODE:-minimal}
+    command: >
+      sh -c "python -m app.seed.bootstrap &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --proxy-headers"
+    restart: always
+
+  worker:
+    environment:
+      ENV: production
+    command: celery -A app.worker.celery_app worker --loglevel=warning --concurrency=4
+    restart: always
+
+  frontend:
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE_URL: /api/v1
+      INTERNAL_API_BASE_URL: http://backend:8000/api/v1
+    command: sh -c "npm run build && npm run start"
+    restart: always
+
+  postgres:
+    restart: always
+
+  redis:
+    restart: always
+
+  minio:
+    restart: always
+
+  nginx:
+    restart: always

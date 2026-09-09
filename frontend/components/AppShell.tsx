@@ -21,6 +21,11 @@ const NAV = [
   { label: "My Self-Service", href: (o?: number) => "/me" },
 ];
 
+const ADMIN_NAV = [
+  { label: "Users", href: "/admin/users" },
+  { label: "Roles & Scopes", href: "/admin/roles" },
+];
+
 export default function AppShell({
   children,
   orgId,
@@ -63,6 +68,8 @@ export default function AppShell({
   }
   if (!user) return null;
 
+  const isAdmin = user.is_superadmin || (user.permissions || []).includes("system.admin");
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
@@ -93,8 +100,24 @@ export default function AppShell({
             );
           })}
         </nav>
+        {isAdmin ? (
+          <div className="border-t border-white/10 px-3 py-3">
+            <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Administration
+            </div>
+            {ADMIN_NAV.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link key={item.label} href={item.href}
+                  className={`block rounded-lg px-3 py-2 text-sm ${active ? "bg-white/15 font-medium text-white" : "text-slate-200 hover:bg-white/10"}`}>
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
         <div className="border-t border-white/10 px-5 py-3 text-[11px] text-slate-400">
-          Modular monolith · Phase 1
+          Enterprise HRIS
         </div>
       </aside>
 

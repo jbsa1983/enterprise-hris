@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     storage_simulated_capacity_gb: float = 50.0
 
     # Seeding
+    #   demo    → full demo dataset (companies, employees, payroll, …)
+    #   minimal → RBAC + a single Superadmin only (recommended for real deployments)
+    #   none    → create tables only, seed nothing
+    seed_mode: str = "demo"
     seed_on_startup: bool = True
     default_admin_email: str = "admin@demo-hris.local"
     default_admin_password: str = "Admin123!"

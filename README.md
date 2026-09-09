@@ -50,6 +50,52 @@ granted; org scoping is enforced on the backend, not in the UI.
 
 ---
 
+## Running in production (clean, admin-operated system)
+
+The demo boot fills the database with sample companies and people. For a **real
+deployment** you want a clean system that the Superadmin builds out.
+
+1. **Set strong secrets** in `.env`:
+   ```
+   JWT_SECRET_KEY=<64+ random chars>      # python -c "import secrets;print(secrets.token_urlsafe(64))"
+   POSTGRES_PASSWORD=<strong>
+   MINIO_ROOT_PASSWORD=<strong>
+   DEFAULT_ADMIN_EMAIL=you@company.com     # your first Superadmin
+   DEFAULT_ADMIN_PASSWORD=<strong>
+   SEED_MODE=minimal                        # RBAC + one Superadmin, NO demo data
+   ```
+2. **Start with the production overrides** (multi-worker backend, built frontend, no hot-reload):
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+   ```
+3. **Log in as the Superadmin** and build your organization from the Administration area
+   (see below). On a dedicated server, point nginx at ports 80/443 and terminate TLS there.
+
+`SEED_MODE=minimal` seeds only the permission catalog, the default roles, and the
+one Superadmin — nothing else. Everything after that is created through the UI.
+
+## Administration & access control (Superadmin)
+
+The **Superadmin** runs the system from the sidebar's **Administration** section:
+
+- **Users** (`/admin/users`) — create / edit users, set an initial password or reset one,
+  toggle active/superadmin, and assign **roles** and **organization access**. A user only
+  sees the organizations they're granted; every org-scoped request re-checks this on the backend.
+- **Roles & Scopes** (`/admin/roles`) — a role is a named set of **permissions**. Edit any
+  role's permission matrix, create new roles, or delete custom ones. Assigning a role to a
+  user grants exactly those permissions (the "scopes and limitations"). Guardrails prevent
+  deleting system roles in use and removing the last active Superadmin.
+
+Everything is **editable through the app**: add/edit/archive **people** and their engagements,
+create **organizations**, **departments**, **positions**, **projects**; create **payroll
+periods**, **runs**, and **compute** them (idempotent — recomputing never double-counts);
+edit **statutory rules** (effective-dated). Non-Superadmins are limited to what their roles allow.
+
+> Payroll-compliance note: the statutory rates ship as clearly-marked illustrative values.
+> Before running real payroll, edit the effective-dated statutory rules (Admin → statutory
+> rules API/UI) with figures validated by your payroll/accounting team. This software is not
+> certified payroll-compliant.
+
 ## Architecture
 
 Modular **monolith** (not microservices), matching the spec:
