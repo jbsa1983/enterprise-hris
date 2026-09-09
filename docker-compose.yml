@@ -1,0 +1,158 @@
+# =============================================================================
+# Enterprise HRIS Prototype — Docker Compose
+# Modular monolith: FastAPI backend + Next.js frontend + supporting services.
+# Bring up with:  docker compose up --build
+# Then open:      http://localhost:8080
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hris-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hris}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hris_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-hris}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Host 55432 → container 5432 (avoids clashing with other local Postgres stacks).
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hris} -d ${POSTGRES_DB:-hris}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: hris-redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: hris-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9010:9000"   # S3 API   (host 9010)
+      - "9011:9001"   # Web console (host 9011)
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: hris-backend
+    env_file:
+      - .env
+    environment:
+      # Ensure container-network hostnames regardless of .env host overrides.
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-hris}:${POSTGRES_PASSWORD:-hris_dev_password}@postgres:5432/${POSTGRES_DB:-hris}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      MINIO_ENDPOINT: minio:9000
+      STORAGE_MONITOR_PATH: /data
+    volumes:
+      - ./backend:/app
+      - backend_storage:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "python -m app.seed.bootstrap &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+    container_name: hris-worker
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-hris}:${POSTGRES_PASSWORD:-hris_dev_password}@postgres:5432/${POSTGRES_DB:-hris}
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      MINIO_ENDPOINT: minio:9000
+    volumes:
+      - ./backend:/app
+      - backend_storage:/data
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: hris-frontend
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: /api/v1
+      # Server-side (SSR) calls go directly to the backend service.
+      INTERNAL_API_BASE_URL: http://backend:8000/api/v1
+    expose:
+      - "3000"
+    depends_on:
+      - backend
+    command: sh -c "npm run dev"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: hris-nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: hris-mailhog
+    ports:
+      - "1026:1025"   # SMTP   (host 1026)
+      - "8026:8025"   # Web UI (host 8026)
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  minio_data:
+  backend_storage:
