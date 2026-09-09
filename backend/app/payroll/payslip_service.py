@@ -157,6 +157,45 @@ def generate_for_run(
     return created
 
 
+def generate_for_engagement(
+    db: Session, run: PayrollRun, engagement_id: int, user_id: int | None = None
+) -> Payslip:
+    """Create (or return the current) payslip for ONE engagement in a run.
+
+    Used by employee self-service — an employee generates their own payslip from
+    a finalized run. Numbers come from the official PayrollRunPerson line.
+    """
+    existing = (
+        db.query(Payslip)
+        .filter(Payslip.payroll_run_id == run.id, Payslip.engagement_id == engagement_id,
+                Payslip.is_current.is_(True))
+        .first()
+    )
+    if existing:
+        return existing
+
+    line = (
+        db.query(PayrollRunPerson)
+        .filter(PayrollRunPerson.run_id == run.id, PayrollRunPerson.engagement_id == engagement_id)
+        .first()
+    )
+    if not line:
+        raise ValueError("No payroll line for this engagement in the run")
+
+    snapshot = build_snapshot(db, run, line)
+    snapshot["version"] = 1
+    engagement = db.get(Engagement, engagement_id)
+    payslip = Payslip(
+        organization_id=run.organization_id, payroll_run_id=run.id, engagement_id=engagement_id,
+        person_id=engagement.person_id, document_type=snapshot["document_type"], version=1,
+        is_current=True, status="ISSUED", net_pay=line.net_pay or 0, snapshot=snapshot,
+        generated_by=user_id,
+    )
+    db.add(payslip)
+    db.flush()
+    return payslip
+
+
 def get_pdf_bytes(db: Session, payslip: Payslip) -> bytes:
     """Return the PDF, from MinIO if stored else re-rendered from the snapshot."""
     if payslip.pdf_object_key:

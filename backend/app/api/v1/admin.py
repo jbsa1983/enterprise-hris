@@ -8,9 +8,10 @@ access, and manage the effective-dated statutory rules used by payroll.
 """
 from __future__ import annotations
 
+import secrets
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -18,8 +19,10 @@ from app.core.database import get_db
 from app.core.deps import require_permission
 from app.core.rbac import PERMISSIONS
 from app.core.security import hash_password
+from app.models.enums import EngagementType
 from app.models.organization import Enterprise, Organization, OrganizationUser
 from app.models.payroll import StatutoryRuleSet
+from app.models.person import Engagement, Person
 from app.models.user import Role, User
 from app.models.user import Permission
 from app.schemas.admin import (
@@ -252,6 +255,74 @@ def reset_password(user_id: int, payload: PasswordReset, actor: User = _ADMIN, d
     audit_service.record(db, action="user.password_reset", user=actor, entity="user", entity_id=u.id, commit=False)
     db.commit()
     return {"ok": True}
+
+
+@router.post("/provision-ess", dependencies=[_ADMIN])
+def provision_ess(request: Request, payload: dict = Body(default={}), actor: User = _ADMIN,
+                  db: Session = Depends(get_db)) -> dict:
+    """Create self-service logins for employees who don't have one yet.
+
+    - One login per person, linked to their Person record, with the Employee role.
+    - Organization access = every org the person is engaged in.
+    - Password: `default_password` for all, or an auto-generated one per user
+      (returned so the Superadmin can distribute them). Employees change it later.
+    """
+    default_password = payload.get("default_password")
+    if default_password is not None and len(default_password) < MIN_PASSWORD_LEN:
+        raise HTTPException(status_code=422, detail=f"default_password must be ≥ {MIN_PASSWORD_LEN} chars")
+    org_filter = payload.get("organization_id")
+    include_consultants = payload.get("include_consultants", False)
+
+    employee_role = db.query(Role).filter(Role.name == "Employee").first()
+    if not employee_role:
+        raise HTTPException(status_code=500, detail="Employee role missing — reseed RBAC")
+
+    q = db.query(Engagement).filter(Engagement.status == "ACTIVE")
+    if org_filter:
+        q = q.filter(Engagement.organization_id == org_filter)
+    if not include_consultants:
+        q = q.filter(Engagement.engagement_type.notin_(EngagementType.CONSULTANT_TYPES))
+    engagements = q.all()
+
+    # Group org access per person.
+    persons: dict[int, set[int]] = {}
+    for e in engagements:
+        persons.setdefault(e.person_id, set()).add(e.organization_id)
+
+    created, skipped, credentials = 0, 0, []
+    for person_id, org_ids in persons.items():
+        if db.query(User).filter(User.person_id == person_id).first():
+            skipped += 1
+            continue
+        person = db.get(Person, person_id)
+        if not person:
+            continue
+        # Choose a login email.
+        email = (person.email or "").strip().lower()
+        if not email or db.query(User).filter(User.email == email).first():
+            emp_no = next((e.employee_number for e in engagements if e.person_id == person_id and e.employee_number), None)
+            email = f"emp{(emp_no or person_id)}@ess.local".lower()
+            n = 1
+            base = email
+            while db.query(User).filter(User.email == email).first():
+                email = base.replace("@", f"{n}@")
+                n += 1
+        pw = default_password or (secrets.token_urlsafe(6) + "A1!")
+        u = User(email=email, full_name=person.full_name, hashed_password=hash_password(pw),
+                 is_active=True, is_superadmin=False, person_id=person_id)
+        u.roles = [employee_role]
+        db.add(u)
+        db.flush()
+        for i, oid in enumerate(sorted(org_ids)):
+            db.add(OrganizationUser(organization_id=oid, user_id=u.id, is_primary=(i == 0)))
+        created += 1
+        credentials.append({"name": person.full_name, "email": email, "temp_password": pw})
+
+    audit_service.record(db, action="ess.provision", user=actor, entity="user",
+                         after={"created": created, "skipped": skipped},
+                         ip_address=request.client.host if request.client else None, commit=False)
+    db.commit()
+    return {"created": created, "skipped": skipped, "credentials": credentials}
 
 
 @router.post("/users/{user_id}/deactivate", dependencies=[_ADMIN])

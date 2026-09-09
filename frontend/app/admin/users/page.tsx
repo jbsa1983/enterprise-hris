@@ -23,6 +23,23 @@ export default function AdminUsersPage() {
   const [form, setForm] = useState({ ...EMPTY });
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [prov, setProv] = useState<{ open: boolean; password: string; result: any }>({ open: false, password: "", result: null });
+
+  async function runProvision() {
+    setErr("");
+    try {
+      const body: any = {};
+      if (prov.password) body.default_password = prov.password;
+      const r = await apiFetch<any>("/admin/provision-ess", { method: "POST", body: JSON.stringify(body) });
+      setProv({ ...prov, result: r }); load();
+    } catch (e: any) { setErr(e.message); }
+  }
+  function downloadCreds(creds: any[]) {
+    const rows = [["Name", "Login Email", "Temporary Password"], ...creds.map((c) => [c.name, c.email, c.temp_password])];
+    const csv = rows.map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a"); a.href = url; a.download = "employee_logins.csv"; a.click(); URL.revokeObjectURL(url);
+  }
 
   const load = useCallback(() => {
     apiFetch<AdminUser[]>("/admin/users").then(setUsers).catch((e) => setErr(e.message));
@@ -79,7 +96,12 @@ export default function AdminUsersPage() {
           <h1 className="text-lg font-semibold text-slate-900">Users</h1>
           <p className="text-sm text-slate-500">Superadmin manages all accounts, roles, and organization access.</p>
         </div>
-        <button className="btn-primary" onClick={openCreate}>+ New User</button>
+        <div className="flex gap-2">
+          <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50" onClick={() => { setProv({ open: true, password: "", result: null }); }}>
+            Provision Employee Logins
+          </button>
+          <button className="btn-primary" onClick={openCreate}>+ New User</button>
+        </div>
       </div>
       {msg ? <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{msg}</div> : null}
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
@@ -149,6 +171,54 @@ export default function AdminUsersPage() {
               <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={() => setEditing(null)}>Cancel</button>
               <button className="btn-primary" onClick={save}>Save</button>
             </div>
+          </div>
+        </div>
+      ) : null}
+      {prov.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setProv({ open: false, password: "", result: null })}>
+          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="mb-2 text-base font-semibold">Provision Employee Logins</h2>
+            {!prov.result ? (
+              <>
+                <p className="mb-3 text-sm text-slate-500">
+                  Creates a self-service login for every active employee who doesn't have one, linked to their record with the Employee role.
+                </p>
+                <label className="mb-1 block text-xs text-slate-500">Shared temporary password (optional)</label>
+                <input className="input max-w-xs" type="text" value={prov.password}
+                  onChange={(e) => setProv({ ...prov, password: e.target.value })} placeholder="leave blank to auto-generate per user" />
+                <p className="mt-1 text-xs text-slate-400">Leave blank to generate a unique password per employee (you'll get a CSV to distribute). Employees can change it in My Self-Service → Security.</p>
+                <div className="mt-5 flex justify-end gap-2">
+                  <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={() => setProv({ open: false, password: "", result: null })}>Cancel</button>
+                  <button className="btn-primary" onClick={runProvision}>Run</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  Created {prov.result.created} login(s), skipped {prov.result.skipped} (already had accounts).
+                </div>
+                {prov.result.credentials?.length ? (
+                  <>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-sm font-medium">New credentials ({prov.result.credentials.length})</span>
+                      <button className="btn-primary !px-3 !py-1 text-xs" onClick={() => downloadCreds(prov.result.credentials)}>Download CSV</button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200">
+                      <table className="min-w-full text-xs"><thead className="bg-slate-50"><tr className="text-left text-slate-500"><th className="px-3 py-2">Name</th><th className="px-3 py-2">Login</th><th className="px-3 py-2">Temp Password</th></tr></thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {prov.result.credentials.map((c: any, i: number) => (
+                            <tr key={i}><td className="px-3 py-1.5">{c.name}</td><td className="px-3 py-1.5 font-mono">{c.email}</td><td className="px-3 py-1.5 font-mono">{c.temp_password}</td></tr>
+                          ))}
+                        </tbody></table>
+                    </div>
+                    <p className="mt-2 text-xs text-amber-700">Download and distribute these now — the passwords are shown only once here.</p>
+                  </>
+                ) : <p className="text-sm text-slate-500">No new accounts were needed.</p>}
+                <div className="mt-5 flex justify-end">
+                  <button className="btn-primary" onClick={() => setProv({ open: false, password: "", result: null })}>Done</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : null}
