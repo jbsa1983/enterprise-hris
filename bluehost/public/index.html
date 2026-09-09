@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GEEK Group — Enterprise HRIS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style> body { font-family: ui-sans-serif, system-ui, sans-serif; } </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+  <div id="app" class="mx-auto max-w-4xl p-6"></div>
+
+  <script>
+    const API = "/api/v1";
+    let token = localStorage.getItem("hris_token") || "";
+
+    const GEEK = { red:"#EA4335", amber:"#F9AB00", green:"#34A853", blue:"#4285F4" };
+    function logo() {
+      return `<div class="flex items-center gap-2">
+        <div class="grid grid-cols-2 gap-[3px]">
+          <span class="h-3 w-3 rounded-[3px]" style="background:${GEEK.red}"></span>
+          <span class="h-3 w-3 rounded-[3px]" style="background:${GEEK.blue}"></span>
+          <span class="h-3 w-3 rounded-[3px]" style="background:${GEEK.green}"></span>
+          <span class="h-3 w-3 rounded-[3px]" style="background:${GEEK.amber}"></span>
+        </div>
+        <div class="text-2xl font-extrabold tracking-tight">
+          <span style="color:${GEEK.red}">G</span><span style="color:${GEEK.amber}">E</span><span style="color:${GEEK.green}">E</span><span style="color:${GEEK.blue}">K</span>
+          <span class="ml-1 text-[11px] font-bold tracking-widest text-slate-500">GROUP</span>
+        </div></div>`;
+    }
+    async function api(path, opts = {}) {
+      const res = await fetch(API + path, {
+        ...opts,
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}), ...(opts.headers||{}) },
+      });
+      if (!res.ok) throw new Error((await res.json().catch(()=>({}))).detail || res.statusText);
+      return res.json();
+    }
+    const peso = n => n == null ? "—" : "₱" + Number(n).toLocaleString("en-PH", { maximumFractionDigits: 0 });
+
+    function loginView(err) {
+      document.getElementById("app").innerHTML = `
+        <div class="mx-auto mt-16 max-w-sm rounded-2xl bg-white shadow-xl overflow-hidden">
+          <div class="flex h-1.5"><div class="flex-1" style="background:${GEEK.red}"></div><div class="flex-1" style="background:${GEEK.amber}"></div><div class="flex-1" style="background:${GEEK.green}"></div><div class="flex-1" style="background:${GEEK.blue}"></div></div>
+          <div class="p-8">
+            ${logo()}
+            <p class="mt-3 text-sm text-slate-500">Enterprise HRIS — PHP / MySQL build</p>
+            ${err ? `<div class="mt-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">${err}</div>` : ""}
+            <label class="mt-4 block text-sm">Email</label>
+            <input id="email" class="mt-1 w-full rounded-lg border px-3 py-2" value="admin@demo-hris.local"/>
+            <label class="mt-3 block text-sm">Password</label>
+            <input id="password" type="password" class="mt-1 w-full rounded-lg border px-3 py-2" value="Admin123!"/>
+            <button id="signin" class="mt-4 w-full rounded-lg py-2 font-medium text-white" style="background:${GEEK.blue}">Sign in</button>
+          </div>
+        </div>`;
+      document.getElementById("signin").onclick = async () => {
+        try {
+          const r = await api("/auth/login", { method: "POST", body: JSON.stringify({
+            email: document.getElementById("email").value, password: document.getElementById("password").value }) });
+          token = r.access_token; localStorage.setItem("hris_token", token); dashboard();
+        } catch (e) { loginView(e.message); }
+      };
+    }
+
+    async function dashboard() {
+      try {
+        const me = await api("/auth/me");
+        const d = await api("/dashboard/enterprise");
+        const card = (label, val) => `<div class="rounded-xl border bg-white p-4"><div class="text-xs uppercase text-slate-500">${label}</div><div class="mt-1 text-2xl font-semibold">${val}</div></div>`;
+        document.getElementById("app").innerHTML = `
+          <div class="mb-4 flex items-center justify-between">${logo()}
+            <div class="text-right text-sm"><div class="font-medium">${me.full_name}</div>
+            <button id="out" class="text-blue-700 underline">Sign out</button></div></div>
+          <h1 class="mb-3 text-lg font-semibold">Enterprise Dashboard</h1>
+          <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+            ${card("Organizations", d.organizations_count)}
+            ${card("Total Personnel", d.total_active_personnel)}
+            ${card("Active Projects", d.active_projects)}
+            ${card("Payroll Net", peso(d.payroll_net_total))}
+            ${card("Regular", d.regular)}${card("Probationary", d.probationary)}
+            ${card("Project-Based", d.project_based)}${card("Consultants", d.consultants)}
+          </div>
+          <p class="mt-6 text-xs text-slate-400">PHP/MySQL foundation running. The full React UI mounts here in the next build increment.</p>`;
+        document.getElementById("out").onclick = () => { token=""; localStorage.removeItem("hris_token"); loginView(); };
+      } catch (e) { token=""; localStorage.removeItem("hris_token"); loginView(e.message); }
+    }
+
+    token ? dashboard() : loginView();
+  </script>
+</body>
+</html>

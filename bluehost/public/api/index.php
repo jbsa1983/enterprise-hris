@@ -1,0 +1,36 @@
+<?php
+// API front controller. All /api/v1/* requests route here.
+require __DIR__ . '/../app/bootstrap.php';
+
+$origin = Config::get('cors_origin');
+if ($origin) {
+    header("Access-Control-Allow-Origin: $origin");
+    header('Access-Control-Allow-Headers: Authorization, Content-Type');
+    header('Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS');
+    header('Vary: Origin');
+}
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(204); exit; }
+
+// Strip everything up to and including /api/v1 to get the route path.
+$uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$prefix = '/api/v1';
+$pos = strpos($uri, $prefix);
+$path = $pos !== false ? substr($uri, $pos + strlen($prefix)) : $uri;
+$path = rtrim($path, '/');
+if ($path === '') $path = '/';
+
+$router = new Router();
+$router->get('/health', fn() => Http::json(['status' => 'ok', 'service' => 'hris-php', 'version' => '1.0.0']));
+AuthController::routes($router);
+OrganizationController::routes($router);
+DashboardController::routes($router);
+PeopleController::routes($router);
+StorageController::routes($router);
+
+try {
+    $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $path);
+} catch (HttpError $e) {
+    Http::error($e->getMessage(), $e->status, $e->extra);
+} catch (Throwable $e) {
+    Http::error('Server error: ' . $e->getMessage(), 500);
+}

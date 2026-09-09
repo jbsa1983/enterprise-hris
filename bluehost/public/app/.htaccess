@@ -1,0 +1,2 @@
+# Deny direct web access to PHP source & config.
+Require all denied

@@ -27,3 +27,6 @@ yarn-error.log*
 # Local backups (never commit data)
 /backups/
 hris-backups/
+
+# Bluehost PHP build — local secrets
+bluehost/public/app/settings.php

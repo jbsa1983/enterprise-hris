@@ -1,0 +1,2 @@
+# Documents/PDFs are served through PHP, never directly.
+Require all denied

@@ -1,0 +1,2 @@
+# If db/ ends up inside your web root, deny direct web access to SQL/seeders.
+Require all denied

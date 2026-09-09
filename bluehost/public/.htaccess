@@ -1,0 +1,25 @@
+# GEEK Group HRIS — Apache config for shared hosting (Bluehost / Zoom)
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Pass the Authorization header through to PHP (CGI/FastCGI often strip it).
+    RewriteCond %{HTTP:Authorization} ^(.+)$
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+
+    # API → PHP front controller.
+    RewriteRule ^api/v1(/.*)?$ api/index.php [QSA,L]
+
+    # SPA fallback: serve index.html for any non-file, non-API route.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} !^/api/
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+# Force HTTPS once your SSL certificate is active (uncomment on production):
+# <IfModule mod_rewrite.c>
+#   RewriteCond %{HTTPS} off
+#   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+# </IfModule>

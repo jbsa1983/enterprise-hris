@@ -1,0 +1,39 @@
+# LOCAL TEST ONLY — emulates a PHP + MySQL host to validate the Bluehost build.
+# Not used in production (Bluehost provides PHP/MySQL/Apache directly).
+#   docker compose -f docker-compose.test.yml up -d
+name: hris-php-test
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: hris
+      MYSQL_USER: hris
+      MYSQL_PASSWORD: hris
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpw"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  php:
+    image: php:8.2-cli
+    working_dir: /app
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: hris
+      DB_USER: hris
+      DB_PASS: hris
+      JWT_SECRET: local-test-secret
+      STORAGE_PATH: /app/public/storage
+    volumes:
+      - ./:/app
+    ports:
+      - "8090:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: bash -c "docker-php-ext-install pdo_mysql >/dev/null 2>&1 && php -S 0.0.0.0:8080 -t /app/public /app/public/router.php"
