@@ -74,6 +74,35 @@ deployment** you want a clean system that the Superadmin builds out.
 `SEED_MODE=minimal` seeds only the permission catalog, the default roles, and the
 one Superadmin — nothing else. Everything after that is created through the UI.
 
+## Backups & restore
+
+Your data lives in Docker volumes (Postgres + MinIO), **not** in git. Back it up:
+
+```bash
+scripts/backup.sh                        # → ~/hris-backups/<timestamp>/
+```
+
+Each backup contains a compressed PostgreSQL dump (`postgres_hris.dump`, restorable
+with `pg_restore`), the MinIO documents (`minio_data.tar.gz`), a `manifest.txt`, and
+`SHA256SUMS`. Old backups are pruned after `RETENTION_DAYS` (default 14). Override
+with `BACKUP_DIR` / `RETENTION_DAYS` env vars.
+
+**Schedule it** (daily 02:00):
+
+```bash
+scripts/install-backup-schedule.sh        # macOS: launchd agent · Linux: prints a cron line
+```
+
+**Restore** a backup (overwrites current data; stops the app while it works):
+
+```bash
+scripts/restore.sh ~/hris-backups/<timestamp>
+```
+
+Keep at least one copy **off this machine** (a backup on the same disk doesn't
+survive disk loss) — sync `~/hris-backups` to external/cloud storage. Note: backups
+contain live data but **not** `.env`; store your secrets separately and securely.
+
 ## Administration & access control (Superadmin)
 
 The **Superadmin** runs the system from the sidebar's **Administration** section:

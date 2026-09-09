@@ -23,3 +23,7 @@ yarn-error.log*
 
 # Data
 *.sqlite3
+
+# Local backups (never commit data)
+/backups/
+hris-backups/
