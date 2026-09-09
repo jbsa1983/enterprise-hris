@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     # General
     env: str = "development"
-    project_name: str = "Enterprise HRIS Prototype"
+    project_name: str = "GEEK Group — Enterprise HRIS"
     api_v1_prefix: str = "/api/v1"
 
     # Database

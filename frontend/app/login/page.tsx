@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
+import GeekLogo from "@/components/GeekLogo";
+import { GEEK_CYCLE } from "@/lib/geek";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,11 +28,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-brand-900 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex h-1.5 w-full">
+          {GEEK_CYCLE.map((c) => (
+            <div key={c} className="flex-1" style={{ backgroundColor: c }} />
+          ))}
+        </div>
+        <div className="p-8">
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-slate-900">Enterprise HRIS</h1>
-          <p className="text-sm text-slate-500">Multi-company Philippine HRIS — Prototype</p>
+          <GeekLogo onDark={false} subtitle="" size="lg" />
+          <p className="mt-3 text-sm text-slate-500">Enterprise HRIS — Multi-company Philippine payroll &amp; HR</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
@@ -66,6 +74,7 @@ export default function LoginPage() {
           <div className="font-medium text-slate-600">Demo credentials</div>
           <div>Super Admin — admin@demo-hris.local / Admin123!</div>
           <div>Org user — hr.exg@demo-hris.local / Demo123!</div>
+        </div>
         </div>
       </div>
     </div>

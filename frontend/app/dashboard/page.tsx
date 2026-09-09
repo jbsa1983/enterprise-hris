@@ -7,6 +7,7 @@ import StatCard from "@/components/StatCard";
 import StorageWidget from "@/components/StorageWidget";
 import { apiFetch } from "@/lib/api";
 import { peso, num } from "@/lib/format";
+import { geekColor } from "@/lib/geek";
 
 interface EnterpriseDash {
   organizations_count: number;
@@ -54,10 +55,10 @@ export default function EnterpriseDashboardPage() {
             <StatCard label="Total Active Personnel" value={num(data.total_active_personnel)} />
             <StatCard label="Active Projects" value={num(data.active_projects)} />
             <StatCard label="Pending Approvals" value={num(data.pending_approvals)} />
-            <StatCard label="Regular" value={num(data.regular)} />
-            <StatCard label="Probationary" value={num(data.probationary)} />
-            <StatCard label="Project-Based" value={num(data.project_based)} />
-            <StatCard label="Consultants" value={num(data.consultants)} />
+            <StatCard label="Regular" value={num(data.regular)} accent="#EA4335" />
+            <StatCard label="Probationary" value={num(data.probationary)} accent="#F9AB00" />
+            <StatCard label="Project-Based" value={num(data.project_based)} accent="#34A853" />
+            <StatCard label="Consultants" value={num(data.consultants)} accent="#4285F4" />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -82,8 +83,8 @@ export default function EnterpriseDashboardPage() {
                       </div>
                       <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                         <div
-                          className="h-full rounded-full bg-brand-600"
-                          style={{ width: `${(o.personnel / max) * 100}%` }}
+                          className="h-full rounded-full"
+                          style={{ width: `${(o.personnel / max) * 100}%`, backgroundColor: geekColor(data.employee_distribution.indexOf(o)) }}
                         />
                       </div>
                     </div>

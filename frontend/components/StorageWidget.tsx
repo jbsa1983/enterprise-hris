@@ -23,7 +23,7 @@ export default function StorageWidget() {
       }
     }
     load();
-    // Prototype: refresh every 30 seconds (real-time storage monitoring).
+    // Refresh every 30 seconds (real-time storage monitoring).
     const interval = setInterval(load, 30_000);
     return () => {
       active = false;
@@ -76,7 +76,7 @@ export default function StorageWidget() {
       </div>
       <div className="mt-3 text-[11px] text-slate-400">
         Auto-refresh every {data.refresh_seconds}s
-        {data.simulated_capacity ? " · simulated capacity (prototype)" : ""}
+        {data.simulated_capacity ? " · simulated capacity" : ""}
       </div>
     </div>
   );

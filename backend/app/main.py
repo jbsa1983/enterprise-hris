@@ -11,8 +11,8 @@ app = FastAPI(
     title=settings.project_name,
     version="0.1.0",
     description=(
-        "Enterprise HRIS Prototype API. PROTOTYPE ONLY — seeded statutory values "
-        "are illustrative and not authoritative Philippine payroll rates."
+        "GEEK Group Enterprise HRIS API. Note: seeded statutory values are "
+        "illustrative and must be validated before running real Philippine payroll."
     ),
 )
 

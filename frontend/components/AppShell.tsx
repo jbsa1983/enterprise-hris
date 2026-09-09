@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch, clearTokens, getAccessToken } from "@/lib/api";
 import type { CurrentUser } from "@/lib/types";
+import GeekLogo from "@/components/GeekLogo";
 
 const NAV = [
   { label: "Enterprise Dashboard", href: (o?: number) => "/dashboard" },
@@ -75,8 +76,7 @@ export default function AppShell({
       {/* Sidebar */}
       <aside className="hidden w-60 flex-shrink-0 flex-col bg-brand-900 text-slate-100 md:flex">
         <div className="border-b border-white/10 px-5 py-4">
-          <div className="text-sm font-semibold tracking-wide">ENTERPRISE HRIS</div>
-          <div className="text-[11px] text-slate-300">Prototype</div>
+          <GeekLogo onDark subtitle="Enterprise HRIS" />
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">
           {NAV.map((item) => {
@@ -89,7 +89,7 @@ export default function AppShell({
                 href={disabled ? "#" : href}
                 className={`block rounded-lg px-3 py-2 text-sm ${
                   active
-                    ? "bg-white/15 font-medium text-white"
+                    ? "bg-geek-blue/25 font-medium text-white ring-1 ring-geek-blue/40"
                     : disabled
                       ? "cursor-not-allowed text-slate-500"
                       : "text-slate-200 hover:bg-white/10"
@@ -109,7 +109,7 @@ export default function AppShell({
               const active = pathname === item.href;
               return (
                 <Link key={item.label} href={item.href}
-                  className={`block rounded-lg px-3 py-2 text-sm ${active ? "bg-white/15 font-medium text-white" : "text-slate-200 hover:bg-white/10"}`}>
+                  className={`block rounded-lg px-3 py-2 text-sm ${active ? "bg-geek-blue/25 font-medium text-white ring-1 ring-geek-blue/40" : "text-slate-200 hover:bg-white/10"}`}>
                   {item.label}
                 </Link>
               );
@@ -117,7 +117,7 @@ export default function AppShell({
           </div>
         ) : null}
         <div className="border-t border-white/10 px-5 py-3 text-[11px] text-slate-400">
-          Enterprise HRIS
+          GEEK Group · Enterprise HRIS
         </div>
       </aside>
 

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Enterprise HRIS Prototype",
-  description: "Multi-company Philippine HRIS — prototype",
+  title: "GEEK Group — Enterprise HRIS",
+  description: "Multi-company Philippine HRIS by GEEK Group",
 };
 
 export default function RootLayout({
