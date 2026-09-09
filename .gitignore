@@ -31,3 +31,5 @@ hris-backups/
 # Bluehost PHP build — local secrets
 bluehost/public/app/settings.php
 bluehost/*.zip
+bluehost/spa/node_modules
+bluehost/spa/dist

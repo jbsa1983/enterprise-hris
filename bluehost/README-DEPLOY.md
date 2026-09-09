@@ -110,11 +110,20 @@ docker compose -f docker-compose.test.yml down    # stop
   leave, attendance, loans, contributions, change password
 - **Admin**: users, roles & permission scopes, **bulk-provision employee logins**,
   organizations
-- GEEK-branded front-end (login → dashboard) proving the stack
+- **Full React SPA** front-end (the same GEEK UI as the Docker build) — static
+  files talking to the PHP API. Pages whose backend is ported (dashboards, people,
+  payroll, payslips, ESS, admin) are fully live; the rest render and light up as
+  their controllers are ported.
 
 **Porting next:** bank export, loans/projects-budget/attendance-import/13th-month/
-recruitment/assets/reports controllers, and swapping the foundation page for the
-**full React SPA** built from the existing UI.
+recruitment/assets/reports controllers (the SPA pages already exist and call them).
+
+### Rebuilding the SPA (optional; only if you change the UI source in `spa/`)
+```bash
+cd spa && npm install && npm run build   # outputs spa/dist
+cd .. && ./package.sh                     # re-bundles the ZIP
+```
+The deployable ZIP already contains the built SPA — you don't need Node on the host.
 
 > Payslips are delivered as a **printable HTML page** (Save-as-PDF) in this shared-
 > hosting build. A true binary-PDF path (mPDF via cron for bulk) can be added.
