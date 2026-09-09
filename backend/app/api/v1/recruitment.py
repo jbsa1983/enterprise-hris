@@ -10,17 +10,47 @@ from app.core.database import get_db
 from app.core.deps import require_org_access, require_permission
 from app.models.enums import EngagementType
 from app.models.person import Engagement, Person
+from app.models.project import Project
 from app.models.recruitment import Applicant, JobApplication, JobRequisition
 
 router = APIRouter(prefix="/organizations/{organization_id}/recruitment", tags=["recruitment"])
 _STAGES = ["NEW", "SCREENING", "INTERVIEW", "OFFER", "HIRED", "REJECTED"]
 
 
+def _requisition_dict(db: Session, r: JobRequisition) -> dict:
+    proj = db.get(Project, r.project_id) if r.project_id else None
+    return {
+        "id": r.id, "uuid": r.uuid, "title": r.title, "headcount": r.headcount, "status": r.status,
+        "job_description": r.job_description, "placement_type": r.placement_type,
+        "employment_type": r.employment_type, "project_id": r.project_id,
+        "project_name": proj.project_name if proj else None,
+        "department_id": r.department_id,
+        "target_start_date": r.target_start_date.isoformat() if r.target_start_date else None,
+        "target_end_date": r.target_end_date.isoformat() if r.target_end_date else None,
+        "budget": float(r.budget) if r.budget is not None else None,
+    }
+
+
+def _apply_requisition(r: JobRequisition, data: dict) -> None:
+    if "title" in data and data["title"]:
+        r.title = data["title"]
+    for f in ("headcount", "department_id", "project_id", "job_description",
+              "employment_type", "budget", "status"):
+        if f in data and data[f] is not None:
+            setattr(r, f, data[f])
+    if "placement_type" in data and data["placement_type"]:
+        r.placement_type = data["placement_type"].upper()
+        if r.placement_type == "OFFICE":
+            r.project_id = None  # office/org worker → not tied to a project
+    for f in ("target_start_date", "target_end_date"):
+        if data.get(f):
+            setattr(r, f, date.fromisoformat(data[f]))
+
+
 @router.get("/requisitions", dependencies=[Depends(require_permission("employee.view"))])
 def list_requisitions(organization_id: int, _: int = Depends(require_org_access), db: Session = Depends(get_db)):
-    rows = db.query(JobRequisition).filter(JobRequisition.organization_id == organization_id).all()
-    return [{"id": r.id, "uuid": r.uuid, "title": r.title, "headcount": r.headcount, "status": r.status}
-            for r in rows]
+    rows = db.query(JobRequisition).filter(JobRequisition.organization_id == organization_id).order_by(JobRequisition.id.desc()).all()
+    return [_requisition_dict(db, r) for r in rows]
 
 
 @router.post("/requisitions", dependencies=[Depends(require_permission("employee.edit"))])
@@ -28,12 +58,36 @@ def create_requisition(
     organization_id: int, payload: dict = Body(...),
     _: int = Depends(require_org_access), db: Session = Depends(get_db),
 ):
+    if not payload.get("title"):
+        raise HTTPException(status_code=422, detail="title is required")
     r = JobRequisition(organization_id=organization_id, title=payload["title"],
-                       department_id=payload.get("department_id"), project_id=payload.get("project_id"),
-                       headcount=payload.get("headcount", 1), status="OPEN")
+                       headcount=payload.get("headcount", 1), status="OPEN", placement_type="OFFICE")
+    _apply_requisition(r, payload)
     db.add(r)
     db.commit()
-    return {"id": r.id}
+    return _requisition_dict(db, r)
+
+
+@router.put("/requisitions/{req_id}", dependencies=[Depends(require_permission("employee.edit"))])
+def update_requisition(organization_id: int, req_id: int, payload: dict = Body(...),
+                       _: int = Depends(require_org_access), db: Session = Depends(get_db)):
+    r = db.get(JobRequisition, req_id)
+    if not r or r.organization_id != organization_id:
+        raise HTTPException(status_code=404, detail="Requisition not found")
+    _apply_requisition(r, payload)
+    db.commit()
+    return _requisition_dict(db, r)
+
+
+@router.delete("/requisitions/{req_id}", dependencies=[Depends(require_permission("employee.edit"))])
+def delete_requisition(organization_id: int, req_id: int, _: int = Depends(require_org_access),
+                       db: Session = Depends(get_db)):
+    r = db.get(JobRequisition, req_id)
+    if not r or r.organization_id != organization_id:
+        raise HTTPException(status_code=404, detail="Requisition not found")
+    db.delete(r)
+    db.commit()
+    return {"deleted": req_id}
 
 
 @router.get("/applicants", dependencies=[Depends(require_permission("employee.view"))])

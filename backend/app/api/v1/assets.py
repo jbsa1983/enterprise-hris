@@ -53,6 +53,35 @@ def create_asset(
     return {"id": a.id}
 
 
+@router.put("/{asset_id}", dependencies=[Depends(require_permission("employee.edit"))])
+def update_asset(
+    organization_id: int, asset_id: int, payload: dict = Body(...),
+    _: int = Depends(require_org_access), db: Session = Depends(get_db),
+):
+    a = db.get(Asset, asset_id)
+    if not a or a.organization_id != organization_id:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    for f in ("asset_number", "item", "serial_number", "is_employee_payable", "assigned_person_id",
+              "cost", "employee_share", "installment", "outstanding_balance", "condition", "status"):
+        if f in payload and payload[f] is not None:
+            setattr(a, f, payload[f])
+    db.commit()
+    return {"id": a.id, "item": a.item, "status": a.status}
+
+
+@router.delete("/{asset_id}", dependencies=[Depends(require_permission("employee.edit"))])
+def delete_asset(
+    organization_id: int, asset_id: int,
+    _: int = Depends(require_org_access), db: Session = Depends(get_db),
+):
+    a = db.get(Asset, asset_id)
+    if not a or a.organization_id != organization_id:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    db.delete(a)
+    db.commit()
+    return {"deleted": asset_id}
+
+
 @router.post("/{asset_id}/return", dependencies=[Depends(require_permission("employee.edit"))])
 def return_asset(
     organization_id: int, asset_id: int, payload: dict = Body(default={}),

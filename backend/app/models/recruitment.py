@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -20,6 +20,15 @@ class JobRequisition(Base, UUIDMixin, TimestampMixin):
     project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), nullable=True)
     headcount: Mapped[int] = mapped_column(Integer, default=1)
     status: Mapped[str] = mapped_column(String(20), default="OPEN", index=True)  # OPEN/ON_HOLD/FILLED/CLOSED
+
+    # Requisition detail
+    job_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Where the hire is for: PROJECT (project-based) or OFFICE (office/organization worker).
+    placement_type: Mapped[str] = mapped_column(String(20), default="OFFICE")
+    employment_type: Mapped[str | None] = mapped_column(String(40), nullable=True)  # target engagement type
+    target_start_date: Mapped[date | None] = mapped_column(Date, nullable=True)     # needed by
+    target_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)       # engagement end (if fixed)
+    budget: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)      # monthly salary budget
 
 
 class Applicant(Base, UUIDMixin, TimestampMixin):
