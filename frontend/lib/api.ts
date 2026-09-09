@@ -106,6 +106,20 @@ export async function apiDownload(path: string, filename: string, options: Reque
   URL.revokeObjectURL(url);
 }
 
+// Upload a file (multipart/form-data) with auth; returns parsed JSON.
+export async function apiUpload<T = any>(path: string, formData: FormData): Promise<T> {
+  const token = getAccessToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: formData });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail || detail; } catch { /* ignore */ }
+    throw new ApiError(res.status, detail);
+  }
+  return (await res.json()) as T;
+}
+
 // Open a binary endpoint (e.g. a PDF) inline in a new tab.
 export async function apiOpen(path: string, options: RequestInit = {}) {
   const blob = await apiBlob(path, options);

@@ -14,6 +14,8 @@ from app.models.attendance import (
 )
 from app.models.audit import AuditLog
 from app.models.bank import BankExportColumn, BankExportRun, BankExportTemplate
+from app.models.budget import ProjectBudgetAllocation
+from app.models.specialpay import SpecialPayLine, SpecialPayRun
 from app.models.enums import (
     EngagementStatus,
     EngagementType,

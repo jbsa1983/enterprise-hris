@@ -14,6 +14,8 @@ const NAV = [
   { label: "Consultants", href: (o?: number) => (o ? `/o/${o}/people?type=consultants` : "#") },
   { label: "Projects", href: (o?: number) => (o ? `/o/${o}/projects` : "#") },
   { label: "Payroll", href: (o?: number) => (o ? `/o/${o}/payroll` : "#") },
+  { label: "13th Month & Bonuses", href: (o?: number) => (o ? `/o/${o}/special-pay` : "#") },
+  { label: "Loans & Advances", href: (o?: number) => (o ? `/o/${o}/loans` : "#") },
   { label: "Leave & Attendance", href: (o?: number) => (o ? `/o/${o}/leave` : "#") },
   { label: "Assets", href: (o?: number) => (o ? `/o/${o}/assets` : "#") },
   { label: "Recruitment", href: (o?: number) => (o ? `/o/${o}/recruitment` : "#") },

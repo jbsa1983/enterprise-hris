@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import AppShell from "@/components/AppShell";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiDownload, apiUpload } from "@/lib/api";
 import { statusColor } from "@/lib/format";
 
 export default function LeavePage() {
@@ -11,6 +11,7 @@ export default function LeavePage() {
   const [leave, setLeave] = useState<any[]>([]);
   const [ot, setOt] = useState<any[]>([]);
   const [att, setAtt] = useState<any[]>([]);
+  const [importMsg, setImportMsg] = useState("");
 
   const load = useCallback(() => {
     apiFetch(`/organizations/${orgId}/leave`).then(setLeave).catch(() => setLeave([]));
@@ -82,6 +83,39 @@ export default function LeavePage() {
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <div className="card mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium text-slate-700">Import Time Logs</div>
+            <div className="text-xs text-slate-500">Upload monthly biometric/timekeeping logs (CSV or Excel). Match is by employee number.</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+              onClick={() => apiDownload(`/organizations/${orgId}/attendance/template`, "attendance_template.csv")}>
+              Download template
+            </button>
+            <label className="btn-primary cursor-pointer">
+              Upload file
+              <input type="file" accept=".csv,.xlsx" className="hidden" onChange={async (e) => {
+                const f = e.target.files?.[0]; if (!f) return;
+                setImportMsg("Uploading…");
+                try {
+                  const fd = new FormData(); fd.append("file", f);
+                  const r = await apiUpload<any>(`/organizations/${orgId}/attendance/import`, fd);
+                  setImportMsg(`Imported ${r.imported}, updated ${r.updated}${r.error_count ? `, ${r.error_count} error(s)` : ""}.`);
+                  load(); e.target.value = "";
+                } catch (er: any) { setImportMsg(er.message); }
+              }} />
+            </label>
+          </div>
+        </div>
+        {importMsg ? <div className="mt-2 text-sm text-slate-600">{importMsg}</div> : null}
+        <div className="mt-2 text-[11px] text-slate-400">
+          Format: <code>employee_number, log_date (YYYY-MM-DD), time_in, time_out, hours_worked, late_minutes, overtime_hours, status</code>.
+          Biometric devices/APIs can also POST to <code>/api/v1/organizations/{orgId}/attendance/device</code>.
         </div>
       </div>
 

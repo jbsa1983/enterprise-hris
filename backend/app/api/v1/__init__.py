@@ -10,6 +10,7 @@ from app.api.v1 import (
     bank,
     dashboard,
     hrmodules,
+    loans,
     orgadmin,
     organizations,
     payroll,
@@ -18,6 +19,7 @@ from app.api.v1 import (
     projects,
     recruitment,
     reports,
+    specialpay,
     storage,
     workflow,
 )
@@ -38,6 +40,8 @@ api_router.include_router(payslips.ess_router)
 # Bank export & reports (Phase 5)
 api_router.include_router(bank.router)
 api_router.include_router(reports.router)
+api_router.include_router(loans.router)
+api_router.include_router(specialpay.router)
 # Workforce (Phase 2)
 api_router.include_router(attendance.router)
 api_router.include_router(assets.router)

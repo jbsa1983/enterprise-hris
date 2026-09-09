@@ -118,10 +118,46 @@ def _statutory(db: Session, org_id: int) -> list[dict]:
     return out
 
 
+def _payroll_by_period(db: Session, org_id: int) -> list[dict]:
+    from app.models.payroll import PayrollPeriod
+
+    rows = (
+        db.query(PayrollPeriod.name,
+                 func.coalesce(func.sum(PayrollRunPerson.gross_pay), 0),
+                 func.coalesce(func.sum(PayrollRunPerson.total_deductions), 0),
+                 func.coalesce(func.sum(PayrollRunPerson.net_pay), 0),
+                 func.count(PayrollRunPerson.id))
+        .join(PayrollRun, PayrollRun.period_id == PayrollPeriod.id)
+        .join(PayrollRunPerson, PayrollRunPerson.run_id == PayrollRun.id)
+        .filter(PayrollPeriod.organization_id == org_id)
+        .group_by(PayrollPeriod.id, PayrollPeriod.name)
+        .all()
+    )
+    return [{"period": name, "headcount": int(hc), "gross": float(g), "deductions": float(d), "net": float(n)}
+            for name, g, d, n, hc in rows]
+
+
+def _payroll_by_project(db: Session, org_id: int) -> list[dict]:
+    rows = (
+        db.query(Project.project_code, Project.project_name,
+                 func.coalesce(func.sum(PayrollRunPerson.gross_pay), 0),
+                 func.count(func.distinct(Engagement.id)))
+        .join(Engagement, Engagement.project_id == Project.id)
+        .join(PayrollRunPerson, PayrollRunPerson.engagement_id == Engagement.id)
+        .filter(Project.organization_id == org_id)
+        .group_by(Project.id, Project.project_code, Project.project_name)
+        .all()
+    )
+    return [{"project_code": c, "project_name": n, "headcount": int(hc), "total_cost": float(cost)}
+            for c, n, cost, hc in rows]
+
+
 DATASETS = {
     "employees": _employees,
     "consultants": _consultants,
     "payroll": _payroll,
+    "payroll_by_period": _payroll_by_period,
+    "payroll_by_project": _payroll_by_project,
     "loans": _loans,
     "projects": _projects,
     "statutory_contributions": _statutory,

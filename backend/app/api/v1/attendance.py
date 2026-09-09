@@ -1,19 +1,125 @@
 """Attendance, leave, and overtime (Phase 2) — org-scoped."""
 from __future__ import annotations
 
+import csv
+import io
 from datetime import date
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Request, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_org_access, require_permission
 from app.models.attendance import AttendanceLog, LeaveType
 from app.models.hr import LeaveRequest, OvertimeRequest
+from app.models.person import Engagement
 from app.models.user import User
 from app.services import audit_service
 
 router = APIRouter(prefix="/organizations/{organization_id}", tags=["attendance-leave"])
+
+# Columns accepted by the attendance importer (also the template header order).
+IMPORT_COLUMNS = ["employee_number", "log_date", "time_in", "time_out",
+                  "hours_worked", "late_minutes", "overtime_hours", "status"]
+
+
+def _to_num(v, default=0):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _ingest_rows(db: Session, organization_id: int, rows: list[dict]) -> dict:
+    """Match rows to engagements by employee_number; upsert AttendanceLog by date."""
+    emp_map = {
+        e.employee_number: e.id
+        for e in db.query(Engagement).filter(Engagement.organization_id == organization_id,
+                                             Engagement.employee_number.isnot(None)).all()
+    }
+    imported, updated, errors = 0, 0, []
+    for i, row in enumerate(rows, start=1):
+        emp_no = str(row.get("employee_number", "")).strip()
+        if not emp_no or emp_no not in emp_map:
+            errors.append(f"row {i}: unknown employee_number '{emp_no}'")
+            continue
+        raw_date = str(row.get("log_date") or row.get("date") or "").strip()
+        try:
+            log_date = date.fromisoformat(raw_date)
+        except ValueError:
+            errors.append(f"row {i}: invalid date '{raw_date}' (expected YYYY-MM-DD)")
+            continue
+        eng_id = emp_map[emp_no]
+        existing = (db.query(AttendanceLog)
+                    .filter(AttendanceLog.engagement_id == eng_id, AttendanceLog.log_date == log_date).first())
+        target = existing or AttendanceLog(organization_id=organization_id, engagement_id=eng_id, log_date=log_date)
+        target.hours_worked = _to_num(row.get("hours_worked"), 8)
+        target.late_minutes = int(_to_num(row.get("late_minutes"), 0))
+        target.overtime_hours = _to_num(row.get("overtime_hours"), 0)
+        target.status = str(row.get("status") or "PRESENT").strip() or "PRESENT"
+        target.source = row.get("source", "CSV")
+        if existing:
+            updated += 1
+        else:
+            db.add(target)
+            imported += 1
+    db.commit()
+    return {"imported": imported, "updated": updated, "errors": errors[:50], "error_count": len(errors)}
+
+
+@router.get("/attendance/template", dependencies=[Depends(require_permission("attendance.view"))])
+def attendance_template(organization_id: int, _: int = Depends(require_org_access)) -> Response:
+    """Downloadable CSV template with the exact headers and a sample row."""
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\n")
+    w.writerow(IMPORT_COLUMNS)
+    w.writerow(["EMP-1000", date.today().isoformat(), "08:00", "17:00", "8", "0", "0", "PRESENT"])
+    return Response(content=buf.getvalue().encode("utf-8"), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="attendance_template.csv"'})
+
+
+@router.get("/attendance/format", dependencies=[Depends(require_permission("attendance.view"))])
+def attendance_format(organization_id: int, _: int = Depends(require_org_access)) -> dict:
+    return {
+        "columns": IMPORT_COLUMNS,
+        "notes": "One row per employee per day. Match is by employee_number. Dates are YYYY-MM-DD, "
+                 "times HH:MM (optional). Re-importing the same employee+date updates that day.",
+        "accepts": ["CSV (.csv)", "Excel (.xlsx)", "JSON via /attendance/device for biometric devices/APIs"],
+    }
+
+
+@router.post("/attendance/import", dependencies=[Depends(require_permission("attendance.edit"))])
+async def import_attendance(organization_id: int, _: int = Depends(require_org_access),
+                            file: UploadFile = File(...), db: Session = Depends(get_db)) -> dict:
+    content = await file.read()
+    name = (file.filename or "").lower()
+    rows: list[dict] = []
+    if name.endswith(".xlsx"):
+        from openpyxl import load_workbook
+
+        wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        ws = wb.active
+        header = None
+        for r in ws.iter_rows(values_only=True):
+            if header is None:
+                header = [str(c).strip() if c is not None else "" for c in r]
+                continue
+            rows.append({header[i]: r[i] for i in range(min(len(header), len(r)))})
+    else:
+        text = content.decode("utf-8-sig", errors="replace")
+        rows = list(csv.DictReader(io.StringIO(text)))
+    return _ingest_rows(db, organization_id, rows)
+
+
+@router.post("/attendance/device", dependencies=[Depends(require_permission("attendance.edit"))])
+def import_attendance_device(organization_id: int, payload: dict = Body(...),
+                             _: int = Depends(require_org_access), db: Session = Depends(get_db)) -> dict:
+    """Generic ingestion endpoint for biometric devices / integrations.
+    Body: {"logs": [{employee_number, log_date, time_in, time_out, hours_worked, ...}, ...]}"""
+    logs = payload.get("logs") or []
+    if not isinstance(logs, list):
+        raise HTTPException(status_code=422, detail="'logs' must be a list")
+    return _ingest_rows(db, organization_id, logs)
 
 
 # --- Attendance --------------------------------------------------------------

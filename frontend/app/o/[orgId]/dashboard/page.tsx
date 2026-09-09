@@ -56,26 +56,27 @@ export default function OrgDashboardPage() {
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Active Personnel" value={num(data.total_active_personnel)} />
-            <StatCard label="Project-Based" value={num(data.project_based)} />
-            <StatCard label="Consultants" value={num(data.consultants)} />
-            <StatCard label="Departments" value={num(data.departments)} />
-            <StatCard label="Active Projects" value={num(data.active_projects)} />
+            <StatCard label="Active Personnel" value={num(data.total_active_personnel)} href={`/o/${orgId}/people`} />
+            <StatCard label="Project-Based" value={num(data.project_based)} href={`/o/${orgId}/people`} />
+            <StatCard label="Consultants" value={num(data.consultants)} href={`/o/${orgId}/people?type=consultants`} />
+            <StatCard label="Departments" value={num(data.departments)} href={`/o/${orgId}/people`} />
+            <StatCard label="Active Projects" value={num(data.active_projects)} href={`/o/${orgId}/projects`} />
             <StatCard
               label="Payroll Status"
               value={<span className="text-base">{data.payroll_period_status}</span>}
+              href={`/o/${orgId}/payroll`}
             />
-            <StatCard label="Pending Leave" value={num(data.pending_leave_approvals)} />
-            <StatCard label="Pending OT" value={num(data.pending_overtime_approvals)} />
+            <StatCard label="Pending Leave" value={num(data.pending_leave_approvals)} href={`/o/${orgId}/leave`} />
+            <StatCard label="Pending OT" value={num(data.pending_overtime_approvals)} href={`/o/${orgId}/leave`} />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="card lg:col-span-2">
               <div className="stat-label mb-3">Latest Payroll Run</div>
               <div className="grid grid-cols-3 gap-4">
-                <StatCard label="Gross Payroll" value={peso(data.gross_payroll)} />
-                <StatCard label="Total Deductions" value={peso(data.total_deductions)} />
-                <StatCard label="Net Payroll" value={peso(data.net_payroll)} />
+                <StatCard label="Gross Payroll" value={peso(data.gross_payroll)} href={`/o/${orgId}/payroll`} />
+                <StatCard label="Total Deductions" value={peso(data.total_deductions)} href={`/o/${orgId}/payroll`} />
+                <StatCard label="Net Payroll" value={peso(data.net_payroll)} href={`/o/${orgId}/payroll`} />
               </div>
               <div className="mt-5 border-t border-slate-100 pt-4">
                 <div className="stat-label mb-2">Contracts Expiring</div>
