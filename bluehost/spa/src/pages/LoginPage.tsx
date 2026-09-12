@@ -7,8 +7,8 @@ import { GEEK_CYCLE } from "@/lib/geek";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@demo-hris.local");
-  const [password, setPassword] = useState("Admin123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -69,11 +69,6 @@ export default function LoginPage() {
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
-        <div className="mt-6 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-          <div className="font-medium text-slate-600">Demo credentials</div>
-          <div>Super Admin — admin@demo-hris.local / Admin123!</div>
-          <div>Org user — hr.exg@demo-hris.local / Demo123!</div>
-        </div>
         </div>
       </div>
     </div>
