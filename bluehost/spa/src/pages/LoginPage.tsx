@@ -11,6 +11,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const timedOut =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("timeout") === "1";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,6 +41,11 @@ export default function LoginPage() {
           <GeekLogo onDark={false} subtitle="" size="lg" />
           <p className="mt-3 text-sm text-slate-500">Enterprise HRIS — Multi-company Philippine payroll &amp; HR</p>
         </div>
+        {timedOut ? (
+          <div className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            You were signed out after 15 minutes of inactivity. Please sign in again.
+          </div>
+        ) : null}
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>

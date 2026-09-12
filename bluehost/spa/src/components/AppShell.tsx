@@ -3,8 +3,12 @@ import Link from "@/lib/Link";
 import { usePathname, useRouter } from "@/lib/nav";
 import { useEffect, useState } from "react";
 import { apiFetch, clearTokens, getAccessToken } from "@/lib/api";
+import { useIdleLogout } from "@/lib/useIdleLogout";
 import type { CurrentUser } from "@/lib/types";
 import GeekLogo from "@/components/GeekLogo";
+
+// Sign out after this many minutes of no user activity.
+const IDLE_MINUTES = 15;
 
 const NAV = [
   { label: "Enterprise Dashboard", href: (o?: number) => "/dashboard" },
@@ -42,6 +46,8 @@ export default function AppShell({
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [orgs, setOrgs] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useIdleLogout(IDLE_MINUTES);
 
   useEffect(() => {
     if (!getAccessToken()) {
