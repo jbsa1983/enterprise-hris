@@ -22,7 +22,7 @@ mkdir -p "$STAGE"
 
 # 2. PHP backend (api/, app/, storage/, .htaccess) — drop the dev router and the
 #    foundation index.html (the SPA provides index.html instead).
-rsync -a --exclude 'router.php' --exclude 'index.html' --exclude 'app/settings.php' public/ "$STAGE/"
+rsync -a --exclude 'router.php' --exclude 'index.html' --exclude 'app/settings.php' --exclude 'app/installed-license.php' public/ "$STAGE/"
 
 # 3. The built SPA (index.html + assets/) as the web-root front-end.
 rsync -a spa/dist/ "$STAGE/"
