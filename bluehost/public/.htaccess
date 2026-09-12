@@ -1,10 +1,16 @@
 # GEEK Group HRIS — Apache config for shared hosting (Bluehost / Zoom)
 Options -Indexes
 
+# --- Make the Authorization (Bearer token) header reach PHP -------------------
+# Shared hosting (LiteSpeed/CGI/FastCGI) often strips it, which causes random
+# "logged out" behaviour. These give PHP several ways to receive it.
+<IfModule mod_setenvif.c>
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Pass the Authorization header through to PHP (CGI/FastCGI often strip it).
     RewriteCond %{HTTP:Authorization} ^(.+)$
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
 

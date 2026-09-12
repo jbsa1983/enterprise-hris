@@ -8,14 +8,26 @@ class Auth
     private static function bearerToken(): ?string
     {
         $hdr = null;
-        if (isset($_SERVER['HTTP_AUTHORIZATION'])) $hdr = $_SERVER['HTTP_AUTHORIZATION'];
-        elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) $hdr = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-        elseif (function_exists('getallheaders')) {
+        // 1. LiteSpeed/Apache usually expose the header via getallheaders().
+        if (function_exists('getallheaders')) {
             foreach (getallheaders() as $k => $v) {
                 if (strcasecmp($k, 'Authorization') === 0) { $hdr = $v; break; }
             }
         }
-        if ($hdr && preg_match('/Bearer\s+(.+)/i', $hdr, $m)) return trim($m[1]);
+        // 2. Some builds expose it only via apache_request_headers().
+        if (!$hdr && function_exists('apache_request_headers')) {
+            foreach (apache_request_headers() as $k => $v) {
+                if (strcasecmp($k, 'Authorization') === 0) { $hdr = $v; break; }
+            }
+        }
+        // 3. CGI/FCGI: it may land in $_SERVER under HTTP_AUTHORIZATION or one/more
+        //    REDIRECT_ prefixes (REDIRECT_HTTP_AUTHORIZATION, REDIRECT_REDIRECT_...).
+        if (!$hdr) {
+            foreach ($_SERVER as $k => $v) {
+                if (substr($k, -18) === 'HTTP_AUTHORIZATION') { $hdr = $v; break; }
+            }
+        }
+        if ($hdr && preg_match('/Bearer\s+(.+)/i', (string) $hdr, $m)) return trim($m[1]);
         return null;
     }
 
