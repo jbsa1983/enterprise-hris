@@ -4,7 +4,7 @@ import AppShell from "@/components/AppShell";
 import { apiFetch, apiOpen } from "@/lib/api";
 import { peso } from "@/lib/format";
 
-const TABS = ["Profile", "Payslips", "13th Month", "Leave", "Attendance", "Loans", "Contributions", "Security"];
+const TABS = ["Profile", "Payslips", "13th Month", "Leave", "Attendance", "Overtime", "Loans", "Contributions", "Security"];
 const LOAN_TYPES = ["CASH_ADVANCE", "COMPANY_LOAN", "SALARY_LOAN", "EMERGENCY_LOAN", "TRAVEL_ADVANCE", "OTHER"];
 const loanLabel = (t: string) => t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -14,6 +14,7 @@ export default function SelfServicePage() {
   const [payslips, setPayslips] = useState<any[]>([]);
   const [leave, setLeave] = useState<any[]>([]);
   const [att, setAtt] = useState<any[]>([]);
+  const [ot, setOt] = useState<any[]>([]);
   const [loans, setLoans] = useState<any[]>([]);
   const [contrib, setContrib] = useState<any[]>([]);
   const [special, setSpecial] = useState<any[]>([]);
@@ -23,6 +24,7 @@ export default function SelfServicePage() {
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
   const [leaveForm, setLeaveForm] = useState<any>({ leave_type: "", date_from: "", date_to: "", days: "" });
   const [loanForm, setLoanForm] = useState<any>({ obligation_type: "CASH_ADVANCE", principal: "", description: "" });
+  const [otForm, setOtForm] = useState<any>({ ot_date: "", hours: "" });
 
   const load = useCallback(() => {
     apiFetch("/me/profile").then(setProfile).catch((e) => setErr(e.message));
@@ -30,6 +32,7 @@ export default function SelfServicePage() {
     apiFetch("/me/leave").then(setLeave).catch(() => {});
     apiFetch("/me/leave-types").then(setLeaveTypes).catch(() => {});
     apiFetch("/me/attendance").then(setAtt).catch(() => {});
+    apiFetch("/me/overtime").then(setOt).catch(() => {});
     apiFetch("/me/loans").then(setLoans).catch(() => {});
     apiFetch("/me/special-pay").then(setSpecial).catch(() => {});
     apiFetch("/me/contributions").then(setContrib).catch(() => {});
@@ -47,6 +50,20 @@ export default function SelfServicePage() {
       }) });
       setMsg("Leave request submitted for approval.");
       setLeaveForm({ leave_type: "", date_from: "", date_to: "", days: "" });
+      load();
+    } catch (e: any) { setErr(e.message); }
+  }
+
+  async function submitOvertime() {
+    setErr(""); setMsg("");
+    if (!otForm.ot_date) { setErr("Please choose the overtime date."); return; }
+    if (!otForm.hours || Number(otForm.hours) <= 0) { setErr("Enter the number of overtime hours."); return; }
+    try {
+      await apiFetch("/me/overtime", { method: "POST", body: JSON.stringify({
+        ot_date: otForm.ot_date, hours: Number(otForm.hours),
+      }) });
+      setMsg("Overtime request submitted for approval.");
+      setOtForm({ ot_date: "", hours: "" });
       load();
     } catch (e: any) { setErr(e.message); }
   }
@@ -207,6 +224,27 @@ export default function SelfServicePage() {
             {att.length === 0 ? <tr><td className="py-6 text-center text-slate-400">No attendance logs.</td></tr> : null}
           </tbody></table>
         </Section>
+      ) : null}
+
+      {tab === "Overtime" ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Section title="Request Overtime">
+            <div className="space-y-3">
+              <div><label className="mb-1 block text-xs text-slate-500">Date</label>
+                <input type="date" className="input" value={otForm.ot_date} onChange={(e) => setOtForm({ ...otForm, ot_date: e.target.value })} /></div>
+              <div><label className="mb-1 block text-xs text-slate-500">Overtime hours</label>
+                <input type="number" min="0" step="0.5" className="input max-w-[140px]" value={otForm.hours} onChange={(e) => setOtForm({ ...otForm, hours: e.target.value })} /></div>
+              <button className="btn-primary" onClick={submitOvertime}>Submit for approval</button>
+              <p className="text-xs text-slate-400">Your Department Head or HR will review and approve or reject the request.</p>
+            </div>
+          </Section>
+          <Section title={`My Overtime Requests (${ot.length})`}>
+            <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
+              {ot.map((o) => (<tr key={o.id}><td className="py-2">{o.ot_date}</td><td className="py-2">{o.hours}h</td><td className="py-2"><span className="badge bg-slate-100 text-slate-600">{o.status}</span></td></tr>))}
+              {ot.length === 0 ? <tr><td colSpan={3} className="py-6 text-center text-slate-400">No overtime requests yet.</td></tr> : null}
+            </tbody></table>
+          </Section>
+        </div>
       ) : null}
 
       {tab === "Loans" ? (

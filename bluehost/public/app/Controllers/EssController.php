@@ -13,6 +13,8 @@ class EssController
         $r->get('/me/leave-types', [self::class, 'leaveTypes']);
         $r->post('/me/leave', [self::class, 'requestLeave']);
         $r->get('/me/attendance', [self::class, 'attendance']);
+        $r->get('/me/overtime', [self::class, 'overtime']);
+        $r->post('/me/overtime', [self::class, 'requestOvertime']);
         $r->get('/me/loans', [self::class, 'loans']);
         $r->post('/me/loans', [self::class, 'requestLoan']);
         $r->get('/me/special-pay', [self::class, 'specialPay']);
@@ -146,6 +148,32 @@ class EssController
             return ['period' => $r['period'], 'sss' => (float) ($d['sss'] ?? 0), 'philhealth' => (float) ($d['philhealth'] ?? 0),
                 'pagibig' => (float) ($d['pagibig'] ?? 0), 'withholding_tax' => (float) ($d['withholding_tax'] ?? 0)];
         }, $rows));
+    }
+
+    /** The person's own overtime requests (employees and consultants alike). */
+    public static function overtime(): void
+    {
+        $u = Auth::require();
+        $eng = self::engIds(self::personId($u)) ?: [-1];
+        $in = implode(',', array_fill(0, count($eng), '?'));
+        Http::json(Database::all("SELECT id, ot_date, hours, status FROM overtime_requests
+            WHERE engagement_id IN ($in) ORDER BY id DESC", $eng));
+    }
+
+    /** File an own overtime request (routed to Dept Head / HR for approval). */
+    public static function requestOvertime(): void
+    {
+        $u = Auth::require();
+        $eng = self::primaryEngagement(self::personId($u));
+        if (!$eng) throw new HttpError('You have no active engagement to file overtime against', 409);
+        $b = Http::body();
+        $hours = (float) ($b['hours'] ?? 0);
+        if ($hours <= 0) throw new HttpError('Hours must be greater than zero', 422);
+        $id = Database::insert('overtime_requests', [
+            'organization_id' => (int) $eng['organization_id'], 'engagement_id' => (int) $eng['id'],
+            'ot_date' => ($b['ot_date'] ?? '') ?: null, 'hours' => $hours, 'status' => 'PENDING']);
+        Audit::record('overtime.self_apply', $u, ['organization_id' => (int) $eng['organization_id'], 'entity' => 'overtime_request', 'entity_id' => $id]);
+        Http::json(['id' => $id, 'status' => 'PENDING']);
     }
 
     /** Leave types available in the employee's organization (for the request form). */
