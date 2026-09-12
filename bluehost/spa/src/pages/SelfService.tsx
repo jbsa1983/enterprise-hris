@@ -4,7 +4,9 @@ import AppShell from "@/components/AppShell";
 import { apiFetch, apiOpen } from "@/lib/api";
 import { peso } from "@/lib/format";
 
-const TABS = ["Profile", "Payslips", "Leave", "Attendance", "Loans", "Contributions", "Security"];
+const TABS = ["Profile", "Payslips", "13th Month", "Leave", "Attendance", "Loans", "Contributions", "Security"];
+const LOAN_TYPES = ["CASH_ADVANCE", "COMPANY_LOAN", "SALARY_LOAN", "EMERGENCY_LOAN", "TRAVEL_ADVANCE", "OTHER"];
+const loanLabel = (t: string) => t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 export default function SelfServicePage() {
   const [tab, setTab] = useState("Profile");
@@ -14,19 +16,53 @@ export default function SelfServicePage() {
   const [att, setAtt] = useState<any[]>([]);
   const [loans, setLoans] = useState<any[]>([]);
   const [contrib, setContrib] = useState<any[]>([]);
+  const [special, setSpecial] = useState<any[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
+  const [leaveForm, setLeaveForm] = useState<any>({ leave_type: "", date_from: "", date_to: "", days: "" });
+  const [loanForm, setLoanForm] = useState<any>({ obligation_type: "CASH_ADVANCE", principal: "", description: "" });
 
   const load = useCallback(() => {
     apiFetch("/me/profile").then(setProfile).catch((e) => setErr(e.message));
     apiFetch("/me/available-payslips").then(setPayslips).catch(() => {});
     apiFetch("/me/leave").then(setLeave).catch(() => {});
+    apiFetch("/me/leave-types").then(setLeaveTypes).catch(() => {});
     apiFetch("/me/attendance").then(setAtt).catch(() => {});
     apiFetch("/me/loans").then(setLoans).catch(() => {});
+    apiFetch("/me/special-pay").then(setSpecial).catch(() => {});
     apiFetch("/me/contributions").then(setContrib).catch(() => {});
   }, []);
   useEffect(load, [load]);
+
+  async function submitLeave() {
+    setErr(""); setMsg("");
+    if (!leaveForm.date_from || !leaveForm.date_to) { setErr("Please choose the leave dates."); return; }
+    try {
+      await apiFetch("/me/leave", { method: "POST", body: JSON.stringify({
+        leave_type: leaveForm.leave_type || "Vacation",
+        date_from: leaveForm.date_from, date_to: leaveForm.date_to,
+        days: leaveForm.days ? Number(leaveForm.days) : undefined,
+      }) });
+      setMsg("Leave request submitted for approval.");
+      setLeaveForm({ leave_type: "", date_from: "", date_to: "", days: "" });
+      load();
+    } catch (e: any) { setErr(e.message); }
+  }
+
+  async function submitLoan() {
+    setErr(""); setMsg("");
+    if (!loanForm.principal || Number(loanForm.principal) <= 0) { setErr("Enter the amount you're requesting."); return; }
+    try {
+      await apiFetch("/me/loans", { method: "POST", body: JSON.stringify({
+        obligation_type: loanForm.obligation_type, principal: Number(loanForm.principal), description: loanForm.description,
+      }) });
+      setMsg("Request submitted for approval.");
+      setLoanForm({ obligation_type: "CASH_ADVANCE", principal: "", description: "" });
+      load();
+    } catch (e: any) { setErr(e.message); }
+  }
 
   async function generateAndView(runId: number, existingUuid: string | null) {
     setErr(""); setMsg("");
@@ -115,13 +151,52 @@ export default function SelfServicePage() {
         </Section>
       ) : null}
 
-      {tab === "Leave" ? (
-        <Section title={`Leave (${leave.length})`}>
-          <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
-            {leave.map((l) => (<tr key={l.id}><td className="py-2">{l.leave_type}</td><td className="py-2 text-xs text-slate-500">{l.date_from} → {l.date_to}</td><td className="py-2">{l.days}d</td><td className="py-2"><span className="badge bg-slate-100 text-slate-600">{l.status}</span></td></tr>))}
-            {leave.length === 0 ? <tr><td className="py-6 text-center text-slate-400">No leave records.</td></tr> : null}
-          </tbody></table>
+      {tab === "13th Month" ? (
+        <Section title={`13th Month & Bonuses (${special.length})`}>
+          <table className="min-w-full text-sm">
+            <thead><tr className="text-left text-xs uppercase text-slate-400"><th className="py-1">Name</th><th>Type</th><th>Year</th><th className="text-right">Amount</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {special.map((s, i) => (<tr key={i}><td className="py-2">{s.name}</td><td className="py-2 text-xs text-slate-500">{s.pay_type}</td><td className="py-2">{s.year}</td><td className="py-2 text-right font-medium">{peso(s.amount)}</td></tr>))}
+              {special.length === 0 ? <tr><td colSpan={4} className="py-6 text-center text-slate-400">No 13th-month or bonus records yet.</td></tr> : null}
+            </tbody>
+          </table>
         </Section>
+      ) : null}
+
+      {tab === "Leave" ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Section title="Request Leave">
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs text-slate-500">Leave type</label>
+                {leaveTypes.length ? (
+                  <select className="input" value={leaveForm.leave_type} onChange={(e) => setLeaveForm({ ...leaveForm, leave_type: e.target.value })}>
+                    <option value="">— select —</option>
+                    {leaveTypes.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+                  </select>
+                ) : (
+                  <input className="input" placeholder="e.g. Vacation, Sick" value={leaveForm.leave_type} onChange={(e) => setLeaveForm({ ...leaveForm, leave_type: e.target.value })} />
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="mb-1 block text-xs text-slate-500">From</label>
+                  <input type="date" className="input" value={leaveForm.date_from} onChange={(e) => setLeaveForm({ ...leaveForm, date_from: e.target.value })} /></div>
+                <div><label className="mb-1 block text-xs text-slate-500">To</label>
+                  <input type="date" className="input" value={leaveForm.date_to} onChange={(e) => setLeaveForm({ ...leaveForm, date_to: e.target.value })} /></div>
+              </div>
+              <div><label className="mb-1 block text-xs text-slate-500">Days (optional — auto-computed from dates)</label>
+                <input type="number" min="0" step="0.5" className="input max-w-[140px]" value={leaveForm.days} onChange={(e) => setLeaveForm({ ...leaveForm, days: e.target.value })} /></div>
+              <button className="btn-primary" onClick={submitLeave}>Submit for approval</button>
+              <p className="text-xs text-slate-400">Your Department Head or HR will review and approve or reject the request.</p>
+            </div>
+          </Section>
+          <Section title={`My Leave Requests (${leave.length})`}>
+            <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
+              {leave.map((l) => (<tr key={l.id}><td className="py-2">{l.leave_type}</td><td className="py-2 text-xs text-slate-500">{l.date_from} → {l.date_to}</td><td className="py-2">{l.days}d</td><td className="py-2"><span className="badge bg-slate-100 text-slate-600">{l.status}</span></td></tr>))}
+              {leave.length === 0 ? <tr><td colSpan={4} className="py-6 text-center text-slate-400">No leave requests yet.</td></tr> : null}
+            </tbody></table>
+          </Section>
+        </div>
       ) : null}
 
       {tab === "Attendance" ? (
@@ -135,12 +210,28 @@ export default function SelfServicePage() {
       ) : null}
 
       {tab === "Loans" ? (
-        <Section title={`Loans & Advances (${loans.length})`}>
-          <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
-            {loans.map((l, i) => (<tr key={i}><td className="py-2">{l.description || l.type}</td><td className="py-2 text-right">{peso(l.principal)}</td><td className="py-2 text-right font-medium">{peso(l.balance)} left</td><td className="py-2"><span className="badge bg-slate-100 text-slate-600">{l.status}</span></td></tr>))}
-            {loans.length === 0 ? <tr><td className="py-6 text-center text-slate-400">No loans or advances.</td></tr> : null}
-          </tbody></table>
-        </Section>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Section title="Request a Loan / Cash Advance">
+            <div className="space-y-3">
+              <div><label className="mb-1 block text-xs text-slate-500">Type</label>
+                <select className="input" value={loanForm.obligation_type} onChange={(e) => setLoanForm({ ...loanForm, obligation_type: e.target.value })}>
+                  {LOAN_TYPES.map((t) => <option key={t} value={t}>{loanLabel(t)}</option>)}
+                </select></div>
+              <div><label className="mb-1 block text-xs text-slate-500">Amount requested (₱)</label>
+                <input type="number" min="0" step="0.01" className="input max-w-[200px]" value={loanForm.principal} onChange={(e) => setLoanForm({ ...loanForm, principal: e.target.value })} /></div>
+              <div><label className="mb-1 block text-xs text-slate-500">Reason / details</label>
+                <textarea className="input" rows={2} value={loanForm.description} onChange={(e) => setLoanForm({ ...loanForm, description: e.target.value })} /></div>
+              <button className="btn-primary" onClick={submitLoan}>Submit for approval</button>
+              <p className="text-xs text-slate-400">Your Department Head or HR will review and approve or reject the request.</p>
+            </div>
+          </Section>
+          <Section title={`My Loans & Advances (${loans.length})`}>
+            <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
+              {loans.map((l, i) => (<tr key={i}><td className="py-2">{l.description || loanLabel(l.type)}</td><td className="py-2 text-right">{peso(l.principal)}</td><td className="py-2 text-right font-medium">{peso(l.balance)} left</td><td className="py-2"><span className="badge bg-slate-100 text-slate-600">{l.status}</span></td></tr>))}
+              {loans.length === 0 ? <tr><td colSpan={4} className="py-6 text-center text-slate-400">No loans or advances.</td></tr> : null}
+            </tbody></table>
+          </Section>
+        </div>
       ) : null}
 
       {tab === "Contributions" ? (

@@ -50,6 +50,14 @@ export default function LoansPage() {
     } catch (e: any) { setErr(e.message); }
   }
 
+  async function decide(loan: any, decision: string) {
+    setErr("");
+    try {
+      await apiFetch(`/organizations/${orgId}/loans/${loan.id}/decision`, { method: "POST", body: JSON.stringify({ decision }) });
+      setMsg(decision === "APPROVED" ? "Request approved." : "Request rejected."); load();
+    } catch (e: any) { setErr(e.message); }
+  }
+
   const countFor = (t: string) => summary.find((s) => s.obligation_type === t)?.count || 0;
 
   return (
@@ -86,8 +94,17 @@ export default function LoansPage() {
                 <td className="px-4 py-2 text-right">{peso(r.principal)}</td>
                 <td className="px-4 py-2 text-right font-medium">{peso(r.balance)}</td>
                 <td className="px-4 py-2 text-right">{peso(r.installment_amount)}</td>
-                <td className="px-4 py-2"><span className="badge bg-slate-100 text-slate-600">{r.status}</span></td>
-                <td className="px-4 py-2 text-right">{r.balance > 0 ? <button className="text-brand-700 hover:underline" onClick={() => { setForm({ entry_type: "DIRECT_PAYMENT" }); setModal({ adjust: r }); }}>Adjust</button> : null}</td>
+                <td className="px-4 py-2"><span className={`badge ${r.status === "PENDING" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{r.status}</span></td>
+                <td className="px-4 py-2 text-right whitespace-nowrap">
+                  {r.status === "PENDING" ? (
+                    <span className="space-x-3">
+                      <button className="text-emerald-700 hover:underline" onClick={() => decide(r, "APPROVED")}>Approve</button>
+                      <button className="text-red-600 hover:underline" onClick={() => decide(r, "REJECTED")}>Reject</button>
+                    </span>
+                  ) : r.balance > 0 ? (
+                    <button className="text-brand-700 hover:underline" onClick={() => { setForm({ entry_type: "DIRECT_PAYMENT" }); setModal({ adjust: r }); }}>Adjust</button>
+                  ) : null}
+                </td>
               </tr>
             ))}
             {rows.length === 0 ? <tr><td colSpan={8} className="px-4 py-6 text-center text-slate-400">No records.</td></tr> : null}

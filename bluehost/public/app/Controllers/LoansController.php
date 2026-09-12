@@ -12,6 +12,7 @@ class LoansController
         $r->get("$b/{id}", [self::class, 'get']);
         $r->post($b, [self::class, 'create']);
         $r->post("$b/{id}/adjust", [self::class, 'adjust']);
+        $r->post("$b/{id}/decision", [self::class, 'decide']);
     }
 
     private static function shape(array $l): array
@@ -65,6 +66,29 @@ class LoansController
         Database::insert('loan_transactions', ['loan_id' => $id, 'entry_type' => 'NEW_LOAN', 'amount' => $total, 'balance_after' => $total, 'entry_date' => date('Y-m-d'), 'remarks' => 'Loan/advance granted']);
         Audit::record('loan.create', $u, ['organization_id' => $o, 'entity' => 'loan', 'entity_id' => $id]);
         Http::json(['id' => $id]);
+    }
+
+    /** Approve or reject an employee-submitted PENDING loan/advance request. */
+    public static function decide(array $p): void
+    {
+        [$u, $o] = Auth::org($p, 'loan.approve'); $b = Http::body();
+        $l = Database::one('SELECT * FROM loans WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
+        if (!$l) throw new HttpError('Loan request not found', 404);
+        if ($l['status'] !== 'PENDING') throw new HttpError('This request is no longer pending', 409);
+        $dec = strtoupper($b['decision'] ?? 'APPROVED');
+        if (!in_array($dec, ['APPROVED', 'REJECTED'], true)) throw new HttpError('decision must be APPROVED or REJECTED', 422);
+        if ($dec === 'APPROVED') {
+            Database::update('loans', (int) $l['id'], ['status' => 'ACTIVE']);
+            Database::insert('loan_transactions', ['loan_id' => $l['id'], 'entry_type' => 'NEW_LOAN',
+                'amount' => (float) $l['total_amount'], 'balance_after' => (float) $l['balance'],
+                'entry_date' => date('Y-m-d'), 'remarks' => 'Approved from employee request']);
+            $status = 'ACTIVE';
+        } else {
+            Database::update('loans', (int) $l['id'], ['status' => 'REJECTED']);
+            $status = 'REJECTED';
+        }
+        Audit::record('loan.decision', $u, ['organization_id' => $o, 'entity' => 'loan', 'entity_id' => $l['id'], 'after' => ['status' => $status]]);
+        Http::json(['id' => (int) $l['id'], 'status' => $status]);
     }
 
     public static function adjust(array $p): void

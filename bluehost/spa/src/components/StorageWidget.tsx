@@ -31,7 +31,9 @@ export default function StorageWidget() {
   }, []);
 
   if (error) {
-    return <div className="card text-sm text-slate-500">Storage: {error}</div>;
+    // Not everyone has storage.view — hide the card entirely rather than showing
+    // a permission error to employees.
+    return null;
   }
   if (!data) {
     return <div className="card text-sm text-slate-400">Loading storage…</div>;

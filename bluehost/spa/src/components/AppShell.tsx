@@ -10,22 +10,26 @@ import GeekLogo from "@/components/GeekLogo";
 // Sign out after this many minutes of no user activity.
 const IDLE_MINUTES = 15;
 
-const NAV = [
-  { label: "Enterprise Dashboard", href: (o?: number) => "/dashboard" },
-  { label: "Organization Dashboard", href: (o?: number) => (o ? `/o/${o}/dashboard` : "/dashboard") },
-  { label: "People", href: (o?: number) => (o ? `/o/${o}/people` : "#") },
-  { label: "Consultants", href: (o?: number) => (o ? `/o/${o}/people?type=consultants` : "#") },
-  { label: "Projects", href: (o?: number) => (o ? `/o/${o}/projects` : "#") },
-  { label: "Payroll", href: (o?: number) => (o ? `/o/${o}/payroll` : "#") },
-  { label: "13th Month & Bonuses", href: (o?: number) => (o ? `/o/${o}/special-pay` : "#") },
-  { label: "Loans & Advances", href: (o?: number) => (o ? `/o/${o}/loans` : "#") },
-  { label: "Leave & Attendance", href: (o?: number) => (o ? `/o/${o}/leave` : "#") },
-  { label: "Assets", href: (o?: number) => (o ? `/o/${o}/assets` : "#") },
-  { label: "Recruitment", href: (o?: number) => (o ? `/o/${o}/recruitment` : "#") },
-  { label: "HR Modules", href: (o?: number) => (o ? `/o/${o}/hr` : "#") },
-  { label: "Reports", href: (o?: number) => (o ? `/o/${o}/reports` : "#") },
-  { label: "Org Setup", href: (o?: number) => (o ? `/o/${o}/setup` : "#") },
-  { label: "My Self-Service", href: (o?: number) => "/me" },
+// `perm` is the permission required to see the tab. Items without a perm are
+// visible to everyone (Superadmins always see all). Management tabs are gated on
+// management-level permissions so a plain Employee (who only holds self-service
+// permissions like leave.view) does not see the org-wide admin screens.
+const NAV: { label: string; perm?: string; href: (o?: number) => string }[] = [
+  { label: "Enterprise Dashboard", perm: "organization.view", href: () => "/dashboard" },
+  { label: "Organization Dashboard", perm: "organization.view", href: (o) => (o ? `/o/${o}/dashboard` : "/dashboard") },
+  { label: "People", perm: "employee.view", href: (o) => (o ? `/o/${o}/people` : "#") },
+  { label: "Consultants", perm: "employee.view", href: (o) => (o ? `/o/${o}/people?type=consultants` : "#") },
+  { label: "Projects", perm: "employee.view", href: (o) => (o ? `/o/${o}/projects` : "#") },
+  { label: "Payroll", perm: "payroll.view", href: (o) => (o ? `/o/${o}/payroll` : "#") },
+  { label: "13th Month & Bonuses", perm: "payroll.view", href: (o) => (o ? `/o/${o}/special-pay` : "#") },
+  { label: "Loans & Advances", perm: "loan.view", href: (o) => (o ? `/o/${o}/loans` : "#") },
+  { label: "Leave & Attendance", perm: "leave.approve", href: (o) => (o ? `/o/${o}/leave` : "#") },
+  { label: "Assets", perm: "employee.view", href: (o) => (o ? `/o/${o}/assets` : "#") },
+  { label: "Recruitment", perm: "employee.view", href: (o) => (o ? `/o/${o}/recruitment` : "#") },
+  { label: "HR Modules", perm: "employee.view", href: (o) => (o ? `/o/${o}/hr` : "#") },
+  { label: "Reports", perm: "reports.view", href: (o) => (o ? `/o/${o}/reports` : "#") },
+  { label: "Org Setup", perm: "organization.view", href: (o) => (o ? `/o/${o}/setup` : "#") },
+  { label: "My Self-Service", href: () => "/me" },
 ];
 
 const ADMIN_NAV = [
@@ -55,7 +59,13 @@ export default function AppShell({
       return;
     }
     apiFetch<CurrentUser>("/auth/me")
-      .then((u) => setUser(u))
+      .then((u) => {
+        setUser(u);
+        // Plain employees (no org-wide access) have no use for the dashboards —
+        // send them straight to their self-service area.
+        const canOrg = u.is_superadmin || (u.permissions || []).includes("organization.view");
+        if (!canOrg && /\/dashboard$/.test(pathname)) router.replace("/me");
+      })
       .catch(() => router.replace("/login"))
       .finally(() => setLoading(false));
     // Selector shows every organization the user can access (all of them for a
@@ -94,7 +104,7 @@ export default function AppShell({
           <GeekLogo onDark subtitle="Enterprise HRIS" />
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {NAV.map((item) => {
+          {NAV.filter((item) => !item.perm || user.is_superadmin || (user.permissions || []).includes(item.perm)).map((item) => {
             const href = item.href(orgId);
             const disabled = href === "#";
             const active = pathname === href.split("?")[0];

@@ -10,10 +10,23 @@ class EssController
         $r->get('/me/available-payslips', [self::class, 'availablePayslips']);
         $r->post('/me/payslips/generate', [self::class, 'generatePayslip']);
         $r->get('/me/leave', [self::class, 'leave']);
+        $r->get('/me/leave-types', [self::class, 'leaveTypes']);
+        $r->post('/me/leave', [self::class, 'requestLeave']);
         $r->get('/me/attendance', [self::class, 'attendance']);
         $r->get('/me/loans', [self::class, 'loans']);
+        $r->post('/me/loans', [self::class, 'requestLoan']);
+        $r->get('/me/special-pay', [self::class, 'specialPay']);
         $r->get('/me/contributions', [self::class, 'contributions']);
         $r->post('/me/password', [self::class, 'password']);
+    }
+
+    /** The engagement leave/loan requests are filed against — active preferred, else most recent. */
+    private static function primaryEngagement(int $personId): ?array
+    {
+        $rows = Database::all(
+            "SELECT * FROM engagements WHERE person_id = ? ORDER BY (status = 'ACTIVE') DESC, id DESC LIMIT 1",
+            [$personId]);
+        return $rows[0] ?? null;
     }
 
     private static function personId(array $u): int
@@ -133,6 +146,76 @@ class EssController
             return ['period' => $r['period'], 'sss' => (float) ($d['sss'] ?? 0), 'philhealth' => (float) ($d['philhealth'] ?? 0),
                 'pagibig' => (float) ($d['pagibig'] ?? 0), 'withholding_tax' => (float) ($d['withholding_tax'] ?? 0)];
         }, $rows));
+    }
+
+    /** Leave types available in the employee's organization (for the request form). */
+    public static function leaveTypes(): void
+    {
+        $u = Auth::require();
+        $eng = self::primaryEngagement(self::personId($u));
+        if (!$eng) { Http::json([]); return; }
+        Http::json(array_map(fn($t) => ['id' => (int) $t['id'], 'name' => $t['name']],
+            Database::all('SELECT id, name FROM leave_types WHERE organization_id = ? ORDER BY name', [(int) $eng['organization_id']])));
+    }
+
+    /** Employee files their own leave request (routed to Dept Head / HR for approval). */
+    public static function requestLeave(): void
+    {
+        $u = Auth::require();
+        $eng = self::primaryEngagement(self::personId($u));
+        if (!$eng) throw new HttpError('You have no active engagement to file leave against', 409);
+        $b = Http::body();
+        $days = (float) ($b['days'] ?? 0);
+        if ($days <= 0 && !empty($b['date_from']) && !empty($b['date_to'])) {
+            $d1 = strtotime((string) $b['date_from']); $d2 = strtotime((string) $b['date_to']);
+            if ($d1 && $d2 && $d2 >= $d1) $days = floor(($d2 - $d1) / 86400) + 1;
+        }
+        if ($days <= 0) $days = 1;
+        $id = Database::insert('leave_requests', [
+            'organization_id' => (int) $eng['organization_id'], 'engagement_id' => (int) $eng['id'],
+            'leave_type' => trim((string) ($b['leave_type'] ?? 'Vacation')) ?: 'Vacation',
+            'date_from' => ($b['date_from'] ?? '') ?: null, 'date_to' => ($b['date_to'] ?? '') ?: null,
+            'days' => $days, 'status' => 'PENDING']);
+        Audit::record('leave.self_apply', $u, ['organization_id' => (int) $eng['organization_id'], 'entity' => 'leave_request', 'entity_id' => $id]);
+        Http::json(['id' => $id, 'status' => 'PENDING']);
+    }
+
+    /** Employee requests their own loan / cash advance (routed to Dept Head / HR for approval). */
+    public static function requestLoan(): void
+    {
+        $u = Auth::require();
+        $pid = self::personId($u);
+        $eng = self::primaryEngagement($pid);
+        if (!$eng) throw new HttpError('You have no active engagement to request against', 409);
+        $b = Http::body();
+        $principal = (float) ($b['principal'] ?? 0);
+        if ($principal <= 0) throw new HttpError('Amount must be greater than zero', 422);
+        $id = Database::insert('loans', [
+            'uuid' => Util::uuid(), 'organization_id' => (int) $eng['organization_id'], 'person_id' => $pid,
+            'engagement_id' => (int) $eng['id'], 'obligation_type' => (string) ($b['obligation_type'] ?? 'CASH_ADVANCE'),
+            'description' => $b['description'] ?? null, 'principal' => $principal, 'interest' => 0,
+            'total_amount' => $principal, 'amount_paid' => 0, 'balance' => $principal,
+            'installment_amount' => (float) ($b['installment_amount'] ?? 0), 'status' => 'PENDING',
+            'payroll_deductible' => 1]);
+        Audit::record('loan.self_request', $u, ['organization_id' => (int) $eng['organization_id'], 'entity' => 'loan', 'entity_id' => $id]);
+        Http::json(['id' => $id, 'status' => 'PENDING']);
+    }
+
+    /** The employee's own 13th-month & bonus amounts from finalized special-pay runs. */
+    public static function specialPay(): void
+    {
+        $u = Auth::require();
+        $eng = self::engIds(self::personId($u)) ?: [-1];
+        $in = implode(',', array_fill(0, count($eng), '?'));
+        $rows = Database::all(
+            "SELECT r.name, r.pay_type, r.year, r.status, l.computed_amount, l.override_amount
+               FROM special_pay_lines l JOIN special_pay_runs r ON r.id = l.run_id
+              WHERE l.engagement_id IN ($in) AND r.status <> 'DRAFT'
+              ORDER BY r.year DESC, r.id DESC", $eng);
+        Http::json(array_map(fn($r) => [
+            'name' => $r['name'], 'pay_type' => $r['pay_type'], 'year' => (int) $r['year'], 'status' => $r['status'],
+            'amount' => (float) ($r['override_amount'] ?? $r['computed_amount']),
+        ], $rows));
     }
 
     public static function password(): void
