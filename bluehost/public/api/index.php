@@ -41,6 +41,7 @@ ReportsController::routes($router);
 EssController::routes($router);
 AdminController::routes($router);
 StorageController::routes($router);
+BrandingController::routes($router);
 
 try {
     $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $path);

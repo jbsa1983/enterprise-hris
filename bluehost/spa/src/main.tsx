@@ -21,6 +21,7 @@ import Reports from "@/pages/Reports";
 import SelfService from "@/pages/SelfService";
 import OrgSetup from "@/pages/OrgSetup";
 import AdminOrganizations from "@/pages/AdminOrganizations";
+import AdminBranding from "@/pages/AdminBranding";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminRoles from "@/pages/AdminRoles";
 
@@ -50,6 +51,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/o/:orgId/setup" element={<OrgSetup />} />
         <Route path="/me" element={<SelfService />} />
         <Route path="/admin/organizations" element={<AdminOrganizations />} />
+        <Route path="/admin/branding" element={<AdminBranding />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/roles" element={<AdminRoles />} />
         <Route path="*" element={<Home />} />

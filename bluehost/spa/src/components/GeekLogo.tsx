@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
 import { GEEK } from "@/lib/geek";
+import { cachedBranding, loadBranding } from "@/lib/branding";
 
-// The GEEK Group mark: a 2x2 grid of brand-colored tiles + the "GEEK" wordmark.
+// The GEEK Group mark: a 2x2 grid of brand-colored tiles + the "GEEK" wordmark —
+// or a superadmin-uploaded custom logo when one has been set.
 export default function GeekLogo({
   onDark = true,
   subtitle = "Enterprise HRIS",
@@ -10,6 +13,21 @@ export default function GeekLogo({
   subtitle?: string;
   size?: "sm" | "md" | "lg";
 }) {
+  const [brand, setBrand] = useState(cachedBranding());
+  useEffect(() => { loadBranding().then(setBrand); }, []);
+
+  if (brand.logo_url) {
+    const imgH = size === "lg" ? "h-11" : size === "sm" ? "h-6" : "h-9";
+    return (
+      <div className="leading-none">
+        <img src={brand.logo_url} alt={brand.app_name} className={`${imgH} w-auto max-w-[180px] object-contain`} />
+        {subtitle ? (
+          <div className={`mt-1 text-[11px] ${onDark ? "text-slate-400" : "text-slate-500"}`}>{subtitle}</div>
+        ) : null}
+      </div>
+    );
+  }
+
   const letters: [string, string][] = [
     ["G", GEEK.red],
     ["E", GEEK.amber],
