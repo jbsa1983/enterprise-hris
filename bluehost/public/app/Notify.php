@@ -44,6 +44,7 @@ class Notify
         foreach (self::approvers($orgId, $permCode) as $a) {
             self::record((int) $a['id'], $type, $title, $body, $link);
             Mailer::send($a['email'], $title, $body . "\n\nReview it here:\n" . self::url($link));
+            Telegram::notifyUser((int) $a['id'], "🔔 {$title}\n{$body}\n" . self::url($link));
         }
     }
 
@@ -54,5 +55,6 @@ class Notify
         if (!$u) return;
         self::record((int) $u['id'], $type, $title, $body, $link);
         Mailer::send($u['email'], $title, $body . "\n\nOpen the HRIS:\n" . self::url($link));
+        Telegram::notifyUser((int) $u['id'], "🔔 {$title}\n{$body}\n" . self::url($link));
     }
 }

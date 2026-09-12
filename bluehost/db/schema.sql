@@ -705,6 +705,14 @@ CREATE TABLE IF NOT EXISTS benefit_beneficiaries (
   INDEX (benefit_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- --- Telegram notification links ---------------------------------------------
+CREATE TABLE IF NOT EXISTS telegram_links (
+  user_id INT PRIMARY KEY,
+  chat_id VARCHAR(40) NULL,
+  link_code VARCHAR(40) NULL,
+  INDEX (link_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- --- In-app notifications ----------------------------------------------------
 CREATE TABLE IF NOT EXISTS notifications (
   id INT AUTO_INCREMENT PRIMARY KEY,

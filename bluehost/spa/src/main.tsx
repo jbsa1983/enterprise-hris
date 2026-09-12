@@ -24,6 +24,7 @@ import AdminOrganizations from "@/pages/AdminOrganizations";
 import AdminBranding from "@/pages/AdminBranding";
 import AdminLicense from "@/pages/AdminLicense";
 import AdminBackup from "@/pages/AdminBackup";
+import AdminNotifications from "@/pages/AdminNotifications";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminRoles from "@/pages/AdminRoles";
 
@@ -56,6 +57,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/admin/branding" element={<AdminBranding />} />
         <Route path="/admin/license" element={<AdminLicense />} />
         <Route path="/admin/backup" element={<AdminBackup />} />
+        <Route path="/admin/notifications" element={<AdminNotifications />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/roles" element={<AdminRoles />} />
         <Route path="*" element={<Home />} />

@@ -37,3 +37,6 @@ bluehost/spa/dist
 # Licensing — vendor private key (NEVER commit) + per-install license
 bluehost/license-tools/keys/
 bluehost/public/app/installed-license.php
+
+# Per-install secrets written at runtime
+bluehost/public/app/telegram-config.php

@@ -22,6 +22,7 @@ export default function SelfServicePage() {
   const [leaveBal, setLeaveBal] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
   const [benefits, setBenefits] = useState<any[]>([]);
+  const [tg, setTg] = useState<any>({ configured: false, linked: false, link_url: null });
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
@@ -42,8 +43,13 @@ export default function SelfServicePage() {
     apiFetch("/me/loans").then(setLoans).catch(() => {});
     apiFetch("/me/special-pay").then(setSpecial).catch(() => {});
     apiFetch("/me/contributions").then(setContrib).catch(() => {});
+    apiFetch("/me/telegram").then(setTg).catch(() => {});
   }, []);
   useEffect(load, [load]);
+
+  function tgRefresh() { apiFetch("/me/telegram").then(setTg).catch(() => {}); }
+  async function tgTest() { setErr(""); setMsg(""); try { await apiFetch("/me/telegram/test", { method: "POST" }); setMsg("Test sent — check your Telegram."); } catch (e: any) { setErr(e.message); } }
+  async function tgUnlink() { setErr(""); setMsg(""); try { await apiFetch("/me/telegram/unlink", { method: "POST" }); setMsg("Telegram disconnected."); tgRefresh(); } catch (e: any) { setErr(e.message); } }
 
   async function submitLeave() {
     setErr(""); setMsg("");
@@ -340,15 +346,36 @@ export default function SelfServicePage() {
       ) : null}
 
       {tab === "Security" ? (
-        <Section title="Change Password">
-          <div className="max-w-sm space-y-3">
-            <div><label className="mb-1 block text-xs text-slate-500">Current password</label>
-              <input className="input" type="password" value={pw.current_password} onChange={(e) => setPw({ ...pw, current_password: e.target.value })} /></div>
-            <div><label className="mb-1 block text-xs text-slate-500">New password (min 8)</label>
-              <input className="input" type="password" value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} /></div>
-            <button className="btn-primary" onClick={changePassword}>Update password</button>
-          </div>
-        </Section>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Section title="Change Password">
+            <div className="max-w-sm space-y-3">
+              <div><label className="mb-1 block text-xs text-slate-500">Current password</label>
+                <input className="input" type="password" value={pw.current_password} onChange={(e) => setPw({ ...pw, current_password: e.target.value })} /></div>
+              <div><label className="mb-1 block text-xs text-slate-500">New password (min 8)</label>
+                <input className="input" type="password" value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} /></div>
+              <button className="btn-primary" onClick={changePassword}>Update password</button>
+            </div>
+          </Section>
+          <Section title="Mobile Notifications (Telegram)">
+            {!tg.configured ? (
+              <p className="text-sm text-slate-500">Telegram alerts aren't set up by your administrator yet. You'll still get email and in-app notifications.</p>
+            ) : tg.linked ? (
+              <div className="space-y-3">
+                <p className="text-sm text-emerald-700">✅ Connected — you'll get approval alerts on Telegram.</p>
+                <div className="flex gap-2">
+                  <button className="btn-primary" onClick={tgTest}>Send test</button>
+                  <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50" onClick={tgUnlink}>Disconnect</button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-600">Get instant alerts on your phone. Tap the button, then press <strong>Start</strong> in Telegram.</p>
+                <a className="btn-primary inline-block" href={tg.link_url} target="_blank" rel="noopener noreferrer">Connect Telegram</a>
+                <button className="ml-2 rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50" onClick={tgRefresh}>I've connected — refresh</button>
+              </div>
+            )}
+          </Section>
+        </div>
       ) : null}
     </AppShell>
   );
