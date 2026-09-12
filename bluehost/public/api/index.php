@@ -45,6 +45,7 @@ BrandingController::routes($router);
 LicenseController::routes($router);
 BackupController::routes($router);
 TelegramController::routes($router);
+DigestController::routes($router);
 
 // When license enforcement is on, lock everything except sign-in and activation
 // until a valid license is installed.
