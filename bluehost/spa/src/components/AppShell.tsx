@@ -115,6 +115,14 @@ export default function AppShell({
             );
           })}
         </nav>
+        <a
+          href="/manual.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mx-3 mb-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-white/10"
+        >
+          <span aria-hidden="true">📘</span> Help &amp; User Guide
+        </a>
         {isAdmin ? (
           <div className="border-t border-white/10 px-3 py-3">
             <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
@@ -156,6 +164,14 @@ export default function AppShell({
             </select>
           </div>
           <div className="flex items-center gap-4">
+            <a
+              href="/manual.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-slate-500 hover:text-geek-blue"
+            >
+              Help
+            </a>
             <div className="text-right">
               <div className="text-sm font-medium text-slate-800">{user.full_name}</div>
               <div className="text-[11px] text-slate-500">{user.roles.join(", ") || "—"}</div>

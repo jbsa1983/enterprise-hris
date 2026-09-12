@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<title>GEEK HRIS Employee Guide</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --geek-red: #EA4335;
+    --geek-amber: #F9AB00;
+    --geek-green: #34A853;
+    --geek-blue: #4285F4;
+    --geek-bluedark: #1A73E8;
+
+    --bg: #F5F7FA;
+    --surface: #FFFFFF;
+    --surface-2: #FBFCFE;
+    --ink: #19212E;
+    --muted: #5C6672;
+    --faint: #8A929E;
+    --line: #E3E7ED;
+    --accent: #1A73E8;
+    --accent-soft: rgba(26,115,232,.08);
+
+    --tip: #1E8E4E;
+    --tip-soft: rgba(52,168,83,.10);
+    --warn: #B5730B;
+    --warn-soft: rgba(249,171,0,.12);
+    --danger: #C5372C;
+    --danger-soft: rgba(234,67,53,.09);
+
+    --measure: 68ch;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.05);
+  }
+
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg: #0D1320;
+      --surface: #151D2C;
+      --surface-2: #111827;
+      --ink: #E8EDF4;
+      --muted: #9AA6B8;
+      --faint: #6C788C;
+      --line: #263149;
+      --accent: #6EA6FF;
+      --accent-soft: rgba(110,166,255,.12);
+      --tip: #5BD08A;
+      --tip-soft: rgba(52,168,83,.16);
+      --warn: #F2C15A;
+      --warn-soft: rgba(249,171,0,.14);
+      --danger: #FF8B80;
+      --danger-soft: rgba(234,67,53,.16);
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1320;
+    --surface: #151D2C;
+    --surface-2: #111827;
+    --ink: #E8EDF4;
+    --muted: #9AA6B8;
+    --faint: #6C788C;
+    --line: #263149;
+    --accent: #6EA6FF;
+    --accent-soft: rgba(110,166,255,.12);
+    --tip: #5BD08A;
+    --tip-soft: rgba(52,168,83,.16);
+    --warn: #F2C15A;
+    --warn-soft: rgba(249,171,0,.14);
+    --danger: #FF8B80;
+    --danger-soft: rgba(234,67,53,.16);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---- Brand header ---- */
+  .rail { display: flex; height: 6px; }
+  .rail > span { flex: 1; }
+  .rail .r { background: var(--geek-red); }
+  .rail .a { background: var(--geek-amber); }
+  .rail .g { background: var(--geek-green); }
+  .rail .b { background: var(--geek-blue); }
+
+  header.masthead { background: var(--surface); border-bottom: 1px solid var(--line); }
+  .masthead-inner { padding: 30px 0 34px; }
+
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .mark {
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    gap: 3px; width: 38px; height: 38px; flex: none;
+  }
+  .mark span { border-radius: 5px; }
+  .mark .s1 { background: var(--geek-red); }
+  .mark .s2 { background: var(--geek-blue); }
+  .mark .s3 { background: var(--geek-green); }
+  .mark .s4 { background: var(--geek-amber); }
+  .wordmark { font-family: "Manrope", sans-serif; font-weight: 800; font-size: 26px; letter-spacing: -.5px; }
+  .wordmark .g1 { color: var(--geek-red); }
+  .wordmark .e1 { color: var(--geek-amber); }
+  .wordmark .e2 { color: var(--geek-green); }
+  .wordmark .k1 { color: var(--geek-blue); }
+  .wordmark .grp { color: var(--faint); font-weight: 600; font-size: 15px; letter-spacing: 3px; margin-left: 8px; }
+
+  h1.doc-title {
+    font-family: "Manrope", sans-serif; font-weight: 800;
+    font-size: clamp(30px, 5vw, 42px); line-height: 1.08; letter-spacing: -1px;
+    margin: 24px 0 8px; text-wrap: balance; max-width: 20ch;
+  }
+  .doc-sub { color: var(--muted); font-size: 18px; max-width: var(--measure); margin: 0; }
+  .doc-meta {
+    display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 20px;
+    font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--faint);
+    text-transform: uppercase; letter-spacing: .5px;
+  }
+  .doc-meta b { color: var(--muted); font-weight: 600; }
+
+  /* ---- Sections ---- */
+  main { padding: 8px 0 72px; }
+  section { padding-top: 46px; scroll-margin-top: 20px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--accent);
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .eyebrow::before { content: ""; width: 22px; height: 2px; background: var(--accent); border-radius: 2px; }
+  h2 { font-family: "Manrope", sans-serif; font-weight: 700; font-size: 26px; letter-spacing: -.4px; margin: 0 0 6px; text-wrap: balance; }
+  h3 { font-family: "Manrope", sans-serif; font-weight: 600; font-size: 18px; margin: 26px 0 6px; }
+  p { max-width: var(--measure); margin: 0 0 14px; }
+  a { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 2px; }
+  strong { font-weight: 600; }
+
+  code, .kbd, .url {
+    font-family: "IBM Plex Mono", monospace; font-size: .9em;
+    background: var(--accent-soft); color: color-mix(in srgb, var(--accent) 82%, var(--ink));
+    padding: 1px 6px; border-radius: 6px; white-space: nowrap;
+  }
+  .kbd { border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); box-shadow: 0 1px 0 var(--line); }
+
+  /* ---- Intro lead ---- */
+  .lead { font-size: 18.5px; color: var(--ink); max-width: var(--measure); }
+
+  /* ---- TOC ---- */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px 22px; margin-top: 26px; box-shadow: var(--shadow);
+  }
+  nav.toc h4 {
+    margin: 0 0 12px; font-family: "IBM Plex Mono", monospace; font-size: 12px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--faint); font-weight: 600;
+  }
+  nav.toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 26px; }
+  nav.toc li { counter-increment: toc; }
+  nav.toc a { display: flex; gap: 12px; align-items: baseline; padding: 7px 4px; border-radius: 8px; text-decoration: none; color: var(--ink); }
+  nav.toc a::before {
+    content: counter(toc, decimal-leading-zero); font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; color: var(--accent); font-weight: 600; flex: none; width: 20px;
+  }
+  nav.toc a:hover { background: var(--accent-soft); }
+
+  /* ---- Steps ---- */
+  ol.steps { list-style: none; counter-reset: step; margin: 18px 0 8px; padding: 0; }
+  ol.steps > li {
+    counter-increment: step; position: relative; padding: 0 0 20px 52px; max-width: calc(var(--measure) + 52px);
+  }
+  ol.steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: -2px;
+    width: 34px; height: 34px; display: grid; place-items: center;
+    background: var(--accent); color: #fff; border-radius: 50%;
+    font-family: "Manrope", sans-serif; font-weight: 700; font-size: 15px;
+  }
+  ol.steps > li::after {
+    content: ""; position: absolute; left: 16.5px; top: 36px; bottom: 4px; width: 2px;
+    background: var(--line);
+  }
+  ol.steps > li:last-child { padding-bottom: 0; }
+  ol.steps > li:last-child::after { display: none; }
+  ol.steps .st-title { font-weight: 600; }
+  ol.steps p { margin: 2px 0 0; }
+
+  /* ---- Callouts ---- */
+  .note {
+    border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px;
+    background: var(--surface); padding: 14px 16px 14px 18px; margin: 18px 0; max-width: var(--measure);
+  }
+  .note p { margin: 0; }
+  .note p + p { margin-top: 8px; }
+  .note .lbl { font-family: "Manrope", sans-serif; font-weight: 700; font-size: 13px; letter-spacing: .3px; display: block; margin-bottom: 3px; }
+  .note.tip { border-left-color: var(--tip); background: var(--tip-soft); }
+  .note.tip .lbl { color: var(--tip); }
+  .note.security { border-left-color: var(--accent); background: var(--accent-soft); }
+  .note.security .lbl { color: var(--accent); }
+  .note.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .note.warn .lbl { color: var(--warn); }
+
+  /* ---- Tab reference cards ---- */
+  .tabgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-top: 18px; }
+  .tabcard { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 16px 15px; box-shadow: var(--shadow); }
+  .tabcard .tname {
+    font-family: "Manrope", sans-serif; font-weight: 700; font-size: 15.5px; margin-bottom: 5px;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .tabcard .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .tabcard p { font-size: 14px; color: var(--muted); margin: 0; max-width: none; }
+
+  /* ---- Table ---- */
+  .tablewrap { overflow-x: auto; margin: 18px 0; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 460px; }
+  thead th {
+    text-align: left; background: var(--surface-2); color: var(--faint);
+    font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 11.5px;
+    letter-spacing: 1px; text-transform: uppercase; padding: 11px 16px; border-bottom: 1px solid var(--line);
+  }
+  tbody td { padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { font-weight: 600; white-space: nowrap; }
+
+  /* ---- Admin list ---- */
+  .adminlist { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 2px; max-width: var(--measure); }
+  .adminlist li { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+  .adminlist li:last-child { border-bottom: none; }
+  .adminlist .m { font-family: "Manrope", sans-serif; font-weight: 700; font-size: 14.5px; min-width: 150px; flex: none; }
+  .adminlist .d { color: var(--muted); font-size: 14.5px; }
+
+  hr.div { border: none; border-top: 1px solid var(--line); margin: 44px 0 0; }
+
+  footer { padding: 34px 0 60px; color: var(--faint); font-size: 13.5px; }
+  footer .wordmark { font-size: 18px; }
+  footer .mark { width: 26px; height: 26px; }
+
+  :where(a, button):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 0 18px; }
+    ol.steps > li { padding-left: 46px; }
+  }
+
+  /* ---- Print / PDF ---- */
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --surface-2: #fff; --ink: #111; --muted: #333; --line: #cfd4da; --shadow: none; }
+    body { font-size: 11.5pt; }
+    .no-print { display: none !important; }
+    nav.toc { break-inside: avoid; box-shadow: none; }
+    section { padding-top: 22px; break-inside: avoid-page; }
+    .tabcard, .note, .tablewrap { break-inside: avoid; box-shadow: none; }
+    h2 { break-after: avoid; }
+    a { color: #111; text-decoration: none; }
+    .masthead-inner { padding: 16px 0; }
+  }
+</style>
+</head>
+<body>
+
+
+<header class="masthead">
+  <div class="rail"><span class="r"></span><span class="a"></span><span class="g"></span><span class="b"></span></div>
+  <div class="wrap masthead-inner">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span><span class="s4"></span></div>
+      <div class="wordmark"><span class="g1">G</span><span class="e1">E</span><span class="e2">E</span><span class="k1">K</span><span class="grp">GROUP</span></div>
+    </div>
+    <h1 class="doc-title">Employee User Guide</h1>
+    <p class="doc-sub">Everything you need to sign in, view your records, and download your payslip on the GEEK Enterprise HRIS.</p>
+    <div class="doc-meta">
+      <span><b>For:</b> All GEEK staff</span>
+      <span><b>System:</b> hris.exssi.com</span>
+      <span><b>Time to read:</b> ~6 minutes</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="intro" style="padding-top:38px;">
+    <p class="lead">The HRIS is your personal window into your employment records. From any browser you can check your profile and government IDs, review your attendance and leave, see your loans and contributions, and generate your own payslip as a PDF — all in one place, available anytime.</p>
+
+    <nav class="toc no-print" aria-label="Contents">
+      <h4>In this guide</h4>
+      <ol>
+        <li><a href="#start">Getting started &amp; signing in</a></li>
+        <li><a href="#password">Set your own password</a></li>
+        <li><a href="#selfservice">Your Self-Service area</a></li>
+        <li><a href="#payslip">Download your payslip</a></li>
+        <li><a href="#contributions">Reading your contributions</a></li>
+        <li><a href="#tips">Good to know</a></li>
+        <li><a href="#trouble">Troubleshooting</a></li>
+        <li><a href="#admin">For HR &amp; administrators</a></li>
+        <li><a href="#help">Getting help</a></li>
+      </ol>
+    </nav>
+  </section>
+
+  <section id="start">
+    <div class="eyebrow">Getting started</div>
+    <h2>Signing in for the first time</h2>
+    <p>Your account is created for you by HR or your system administrator. You'll receive your <strong>email address</strong> and a <strong>temporary password</strong> to get in. You don't register or create your own account.</p>
+    <ol class="steps">
+      <li><span class="st-title">Open the HRIS.</span><p>In your web browser, go to <span class="url">https://hris.exssi.com</span>. Works on a computer or phone.</p></li>
+      <li><span class="st-title">Enter your details.</span><p>Type the <strong>Email</strong> and <strong>Password</strong> you were given, then click <strong>Sign in</strong>.</p></li>
+      <li><span class="st-title">You're in.</span><p>You'll land on your dashboard. The <strong>My Self-Service</strong> menu on the left is your home base — everything about you lives there.</p></li>
+    </ol>
+    <div class="note warn">
+      <span class="lbl">Automatic sign-out</span>
+      <p>For your security, the system signs you out after <strong>15 minutes of inactivity</strong> (no clicking or typing). If that happens you'll see a note on the login page — just sign in again. You can also sign out anytime with the <strong>Sign out</strong> link at the top right.</p>
+    </div>
+  </section>
+
+  <section id="password">
+    <div class="eyebrow">First thing to do</div>
+    <h2>Set your own password</h2>
+    <p>Please change the temporary password to something only you know, right after your first sign-in.</p>
+    <ol class="steps">
+      <li><span class="st-title">Open My Self-Service.</span><p>Click <strong>My Self-Service</strong> in the left menu.</p></li>
+      <li><span class="st-title">Go to the Security tab.</span><p>Along the top of the page, click <strong>Security</strong>.</p></li>
+      <li><span class="st-title">Change it.</span><p>Enter your <strong>current password</strong>, then a <strong>new password</strong> (at least 8 characters), and click <strong>Update password</strong>.</p></li>
+    </ol>
+    <div class="note security">
+      <span class="lbl">Keep it private</span>
+      <p>Never share your password. GEEK staff will never ask you for it. Use something you don't reuse on other websites.</p>
+    </div>
+  </section>
+
+  <section id="selfservice">
+    <div class="eyebrow">Your records</div>
+    <h2>The My Self-Service area</h2>
+    <p>My Self-Service shows <strong>your own records only</strong>. It's organized into tabs across the top — here's what each one holds.</p>
+    <div class="tabgrid">
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-blue)"></span>Profile</div><p>Your personal details, bank on file, government IDs (TIN, SSS, PhilHealth, Pag-IBIG), and your employment record — employee number, company, engagement type, and rate.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-green)"></span>Payslips</div><p>Every finalized payroll period, with the net pay and a button to generate and download your payslip as a PDF.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>Leave</div><p>Your leave records — type, dates, number of days, and the current status of each request.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-red)"></span>Attendance</div><p>Your recent daily logs — hours worked, late minutes, overtime, and the status for each day.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-bluedark)"></span>Loans</div><p>Any company loans or cash advances, with the original amount and the remaining balance.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-green)"></span>Contributions</div><p>Your government contributions by period — SSS, PhilHealth, Pag-IBIG, and withholding tax.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>Security</div><p>Change your password. Do this on day one, and any time you think someone else may know it.</p></div>
+    </div>
+    <div class="note tip">
+      <span class="lbl">Something look wrong?</span>
+      <p>Your profile, bank details, and government IDs are maintained by HR — you view them here but can't edit them yourself. If anything is out of date or incorrect, contact HR and they'll update it for you.</p>
+    </div>
+  </section>
+
+  <section id="payslip">
+    <div class="eyebrow">Most-used task</div>
+    <h2>Download your payslip</h2>
+    <p>You can get your own payslip as a PDF the moment a payroll period is finalized — no need to request it from HR.</p>
+    <ol class="steps">
+      <li><span class="st-title">Open the Payslips tab.</span><p>Go to <strong>My Self-Service → Payslips</strong>. Each finalized period is listed with its net pay.</p></li>
+      <li><span class="st-title">Generate the PDF.</span><p>On the period you want, click <strong>Generate PDF</strong>. The first time, the system builds your payslip document.</p></li>
+      <li><span class="st-title">View or save it.</span><p>The button becomes <strong>View / Download PDF</strong> — click it to open the payslip in a new tab, where you can read, save, or print it.</p></li>
+    </ol>
+    <div class="note">
+      <span class="lbl">Don't see a period yet?</span>
+      <p>Only <strong>finalized</strong> payroll periods appear here. If the period you're expecting is missing, payroll hasn't finalized it yet — check back later or ask HR.</p>
+    </div>
+  </section>
+
+  <section id="contributions">
+    <div class="eyebrow">Understanding the numbers</div>
+    <h2>Reading your contributions</h2>
+    <p>The <strong>Contributions</strong> tab lists, for each pay period, the mandatory Philippine deductions taken from your pay:</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Item</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td>SSS</td><td>Social Security System — your contribution toward sickness, maternity, retirement, and other benefits.</td></tr>
+          <tr><td>PhilHealth</td><td>National health insurance that helps cover hospital and medical costs.</td></tr>
+          <tr><td>Pag-IBIG</td><td>The Home Development Mutual Fund — savings that also let you access housing loans.</td></tr>
+          <tr><td>Withholding tax</td><td>Income tax withheld from your pay and remitted to the BIR on your behalf.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>These same figures appear on each payslip, so you can always reconcile a period's deductions against this tab.</p>
+  </section>
+
+  <section id="tips">
+    <div class="eyebrow">Good to know</div>
+    <h2>Habits that keep things smooth</h2>
+    <div class="note tip">
+      <span class="lbl">Keep your info current</span>
+      <p>Moved house, changed your number, or opened a new payroll bank account? Tell HR promptly — accurate details keep your pay and government filings correct.</p>
+    </div>
+    <div class="note security">
+      <span class="lbl">Sign out on shared devices</span>
+      <p>If you're on a shared or public computer, click <strong>Sign out</strong> when you're done rather than just closing the tab. The 15-minute auto sign-out is a backstop, not a replacement.</p>
+    </div>
+    <div class="note warn">
+      <span class="lbl">Use a supported browser</span>
+      <p>A recent version of Chrome, Edge, Safari, or Firefox works best. If a page looks off after an update, refresh with <span class="kbd">Ctrl</span>/<span class="kbd">Cmd</span> + <span class="kbd">Shift</span> + <span class="kbd">R</span>.</p>
+    </div>
+  </section>
+
+  <section id="trouble">
+    <div class="eyebrow">Troubleshooting</div>
+    <h2>If something isn't working</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>What you see</th><th>What to do</th></tr></thead>
+        <tbody>
+          <tr><td>Forgot your password</td><td>Contact HR or your administrator to reset it. You'll get a new temporary password to sign in, then set your own under Security.</td></tr>
+          <tr><td>"Signed out after 15 minutes of inactivity"</td><td>Normal security behavior. Just sign in again.</td></tr>
+          <tr><td>"Invalid credentials" on sign-in</td><td>Check for typos and Caps Lock. Make sure you're using your work email exactly as given. Still stuck? Ask HR to confirm your account.</td></tr>
+          <tr><td>No payslips listed</td><td>Payslips appear only once a payroll period is finalized. If one is overdue, ask HR.</td></tr>
+          <tr><td>A menu says you have no access</td><td>Menus are based on your role. If you need access to something for your job, ask your administrator to adjust your role.</td></tr>
+          <tr><td>Your details are wrong</td><td>Profile, bank, and IDs are edited by HR. Send them the correction.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="admin">
+    <div class="eyebrow">For HR, managers &amp; administrators</div>
+    <h2>Beyond self-service</h2>
+    <p>If your role includes HR, payroll, or administration, you'll see additional menus. What appears depends on the permissions your administrator has granted — access is role-based, so not everyone sees every module.</p>
+    <ul class="adminlist">
+      <li><span class="m">People</span><span class="d">Employee and consultant records for your organization.</span></li>
+      <li><span class="m">Projects</span><span class="d">Projects with budgets, plus loans and cash-advance tracking.</span></li>
+      <li><span class="m">Payroll</span><span class="d">Prepare, review, and finalize payroll runs.</span></li>
+      <li><span class="m">13th Month &amp; Bonuses</span><span class="d">Special-pay runs, processed in bulk.</span></li>
+      <li><span class="m">Loans &amp; Advances</span><span class="d">Issue and manage company loans and cash advances.</span></li>
+      <li><span class="m">Leave &amp; Attendance</span><span class="d">Attendance uploads (CSV / biometric / API) and leave management.</span></li>
+      <li><span class="m">Assets</span><span class="d">Company assets — add, edit, and remove.</span></li>
+      <li><span class="m">Recruitment</span><span class="d">Staffing requisitions with placement, timeline, and budget.</span></li>
+      <li><span class="m">HR Modules</span><span class="d">Performance, training, tickets, and lifecycle checklists.</span></li>
+      <li><span class="m">Reports</span><span class="d">Reports by staff, period, project, or organization.</span></li>
+      <li><span class="m">Org Setup</span><span class="d">Departments and positions for an organization.</span></li>
+      <li><span class="m">Administration</span><span class="d">Organizations, Users, and Roles &amp; Scopes (administrators only).</span></li>
+    </ul>
+  </section>
+
+  <hr class="div">
+
+  <section id="help" style="padding-top:34px;">
+    <div class="eyebrow">Getting help</div>
+    <h2>Still need a hand?</h2>
+    <p>For anything this guide doesn't cover — a login you can't recover, a record that's wrong, or access you need for your work — reach out to your HR team or system administrator.</p>
+    <div class="note">
+      <span class="lbl">HR / Administrator contact</span>
+      <p><em>[ Replace with your HR email and phone before sharing — e.g. hr@geek.com.ph · (0xx) xxx-xxxx ]</em></p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="brand" style="margin-bottom:10px;">
+      <div class="mark" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span><span class="s4"></span></div>
+      <div class="wordmark"><span class="g1">G</span><span class="e1">E</span><span class="e2">E</span><span class="k1">K</span><span class="grp">GROUP</span></div>
+    </div>
+    GEEK Group · Enterprise HRIS — Employee User Guide. Your records are private to you; treat your sign-in like you would your ATM PIN.
+  </div>
+</footer>
+
+</body>
+</html>
