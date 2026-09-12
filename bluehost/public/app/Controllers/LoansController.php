@@ -88,6 +88,8 @@ class LoansController
             $status = 'REJECTED';
         }
         Audit::record('loan.decision', $u, ['organization_id' => $o, 'entity' => 'loan', 'entity_id' => $l['id'], 'after' => ['status' => $status]]);
+        Notify::toPerson((int) $l['person_id'], 'loan_decision', 'Loan/advance ' . strtolower($dec),
+            'Your ' . $l['obligation_type'] . ' request was ' . strtolower($dec) . '.', '/me');
         Http::json(['id' => (int) $l['id'], 'status' => $status]);
     }
 

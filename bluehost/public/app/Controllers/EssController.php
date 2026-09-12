@@ -23,6 +23,46 @@ class EssController
         $r->get('/me/special-pay', [self::class, 'specialPay']);
         $r->get('/me/contributions', [self::class, 'contributions']);
         $r->post('/me/password', [self::class, 'password']);
+        $r->get('/me/notifications', [self::class, 'notifications']);
+        $r->post('/me/notifications/read', [self::class, 'markNotificationsRead']);
+    }
+
+    public static function notifications(): void
+    {
+        $u = Auth::require();
+        $rows = [];
+        try {
+            $rows = Database::all('SELECT id, type, title, body, link, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 30', [$u['id']]);
+        } catch (\Throwable $e) {
+        }
+        $unread = 0;
+        $items = array_map(function ($r) use (&$unread) {
+            $read = (int) $r['is_read'] === 1;
+            if (!$read) $unread++;
+            return ['id' => (int) $r['id'], 'type' => $r['type'], 'title' => $r['title'], 'body' => $r['body'],
+                'link' => $r['link'], 'is_read' => $read, 'created_at' => $r['created_at']];
+        }, $rows);
+        Http::json(['unread' => $unread, 'items' => $items]);
+    }
+
+    public static function markNotificationsRead(): void
+    {
+        $u = Auth::require();
+        try {
+            Database::exec('UPDATE notifications SET is_read = 1 WHERE user_id = ?', [$u['id']]);
+        } catch (\Throwable $e) {
+        }
+        Http::json(['ok' => true]);
+    }
+
+    /** Display name of the signed-in employee (falls back to the account name). */
+    private static function myName(array $u): string
+    {
+        if ($u['person_id']) {
+            $n = Database::scalar("SELECT CONCAT_WS(' ', first_name, last_name) FROM people WHERE id = ?", [$u['person_id']]);
+            if ($n) return $n;
+        }
+        return (string) ($u['full_name'] ?? 'An employee');
     }
 
     /** The engagement leave/loan requests are filed against — active preferred, else most recent. */
@@ -231,6 +271,11 @@ class EssController
             'organization_id' => (int) $eng['organization_id'], 'engagement_id' => (int) $eng['id'],
             'ot_date' => ($b['ot_date'] ?? '') ?: null, 'hours' => $hours, 'status' => 'PENDING']);
         Audit::record('overtime.self_apply', $u, ['organization_id' => (int) $eng['organization_id'], 'entity' => 'overtime_request', 'entity_id' => $id]);
+        $name = self::myName($u);
+        Notify::toApprovers((int) $eng['organization_id'], 'attendance.approve', 'overtime_request',
+            "Overtime request from {$name}",
+            "{$name} requested {$hours} hour(s) of overtime on " . (($b['ot_date'] ?? '') ?: '?') . ", awaiting approval.",
+            "/o/{$eng['organization_id']}/leave");
         Http::json(['id' => $id, 'status' => 'PENDING']);
     }
 
@@ -263,6 +308,11 @@ class EssController
             'date_from' => ($b['date_from'] ?? '') ?: null, 'date_to' => ($b['date_to'] ?? '') ?: null,
             'days' => $days, 'status' => 'PENDING']);
         Audit::record('leave.self_apply', $u, ['organization_id' => (int) $eng['organization_id'], 'entity' => 'leave_request', 'entity_id' => $id]);
+        $name = self::myName($u);
+        Notify::toApprovers((int) $eng['organization_id'], 'leave.approve', 'leave_request',
+            "Leave request from {$name}",
+            "{$name} filed a {$days}-day leave (" . (($b['date_from'] ?? '') ?: '?') . " → " . (($b['date_to'] ?? '') ?: '?') . ") awaiting approval.",
+            "/o/{$eng['organization_id']}/leave");
         Http::json(['id' => $id, 'status' => 'PENDING']);
     }
 
@@ -284,6 +334,11 @@ class EssController
             'installment_amount' => (float) ($b['installment_amount'] ?? 0), 'status' => 'PENDING',
             'payroll_deductible' => 1]);
         Audit::record('loan.self_request', $u, ['organization_id' => (int) $eng['organization_id'], 'entity' => 'loan', 'entity_id' => $id]);
+        $name = self::myName($u);
+        Notify::toApprovers((int) $eng['organization_id'], 'loan.approve', 'loan_request',
+            "Loan/advance request from {$name}",
+            "{$name} requested a " . ((string) ($b['obligation_type'] ?? 'CASH_ADVANCE')) . " of " . number_format($principal, 2) . ", awaiting approval.",
+            "/o/{$eng['organization_id']}/loans");
         Http::json(['id' => $id, 'status' => 'PENDING']);
     }
 

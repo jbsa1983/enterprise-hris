@@ -13,6 +13,8 @@ require __DIR__ . '/Auth.php';
 require __DIR__ . '/Rbac.php';
 require __DIR__ . '/License.php';
 require __DIR__ . '/Audit.php';
+require __DIR__ . '/Mailer.php';
+require __DIR__ . '/Notify.php';
 require __DIR__ . '/Payroll.php';
 require __DIR__ . '/Obligation.php';
 require __DIR__ . '/PayslipService.php';

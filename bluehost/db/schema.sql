@@ -705,6 +705,19 @@ CREATE TABLE IF NOT EXISTS benefit_beneficiaries (
   INDEX (benefit_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- --- In-app notifications ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS notifications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  type VARCHAR(40) NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  body VARCHAR(500) NULL,
+  link VARCHAR(200) NULL,
+  is_read TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (user_id), INDEX (is_read)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- --- Asset lifecycle history -------------------------------------------------
 CREATE TABLE IF NOT EXISTS asset_events (
   id INT AUTO_INCREMENT PRIMARY KEY,

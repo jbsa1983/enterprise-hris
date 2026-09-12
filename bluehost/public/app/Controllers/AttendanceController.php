@@ -150,6 +150,9 @@ class AttendanceController
         if ($dec === 'APPROVED' && $was !== 'APPROVED') self::adjustBalanceUsed($o, (int) $lr['engagement_id'], $lr['leave_type'], $days);
         elseif ($dec === 'REJECTED' && $was === 'APPROVED') self::adjustBalanceUsed($o, (int) $lr['engagement_id'], $lr['leave_type'], -$days);
         Audit::record('leave.decision', $u, ['organization_id' => $o, 'entity' => 'leave_request', 'entity_id' => $lr['id'], 'after' => ['status' => $dec]]);
+        $pid = (int) Database::scalar('SELECT person_id FROM engagements WHERE id = ?', [(int) $lr['engagement_id']]);
+        if ($pid) Notify::toPerson($pid, 'leave_decision', 'Leave ' . strtolower($dec),
+            "Your {$lr['leave_type']} leave request was " . strtolower($dec) . '.', '/me');
         Http::json(['id' => (int) $lr['id'], 'status' => $dec]);
     }
 
@@ -256,8 +259,12 @@ class AttendanceController
         [, $o] = Auth::org($p, 'attendance.approve'); $b = Http::body();
         $ot = Database::one('SELECT * FROM overtime_requests WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
         if (!$ot) throw new HttpError('Overtime request not found', 404);
-        Database::update('overtime_requests', (int) $ot['id'], ['status' => strtoupper($b['decision'] ?? 'APPROVED')]);
-        Http::json(['id' => (int) $ot['id'], 'status' => strtoupper($b['decision'] ?? 'APPROVED')]);
+        $dec = strtoupper($b['decision'] ?? 'APPROVED');
+        Database::update('overtime_requests', (int) $ot['id'], ['status' => $dec]);
+        $pid = (int) Database::scalar('SELECT person_id FROM engagements WHERE id = ?', [(int) $ot['engagement_id']]);
+        if ($pid) Notify::toPerson($pid, 'overtime_decision', 'Overtime ' . strtolower($dec),
+            'Your overtime request for ' . ($ot['ot_date'] ?? '') . ' was ' . strtolower($dec) . '.', '/me');
+        Http::json(['id' => (int) $ot['id'], 'status' => $dec]);
     }
 
     public static function leaveTypes(array $p): void

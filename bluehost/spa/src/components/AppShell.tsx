@@ -54,9 +54,29 @@ export default function AppShell({
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [orgs, setOrgs] = useState<{ id: number; name: string }[]>([]);
   const [license, setLicense] = useState<{ active: boolean; enforced: boolean; reason: string } | null>(null);
+  const [notif, setNotif] = useState<{ unread: number; items: any[] }>({ unread: 0, items: [] });
+  const [notifOpen, setNotifOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useIdleLogout(IDLE_MINUTES);
+
+  useEffect(() => {
+    if (!getAccessToken()) return;
+    const loadNotif = () =>
+      apiFetch<{ unread: number; items: any[] }>("/me/notifications", { silent: true }).then(setNotif).catch(() => {});
+    loadNotif();
+    const iv = window.setInterval(loadNotif, 60_000);
+    return () => window.clearInterval(iv);
+  }, []);
+
+  async function openNotif() {
+    const willOpen = !notifOpen;
+    setNotifOpen(willOpen);
+    if (willOpen && notif.unread > 0) {
+      try { await apiFetch("/me/notifications/read", { method: "POST", silent: true }); } catch { /* ignore */ }
+      setNotif((n) => ({ unread: 0, items: n.items.map((i) => ({ ...i, is_read: true })) }));
+    }
+  }
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -192,6 +212,41 @@ export default function AppShell({
             </select>
           </div>
           <div className="flex items-center gap-4">
+            <div className="relative">
+              <button onClick={openNotif} aria-label="Notifications" className="relative flex text-slate-500 hover:text-geek-blue">
+                <span className="text-lg leading-none">🔔</span>
+                {notif.unread > 0 ? (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                    {notif.unread > 9 ? "9+" : notif.unread}
+                  </span>
+                ) : null}
+              </button>
+              {notifOpen ? (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                  <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                    <div className="border-b border-slate-100 px-4 py-2 text-sm font-medium text-slate-700">Notifications</div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {notif.items.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-sm text-slate-400">Nothing yet.</div>
+                      ) : (
+                        notif.items.map((i) => (
+                          <button
+                            key={i.id}
+                            onClick={() => { setNotifOpen(false); if (i.link) router.push(i.link); }}
+                            className={`block w-full border-b border-slate-50 px-4 py-3 text-left hover:bg-slate-50 ${i.is_read ? "" : "bg-blue-50/40"}`}
+                          >
+                            <div className="text-sm font-medium text-slate-800">{i.title}</div>
+                            {i.body ? <div className="mt-0.5 text-xs text-slate-500">{i.body}</div> : null}
+                            <div className="mt-1 text-[10px] text-slate-400">{i.created_at}</div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
             <a
               href="/manual.html"
               target="_blank"
