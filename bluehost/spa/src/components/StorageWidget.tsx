@@ -12,7 +12,7 @@ export default function StorageWidget() {
     let active = true;
     async function load() {
       try {
-        const d = await apiFetch<StorageOverview>("/system/storage");
+        const d = await apiFetch<StorageOverview>("/system/storage", { silent: true });
         if (active) {
           setData(d);
           setError(null);

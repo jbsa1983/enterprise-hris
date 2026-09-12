@@ -39,20 +39,38 @@ async function refreshTokens(): Promise<boolean> {
   return true;
 }
 
-export async function apiFetch<T = any>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+// `silent: true` makes a call give up quietly on repeated auth failure instead
+// of forcing a redirect to /login — used for background polls so they can never
+// sign the user out.
+type FetchOpts = RequestInit & { silent?: boolean };
+
+export async function apiFetch<T = any>(path: string, options: FetchOpts = {}, attempt = 0): Promise<T> {
+  const { silent, ...init } = options;
   const token = getAccessToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
+    ...(init.headers as Record<string, string>),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
-  if (res.status === 401 && retry) {
-    const ok = await refreshTokens();
-    if (ok) return apiFetch<T>(path, options, false);
-    clearTokens();
-    if (typeof window !== "undefined") window.location.href = "/login";
+  if (res.status === 401) {
+    // First failure: attempt a genuine token refresh (handles real expiry).
+    if (attempt === 0) {
+      const ok = await refreshTokens();
+      if (ok) return apiFetch<T>(path, options, 1);
+    }
+    // Further 401s while the session is still valid are almost always the host
+    // intermittently dropping the Authorization header — retry a few times with
+    // a small backoff before concluding the session is really gone.
+    if (attempt < 4) {
+      await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
+      return apiFetch<T>(path, options, attempt + 1);
+    }
+    if (!silent && typeof window !== "undefined") {
+      clearTokens();
+      window.location.href = "/login";
+    }
     throw new ApiError(401, "Unauthorized");
   }
   if (!res.ok) {

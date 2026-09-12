@@ -75,10 +75,10 @@ export default function AppShell({
       .finally(() => setLoading(false));
     // Selector shows every organization the user can access (all of them for a
     // Superadmin), independent of explicit memberships.
-    apiFetch<{ id: number; name: string }[]>("/organizations")
+    apiFetch<{ id: number; name: string }[]>("/organizations", { silent: true })
       .then(setOrgs)
       .catch(() => setOrgs([]));
-    apiFetch<{ active: boolean; enforced: boolean; reason: string }>("/license")
+    apiFetch<{ active: boolean; enforced: boolean; reason: string }>("/license", { silent: true })
       .then(setLicense)
       .catch(() => setLicense(null));
   }, [router]);
