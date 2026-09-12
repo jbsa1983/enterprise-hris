@@ -84,6 +84,7 @@
   /* Spec + table */
   .tablewrap { overflow-x: auto; margin-top: 22px; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
   table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 460px; background: var(--surface); }
+  thead th { text-align: left; background: var(--surface-2); color: var(--faint); font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 11.5px; letter-spacing: 1px; text-transform: uppercase; padding: 12px 18px; border-bottom: 1px solid var(--line); }
   tbody td { padding: 13px 18px; border-bottom: 1px solid var(--line); vertical-align: top; }
   tbody tr:last-child td { border-bottom: none; }
   tbody td:first-child { font-family: "Manrope", sans-serif; font-weight: 700; white-space: nowrap; width: 210px; }
@@ -263,6 +264,23 @@
     </div>
   </section>
 
+  <section id="editions">
+    <div class="sec-head"><span class="eyebrow">Editions</span></div>
+    <h2>Editions &amp; recommended hosting</h2>
+    <p class="lead">Priced by active employee count. Every edition is the same full system — the license sets the employee cap and the hosting we recommend for smooth performance.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Edition</th><th>Active employees</th><th>Recommended hosting</th></tr></thead>
+        <tbody>
+          <tr><td>Starter</td><td>Up to 50</td><td>Standard cPanel shared hosting</td></tr>
+          <tr><td>Business</td><td>51 – 100</td><td>Business / Pro shared hosting</td></tr>
+          <tr><td>Enterprise</td><td>101 – 300</td><td>High-tier shared hosting or a VPS</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="color:var(--muted); font-size:14px; max-width:var(--measure);">Beyond 300 employees, or for heavy peak loads (payroll day, bulk runs, large exports), we recommend a VPS or dedicated server — the same software on a bigger engine.</p>
+  </section>
+
   <section id="license">
     <div class="sec-head"><span class="eyebrow">Licensing</span></div>
     <h2>One installation, one key</h2>
@@ -270,8 +288,9 @@
       <h3>Single-use activation</h3>
       <div class="keydemo">GEEK-HRIS-XXXXX-XXXXX-XXXXX</div>
       <ul>
-        <li>Each deployment is activated with a <b>single-use key</b> you generate for the customer.</li>
-        <li>The key <b>locks to the installation's domain</b> and is marked used, so it can't be reused elsewhere.</li>
+        <li>Each deployment is activated with a key you generate for the customer.</li>
+        <li>The key <b>locks to the installation's domain</b>, so it only works there.</li>
+        <li>Sets the edition's <b>employee cap</b> — adding beyond it prompts an upgrade.</li>
         <li>Optional <b>expiry date</b> for subscription or trial licensing.</li>
         <li>Until activated, the app runs in a limited/locked state.</li>
       </ul>

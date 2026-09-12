@@ -80,7 +80,15 @@ zwIDAQAB
             'active' => $valid, 'reason' => $reason, 'enforced' => self::ENFORCE,
             'customer' => $data['customer'] ?? null, 'domain' => $data['domain'] ?? null,
             'edition' => $data['edition'] ?? null, 'expires' => $data['expires'] ?? null,
+            'max_users' => isset($data['max']) ? (int) $data['max'] : null,
             'host' => self::currentHost(),
         ];
+    }
+
+    /** Licensed employee cap from an ACTIVE license; 0 means unlimited / not capped. */
+    public static function maxUsers(): int
+    {
+        [$valid, , $data] = self::verify(self::stored());
+        return $valid && !empty($data['max']) ? (int) $data['max'] : 0;
     }
 }

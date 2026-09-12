@@ -31,6 +31,24 @@ It prints one key like `GEEKHRIS.xxxxx.yyyyy`. Send it to the customer; they pas
 it in **Administration → License → Activate**. The key only works on that domain
 and stops after the expiry date.
 
+### Editions (employee cap)
+
+`--edition` sets the maximum number of **active employees**; override with `--max-users N`.
+
+| Edition | `--edition` | Active employees | Recommended hosting |
+|---|---|---|---|
+| Starter | `starter` | up to 50 | Standard shared hosting |
+| Business | `business` | up to 100 | Business/Pro shared hosting |
+| Enterprise | `enterprise` | up to 300 | High-tier shared or VPS |
+| (unlimited) | `standard` | no cap | depends on scale |
+
+```bash
+./make-license.sh --domain acme.com --customer "ACME Inc" --edition business --expires 2027-09-12
+```
+
+When the cap is reached, adding another employee shows a friendly *"upgrade your
+plan"* message. Admin/HR **logins** don't count — only active employee records do.
+
 ## Turn enforcement on for sold copies
 In `public/app/License.php`, set `const ENFORCE = true;` before packaging a copy
 you sell. With enforcement on, the app is locked (except sign-in + the License

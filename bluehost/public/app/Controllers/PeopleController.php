@@ -32,6 +32,14 @@ class PeopleController
     public static function create(array $p): void
     {
         [$user, $orgId] = Auth::org($p, 'employee.create');
+        // Licensed edition may cap the number of active employees.
+        $max = License::maxUsers();
+        if ($max > 0) {
+            $active = (int) Database::scalar("SELECT COUNT(DISTINCT person_id) FROM engagements WHERE status = 'ACTIVE'");
+            if ($active >= $max) {
+                throw new HttpError("You've reached your plan's limit of {$max} active employees. Please upgrade your plan to add more.", 403);
+            }
+        }
         $b = Http::body();
         $eng = $b['engagement'] ?? [];
         $person = self::pick($b, self::PERSON_FIELDS);
