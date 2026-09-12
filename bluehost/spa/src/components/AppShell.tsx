@@ -8,7 +8,7 @@ import type { CurrentUser } from "@/lib/types";
 import GeekLogo from "@/components/GeekLogo";
 
 // Sign out after this many minutes of no user activity.
-const IDLE_MINUTES = 15;
+const IDLE_MINUTES = 3;
 
 // `perm` is the permission required to see the tab. Items without a perm are
 // visible to everyone (Superadmins always see all). Management tabs are gated on
