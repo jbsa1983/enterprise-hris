@@ -11,7 +11,8 @@ if (!$appDir) { fwrite(STDERR, "Cannot locate app/ directory near this script.\n
 require $appDir . '/Config.php';
 require $appDir . '/Database.php';
 
-$defaults = [['Vacation', 15], ['Sick', 15], ['Emergency', 5], ['Birthday', 1]];
+$defaults = [['Vacation', 15], ['Sick', 15], ['Emergency', 5], ['Birthday', 1],
+    ['Bereavement', 3], ['Maternity', 105], ['Paternity', 7]];
 
 $orgs = Database::all('SELECT id, name FROM organizations');
 $added = 0;

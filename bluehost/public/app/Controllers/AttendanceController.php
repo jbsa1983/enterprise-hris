@@ -4,7 +4,9 @@ class AttendanceController
     const COLS = ['employee_number', 'log_date', 'time_in', 'time_out', 'hours_worked', 'late_minutes', 'overtime_hours', 'status'];
 
     // Default leave types every organization starts with (name => default credits).
-    const DEFAULT_LEAVE_TYPES = [['Vacation', 15], ['Sick', 15], ['Emergency', 5], ['Birthday', 1]];
+    // A convenient starting set — HR can edit credits, delete, or add more per org.
+    const DEFAULT_LEAVE_TYPES = [['Vacation', 15], ['Sick', 15], ['Emergency', 5], ['Birthday', 1],
+        ['Bereavement', 3], ['Maternity', 105], ['Paternity', 7]];
 
     /** Create the default leave types for an org, skipping any that already exist by name. */
     public static function ensureDefaultLeaveTypes(int $orgId): int

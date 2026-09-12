@@ -4,8 +4,10 @@ import AppShell from "@/components/AppShell";
 import { apiFetch } from "@/lib/api";
 import { peso } from "@/lib/format";
 
-const BENEFIT_TYPES = ["HMO / Health", "Life Insurance", "Dental", "Accident", "Retirement", "Allowance", "Other"];
-const EMPTY: any = { person_id: "", benefit_type: "HMO / Health", provider: "", policy_number: "", coverage_amount: "",
+// Suggestions only — HR can type any benefit type a given organization offers.
+const BENEFIT_TYPES = ["HMO / Health", "Life Insurance", "Dental", "Accident", "Retirement",
+  "Allowance", "Rice Subsidy", "Meal Allowance", "Transportation", "Educational Assistance", "Other"];
+const EMPTY: any = { person_id: "", benefit_type: "", provider: "", policy_number: "", coverage_amount: "",
   start_date: "", end_date: "", status: "ACTIVE", remarks: "", beneficiaries: [] };
 
 export default function BenefitsPage() {
@@ -50,6 +52,7 @@ export default function BenefitsPage() {
   async function save() {
     setErr("");
     if (editing === "new" && !form.person_id) { setErr("Choose an employee."); return; }
+    if (!(form.benefit_type || "").trim()) { setErr("Enter a benefit type."); return; }
     try {
       if (editing === "new") await apiFetch(`/organizations/${orgId}/benefits`, { method: "POST", body: JSON.stringify(payload()) });
       else await apiFetch(`/organizations/${orgId}/benefits/${editing.id}`, { method: "PUT", body: JSON.stringify(payload()) });
@@ -125,8 +128,8 @@ export default function BenefitsPage() {
                 ) : <input className="input bg-slate-50" value={(editing as any).person} disabled />}
               </div>
               <div><label className="mb-1 block text-xs text-slate-500">Benefit type *</label>
-                <select className="input" value={form.benefit_type} onChange={(e) => setForm({ ...form, benefit_type: e.target.value })}>
-                  {BENEFIT_TYPES.map((t) => <option key={t}>{t}</option>)}</select></div>
+                <input className="input" list="benefit-types" placeholder="e.g. HMO / Health — or type your own" value={form.benefit_type} onChange={(e) => setForm({ ...form, benefit_type: e.target.value })} />
+                <datalist id="benefit-types">{BENEFIT_TYPES.map((t) => <option key={t} value={t} />)}</datalist></div>
               {F("provider", "Provider")}
               {F("policy_number", "Policy number")}
               {F("coverage_amount", "Coverage amount", { type: "number" })}
