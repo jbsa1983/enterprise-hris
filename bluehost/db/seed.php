@@ -91,6 +91,9 @@ foreach ([['Exigent Corporation', 'EXG'], ['GreatnessLab', 'GLB']] as [$n, $c]) 
 }
 foreach ($orgs as $oid) {
     Database::insert('organization_users', ['organization_id' => $oid, 'user_id' => $adminId, 'is_primary' => 0]);
+    foreach ([['Vacation', 15], ['Sick', 15], ['Emergency', 5], ['Birthday', 1]] as [$ltn, $ltc]) {
+        Database::insert('leave_types', ['organization_id' => $oid, 'name' => $ltn, 'default_credits' => $ltc, 'paid' => 1]);
+    }
 }
 
 $first = ['Juan', 'Maria', 'Jose', 'Anna', 'Pedro', 'Liza', 'Mark', 'Grace', 'Paolo', 'Nadine', 'Miguel', 'Sofia'];

@@ -3,6 +3,20 @@ class AttendanceController
 {
     const COLS = ['employee_number', 'log_date', 'time_in', 'time_out', 'hours_worked', 'late_minutes', 'overtime_hours', 'status'];
 
+    // Default leave types every organization starts with (name => default credits).
+    const DEFAULT_LEAVE_TYPES = [['Vacation', 15], ['Sick', 15], ['Emergency', 5], ['Birthday', 1]];
+
+    /** Create the default leave types for an org, skipping any that already exist by name. */
+    public static function ensureDefaultLeaveTypes(int $orgId): int
+    {
+        $added = 0;
+        foreach (self::DEFAULT_LEAVE_TYPES as [$name, $credits]) {
+            $exists = Database::scalar('SELECT id FROM leave_types WHERE organization_id = ? AND name = ?', [$orgId, $name]);
+            if (!$exists) { Database::insert('leave_types', ['organization_id' => $orgId, 'name' => $name, 'default_credits' => $credits, 'paid' => 1]); $added++; }
+        }
+        return $added;
+    }
+
     public static function routes(Router $r): void
     {
         $b = '/organizations/{organization_id}';

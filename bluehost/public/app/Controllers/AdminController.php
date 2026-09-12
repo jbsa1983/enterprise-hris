@@ -270,6 +270,8 @@ class AdminController
         }
         $id = Database::insert('organizations', ['uuid' => Util::uuid(), 'enterprise_id' => (int) $entId, 'name' => $b['name'],
             'code' => $b['code'], 'legal_name' => $b['legal_name'] ?? null, 'tin' => $b['tin'] ?? null, 'address' => $b['address'] ?? null, 'is_active' => 1]);
+        // Start every new organization with the default leave types.
+        AttendanceController::ensureDefaultLeaveTypes($id);
         // Grant a non-superadmin creator access so it shows in their selector.
         if (!$actor['is_superadmin']) Database::insert('organization_users', ['organization_id' => $id, 'user_id' => $actor['id'], 'is_primary' => 0]);
         Audit::record('organization.create', $actor, ['organization_id' => $id, 'entity' => 'organization', 'entity_id' => $id, 'after' => ['code' => $b['code']]]);
