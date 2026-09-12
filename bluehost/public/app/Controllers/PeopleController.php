@@ -10,6 +10,12 @@ class PeopleController
         'department_id', 'position_id', 'job_grade', 'salary_basis', 'base_rate', 'payroll_group', 'cost_center',
         'project_id', 'work_site', 'status'];
 
+    // Columns for the bulk-import CSV template (order matters).
+    const IMPORT_HEADERS = ['first_name', 'middle_name', 'last_name', 'suffix', 'birth_date', 'gender', 'civil_status',
+        'email', 'mobile', 'address', 'tin', 'sss_number', 'philhealth_number', 'pagibig_number',
+        'bank_name', 'bank_account_number', 'bank_account_name',
+        'employee_number', 'engagement_type', 'department', 'position', 'job_grade', 'salary_basis', 'base_rate', 'start_date', 'status'];
+
     public static function routes(Router $r): void
     {
         $b = '/organizations/{organization_id}';
@@ -17,6 +23,8 @@ class PeopleController
         $r->get("$b/employees", [self::class, 'employees']);
         $r->get("$b/consultants", [self::class, 'consultants']);
         $r->post("$b/people/create", [self::class, 'create']);
+        $r->get("$b/people/template", [self::class, 'template']);
+        $r->post("$b/people/import", [self::class, 'importPeople']);
         $r->get("$b/people/{engagement_id}", [self::class, 'detail']);
         $r->put("$b/people/{engagement_id}", [self::class, 'update']);
         $r->post("$b/people/{engagement_id}/archive", [self::class, 'archive']);
@@ -55,6 +63,76 @@ class PeopleController
         $eid = Database::insert('engagements', $engData);
         Audit::record('employee.create', $user, ['organization_id' => $orgId, 'entity' => 'person', 'entity_id' => $pid]);
         Http::json(['person_id' => $pid, 'engagement_id' => $eid]);
+    }
+
+    /** Download a CSV template (opens in Excel) with all importable columns + one example row. */
+    public static function template(array $p): void
+    {
+        Auth::org($p, 'employee.view');
+        $example = ['Juan', 'Cruz', 'Dela Cruz', '', '1995-06-15', 'Male', 'Single',
+            'juan@company.com', '0917 000 0000', 'Metro Manila', '123-456-789-000', '34-1234567-8', '01-234567890-1', '1234-5678-9012',
+            'BDO', '001234567890', 'Juan Dela Cruz',
+            'EMP-1001', 'REGULAR', 'Operations', 'Staff', 'G3', 'MONTHLY', '25000', date('Y-m-d'), 'ACTIVE'];
+        $q = fn($v) => '"' . str_replace('"', '""', (string) $v) . '"';
+        $out = implode(',', array_map($q, self::IMPORT_HEADERS)) . "\n" . implode(',', array_map($q, $example)) . "\n";
+        Http::file($out, 'text/csv', 'employees_template.csv');
+    }
+
+    /** Bulk-create employees from an uploaded CSV. */
+    public static function importPeople(array $p): void
+    {
+        [$user, $o] = Auth::org($p, 'employee.create');
+        if (empty($_FILES['file']['tmp_name'])) throw new HttpError('No file uploaded', 422);
+        if (str_ends_with(strtolower($_FILES['file']['name'] ?? ''), '.xlsx'))
+            throw new HttpError('Please save the file as CSV and upload the .csv version', 422);
+
+        $rows = [];
+        if (($fh = fopen($_FILES['file']['tmp_name'], 'r')) !== false) {
+            $header = fgetcsv($fh);
+            if ($header) {
+                $header = array_map(fn($h) => strtolower(trim((string) preg_replace('/^\xEF\xBB\xBF/', '', $h))), $header);
+                while (($line = fgetcsv($fh)) !== false) {
+                    if (count(array_filter($line, fn($x) => trim((string) $x) !== '')) === 0) continue;
+                    $row = [];
+                    foreach ($header as $ci => $col) $row[$col] = isset($line[$ci]) ? trim((string) $line[$ci]) : '';
+                    $rows[] = $row;
+                }
+            }
+            fclose($fh);
+        }
+        if (!$rows) throw new HttpError('No data rows found in the file', 422);
+
+        $max = License::maxUsers();
+        $active = $max > 0 ? (int) Database::scalar("SELECT COUNT(DISTINCT person_id) FROM engagements WHERE status = 'ACTIVE'") : 0;
+
+        $deptMap = []; foreach (Database::all('SELECT id, LOWER(name) n FROM departments WHERE organization_id = ?', [$o]) as $d) $deptMap[$d['n']] = (int) $d['id'];
+        $posMap = [];  foreach (Database::all('SELECT id, LOWER(title) t FROM positions WHERE organization_id = ?', [$o]) as $q) $posMap[$q['t']] = (int) $q['id'];
+
+        $imported = 0; $skipped = 0; $errors = []; $rowNo = 1;
+        foreach ($rows as $r) {
+            $rowNo++;
+            if (($r['first_name'] ?? '') === '' || ($r['last_name'] ?? '') === '') {
+                $errors[] = "Row $rowNo: first_name and last_name are required"; $skipped++; continue;
+            }
+            if ($max > 0 && $active >= $max) {
+                $errors[] = "Row $rowNo onward: plan limit of $max active employees reached — remaining rows skipped"; $skipped++; break;
+            }
+            $person = ['uuid' => Util::uuid(), 'status' => 'ACTIVE'];
+            foreach (self::PERSON_FIELDS as $f) if (!empty($r[$f])) $person[$f] = $r[$f];
+            $pid = Database::insert('people', $person);
+
+            $eng = ['uuid' => Util::uuid(), 'person_id' => $pid, 'organization_id' => $o,
+                'engagement_type' => ($r['engagement_type'] ?? '') ?: 'REGULAR', 'status' => ($r['status'] ?? '') ?: 'ACTIVE'];
+            foreach (['employee_number', 'job_grade', 'salary_basis', 'start_date'] as $f) if (!empty($r[$f])) $eng[$f] = $r[$f];
+            if (!empty($r['base_rate']) && is_numeric($r['base_rate'])) $eng['base_rate'] = (float) $r['base_rate'];
+            if (!empty($r['department']) && isset($deptMap[strtolower($r['department'])])) $eng['department_id'] = $deptMap[strtolower($r['department'])];
+            if (!empty($r['position']) && isset($posMap[strtolower($r['position'])])) $eng['position_id'] = $posMap[strtolower($r['position'])];
+            Database::insert('engagements', $eng);
+
+            $imported++; if ($max > 0) $active++;
+        }
+        Audit::record('employee.import', $user, ['organization_id' => $o, 'entity' => 'engagement', 'after' => ['imported' => $imported]]);
+        Http::json(['imported' => $imported, 'skipped' => $skipped, 'error_count' => count($errors), 'errors' => array_slice($errors, 0, 50)]);
     }
 
     private static function detailArr(array $eng, array $person): array

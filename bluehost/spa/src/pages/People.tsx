@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "@/lib/nav";
 import AppShell from "@/components/AppShell";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiDownload, apiUpload } from "@/lib/api";
 import { peso, statusColor } from "@/lib/format";
 import type { EngagementRow } from "@/lib/types";
 
@@ -108,13 +108,33 @@ export default function PeoplePage() {
       <input className="input" value={form[k] ?? ""} onChange={(e) => setForm({ ...form, [k]: e.target.value })} {...extra} /></div>
   );
 
+  async function onImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setErr(""); setMsg("Uploading…");
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const r = await apiUpload<any>(`/organizations/${orgId}/people/import`, fd);
+      const issues = r.error_count ? ` · ${r.error_count} issue(s): ${(r.errors || []).slice(0, 3).join("; ")}` : "";
+      setMsg(`Imported ${r.imported}, skipped ${r.skipped}${issues}`);
+      load();
+    } catch (er: any) { setErr(er.message); setMsg(""); }
+    finally { e.target.value = ""; }
+  }
+
   return (
     <AppShell orgId={orgId}>
       <div className="mb-4 flex items-center justify-between">
         <div><h1 className="text-lg font-semibold text-slate-900">{title}</h1>
           <p className="text-sm text-slate-500">{filtered.length} record(s)</p></div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input className="input max-w-xs" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <button className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+            onClick={() => apiDownload(`/organizations/${orgId}/people/template`, "employees_template.csv")}>Template</button>
+          <label className="cursor-pointer whitespace-nowrap rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+            Import CSV
+            <input type="file" accept=".csv" className="hidden" onChange={onImport} />
+          </label>
           <button className="btn-primary whitespace-nowrap" onClick={openCreate}>+ Add Person</button>
         </div>
       </div>
