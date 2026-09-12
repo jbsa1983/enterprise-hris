@@ -11,6 +11,7 @@ require __DIR__ . '/Jwt.php';
 require __DIR__ . '/Tokens.php';
 require __DIR__ . '/Auth.php';
 require __DIR__ . '/Rbac.php';
+require __DIR__ . '/License.php';
 require __DIR__ . '/Audit.php';
 require __DIR__ . '/Payroll.php';
 require __DIR__ . '/Obligation.php';

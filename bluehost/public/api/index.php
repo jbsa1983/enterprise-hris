@@ -42,6 +42,16 @@ EssController::routes($router);
 AdminController::routes($router);
 StorageController::routes($router);
 BrandingController::routes($router);
+LicenseController::routes($router);
+
+// When license enforcement is on, lock everything except sign-in and activation
+// until a valid license is installed.
+if (License::ENFORCE) {
+    $allow = ['/health', '/branding', '/license', '/auth/login', '/auth/refresh', '/auth/me', '/admin/license'];
+    if (!in_array($path, $allow, true) && !License::status()['active']) {
+        Http::error('This installation is not activated. Enter a valid license key in Administration → License.', 403);
+    }
+}
 
 try {
     $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $path);

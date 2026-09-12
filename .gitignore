@@ -33,3 +33,7 @@ bluehost/public/app/settings.php
 bluehost/*.zip
 bluehost/spa/node_modules
 bluehost/spa/dist
+
+# Licensing — vendor private key (NEVER commit) + per-install license
+bluehost/license-tools/keys/
+bluehost/public/app/installed-license.php
