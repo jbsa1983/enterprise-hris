@@ -87,10 +87,15 @@ export default function AppShell({
     apiFetch<CurrentUser>("/auth/me")
       .then((u) => {
         setUser(u);
-        // Plain employees (no org-wide access) have no use for the dashboards —
-        // send them straight to their self-service area.
         const canOrg = u.is_superadmin || (u.permissions || []).includes("organization.view");
-        if (!canOrg && /\/dashboard$/.test(pathname)) router.replace("/me");
+        const orgs = u.organizations || [];
+        if (!canOrg && /\/dashboard$/.test(pathname)) {
+          // Plain employees have no use for the dashboards — send them to self-service.
+          router.replace("/me");
+        } else if (canOrg && !u.is_superadmin && pathname === "/dashboard" && orgs.length === 1) {
+          // Assigned to exactly one organization → go straight into it.
+          router.replace(`/o/${orgs[0].organization_id}/dashboard`);
+        }
       })
       .catch(() => router.replace("/login"))
       .finally(() => setLoading(false));
