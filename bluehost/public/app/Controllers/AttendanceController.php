@@ -18,6 +18,11 @@ class AttendanceController
         $r->get("$b/overtime", [self::class, 'listOvertime']);
         $r->post("$b/overtime/{id}/decision", [self::class, 'decideOvertime']);
         $r->get("$b/leave-types", [self::class, 'leaveTypes']);
+        $r->post("$b/leave-types", [self::class, 'createLeaveType']);
+        $r->put("$b/leave-types/{id}", [self::class, 'updateLeaveType']);
+        $r->delete("$b/leave-types/{id}", [self::class, 'deleteLeaveType']);
+        $r->get("$b/leave-balances", [self::class, 'listLeaveBalances']);
+        $r->post("$b/leave-balances", [self::class, 'setLeaveBalance']);
     }
 
     public static function listAttendance(array $p): void
@@ -121,9 +126,104 @@ class AttendanceController
         if (!$lr) throw new HttpError('Leave request not found', 404);
         $dec = strtoupper($b['decision'] ?? 'APPROVED');
         if (!in_array($dec, ['APPROVED', 'REJECTED'], true)) throw new HttpError('decision must be APPROVED or REJECTED', 422);
+        $was = strtoupper((string) $lr['status']);
         Database::update('leave_requests', (int) $lr['id'], ['status' => $dec]);
+        // Keep the leave balance in step with usage: deduct on approval, restore
+        // if an approved leave is later rejected.
+        $days = (float) $lr['days'];
+        if ($dec === 'APPROVED' && $was !== 'APPROVED') self::adjustBalanceUsed($o, (int) $lr['engagement_id'], $lr['leave_type'], $days);
+        elseif ($dec === 'REJECTED' && $was === 'APPROVED') self::adjustBalanceUsed($o, (int) $lr['engagement_id'], $lr['leave_type'], -$days);
         Audit::record('leave.decision', $u, ['organization_id' => $o, 'entity' => 'leave_request', 'entity_id' => $lr['id'], 'after' => ['status' => $dec]]);
         Http::json(['id' => (int) $lr['id'], 'status' => $dec]);
+    }
+
+    /** Move `used` on a leave balance by $delta days, creating the row if needed. */
+    private static function adjustBalanceUsed(int $o, int $engagementId, string $leaveType, float $delta): void
+    {
+        $bal = Database::one('SELECT * FROM leave_balances WHERE organization_id = ? AND engagement_id = ? AND leave_type = ?',
+            [$o, $engagementId, $leaveType]);
+        if ($bal) {
+            $used = max(0, (float) $bal['used'] + $delta);
+            Database::update('leave_balances', (int) $bal['id'], ['used' => $used]);
+        } elseif ($delta > 0) {
+            $credits = (float) (Database::scalar('SELECT default_credits FROM leave_types WHERE organization_id = ? AND name = ?', [$o, $leaveType]) ?? 0);
+            Database::insert('leave_balances', ['organization_id' => $o, 'engagement_id' => $engagementId,
+                'leave_type' => $leaveType, 'credits' => $credits, 'used' => $delta]);
+        }
+    }
+
+    public static function createLeaveType(array $p): void
+    {
+        [, $o] = Auth::org($p, 'leave.approve'); $b = Http::body();
+        $name = trim((string) ($b['name'] ?? ''));
+        if ($name === '') throw new HttpError('Leave type name is required', 422);
+        $id = Database::insert('leave_types', ['organization_id' => $o, 'name' => $name,
+            'default_credits' => (float) ($b['default_credits'] ?? 0), 'paid' => isset($b['paid']) ? (int) (bool) $b['paid'] : 1]);
+        Http::json(['id' => $id]);
+    }
+
+    public static function updateLeaveType(array $p): void
+    {
+        [, $o] = Auth::org($p, 'leave.approve'); $b = Http::body();
+        $t = Database::one('SELECT id FROM leave_types WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
+        if (!$t) throw new HttpError('Leave type not found', 404);
+        $data = [];
+        if (isset($b['name'])) $data['name'] = $b['name'];
+        if (isset($b['default_credits'])) $data['default_credits'] = (float) $b['default_credits'];
+        if (isset($b['paid'])) $data['paid'] = (int) (bool) $b['paid'];
+        if ($data) Database::update('leave_types', (int) $t['id'], $data);
+        Http::json(['id' => (int) $t['id']]);
+    }
+
+    public static function deleteLeaveType(array $p): void
+    {
+        [, $o] = Auth::org($p, 'leave.approve');
+        Database::exec('DELETE FROM leave_types WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
+        Http::json(['deleted' => (int) $p['id']]);
+    }
+
+    /** Leave balances for one engagement — every leave type, with remaining computed. */
+    public static function listLeaveBalances(array $p): void
+    {
+        [, $o] = Auth::org($p, 'leave.view');
+        $eng = (int) Http::query('engagement_id');
+        $types = Database::all('SELECT name, default_credits FROM leave_types WHERE organization_id = ? ORDER BY name', [$o]);
+        $bal = [];
+        foreach (Database::all('SELECT leave_type, credits, used FROM leave_balances WHERE organization_id = ? AND engagement_id = ?', [$o, $eng]) as $b) {
+            $bal[$b['leave_type']] = $b;
+        }
+        $out = [];
+        foreach ($types as $t) {
+            $row = $bal[$t['name']] ?? null;
+            $credits = $row ? (float) $row['credits'] : (float) $t['default_credits'];
+            $used = $row ? (float) $row['used'] : 0;
+            $out[] = ['leave_type' => $t['name'], 'credits' => $credits, 'used' => $used, 'remaining' => $credits - $used];
+            unset($bal[$t['name']]);
+        }
+        // Any balance whose type was deleted still shows.
+        foreach ($bal as $name => $row) {
+            $out[] = ['leave_type' => $name, 'credits' => (float) $row['credits'], 'used' => (float) $row['used'], 'remaining' => (float) $row['credits'] - (float) $row['used']];
+        }
+        Http::json($out);
+    }
+
+    public static function setLeaveBalance(array $p): void
+    {
+        [, $o] = Auth::org($p, 'leave.approve'); $b = Http::body();
+        $eng = (int) ($b['engagement_id'] ?? 0);
+        $type = trim((string) ($b['leave_type'] ?? ''));
+        if (!$eng || $type === '') throw new HttpError('engagement_id and leave_type are required', 422);
+        $credits = (float) ($b['credits'] ?? 0);
+        $existing = Database::one('SELECT id, used FROM leave_balances WHERE organization_id = ? AND engagement_id = ? AND leave_type = ?', [$o, $eng, $type]);
+        if ($existing) {
+            $data = ['credits' => $credits];
+            if (isset($b['used'])) $data['used'] = (float) $b['used'];
+            Database::update('leave_balances', (int) $existing['id'], $data);
+        } else {
+            Database::insert('leave_balances', ['organization_id' => $o, 'engagement_id' => $eng, 'leave_type' => $type,
+                'credits' => $credits, 'used' => (float) ($b['used'] ?? 0)]);
+        }
+        Http::json(['ok' => true]);
     }
 
     public static function listOvertime(array $p): void

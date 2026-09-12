@@ -35,6 +35,7 @@ AttendanceController::routes($router);
 SpecialPayController::routes($router);
 RecruitmentController::routes($router);
 AssetsController::routes($router);
+BenefitsController::routes($router);
 HrModulesController::routes($router);
 ReportsController::routes($router);
 EssController::routes($router);

@@ -11,13 +11,44 @@ export default function LeavePage() {
   const [ot, setOt] = useState<any[]>([]);
   const [att, setAtt] = useState<any[]>([]);
   const [importMsg, setImportMsg] = useState("");
+  const [types, setTypes] = useState<any[]>([]);
+  const [people, setPeople] = useState<any[]>([]);
+  const [newType, setNewType] = useState({ name: "", default_credits: "" });
+  const [selEng, setSelEng] = useState("");
+  const [balances, setBalances] = useState<any[]>([]);
+  const [creditMsg, setCreditMsg] = useState("");
 
   const load = useCallback(() => {
     apiFetch(`/organizations/${orgId}/leave`).then(setLeave).catch(() => setLeave([]));
     apiFetch(`/organizations/${orgId}/overtime`).then(setOt).catch(() => setOt([]));
     apiFetch(`/organizations/${orgId}/attendance`).then(setAtt).catch(() => setAtt([]));
+    apiFetch(`/organizations/${orgId}/leave-types`).then(setTypes).catch(() => setTypes([]));
+    apiFetch(`/organizations/${orgId}/people`).then(setPeople).catch(() => {});
   }, [orgId]);
   useEffect(load, [load]);
+
+  const loadBalances = useCallback((eng: string) => {
+    setSelEng(eng); setCreditMsg("");
+    if (eng) apiFetch(`/organizations/${orgId}/leave-balances?engagement_id=${eng}`).then(setBalances).catch(() => setBalances([]));
+    else setBalances([]);
+  }, [orgId]);
+
+  async function addType() {
+    if (!newType.name) return;
+    await apiFetch(`/organizations/${orgId}/leave-types`, { method: "POST", body: JSON.stringify({ name: newType.name, default_credits: Number(newType.default_credits || 0) }) });
+    setNewType({ name: "", default_credits: "" }); load();
+  }
+  async function saveTypeCredits(t: any, credits: string) {
+    await apiFetch(`/organizations/${orgId}/leave-types/${t.id}`, { method: "PUT", body: JSON.stringify({ default_credits: Number(credits || 0) }) }); load();
+  }
+  async function delType(t: any) {
+    if (!confirm(`Delete leave type "${t.name}"?`)) return;
+    await apiFetch(`/organizations/${orgId}/leave-types/${t.id}`, { method: "DELETE" }); load();
+  }
+  async function saveBalance(leaveType: string, credits: string) {
+    await apiFetch(`/organizations/${orgId}/leave-balances`, { method: "POST", body: JSON.stringify({ engagement_id: Number(selEng), leave_type: leaveType, credits: Number(credits || 0) }) });
+    setCreditMsg("Saved."); loadBalances(selEng);
+  }
 
   async function decideLeave(id: number, decision: string) {
     await apiFetch(`/organizations/${orgId}/leave/${id}/decision`, { method: "POST", body: JSON.stringify({ decision }) });
@@ -81,6 +112,57 @@ export default function LeavePage() {
                 {ot.length === 0 ? <tr><td className="px-4 py-6 text-center text-slate-400">No overtime requests.</td></tr> : null}
               </tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="card p-0">
+          <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium">Leave Types &amp; Default Credits</div>
+          <div className="p-4">
+            <div className="mb-3 flex gap-2">
+              <input className="input" placeholder="Type name (e.g. Vacation)" value={newType.name} onChange={(e) => setNewType({ ...newType, name: e.target.value })} />
+              <input className="input max-w-[110px]" type="number" placeholder="Credits" value={newType.default_credits} onChange={(e) => setNewType({ ...newType, default_credits: e.target.value })} />
+              <button className="btn-primary whitespace-nowrap" onClick={addType}>Add</button>
+            </div>
+            <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
+              {types.map((t) => (
+                <tr key={t.id}>
+                  <td className="py-2">{t.name}</td>
+                  <td className="py-2 text-right"><input key={`${t.id}-${t.default_credits}`} type="number" className="input max-w-[90px]" defaultValue={t.default_credits} onBlur={(e) => saveTypeCredits(t, e.target.value)} /></td>
+                  <td className="py-2 text-right"><button className="text-red-600 hover:underline" onClick={() => delType(t)}>Delete</button></td>
+                </tr>
+              ))}
+              {types.length === 0 ? <tr><td colSpan={3} className="py-4 text-center text-slate-400">No leave types yet — add Vacation, Sick, Emergency, Birthday…</td></tr> : null}
+            </tbody></table>
+            <p className="mt-2 text-[11px] text-slate-400">Default credits apply to everyone unless overridden per employee. Approved leave auto-deducts from the balance.</p>
+          </div>
+        </div>
+
+        <div className="card p-0">
+          <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium">Per-Employee Leave Credits</div>
+          <div className="p-4">
+            <select className="input mb-3" value={selEng} onChange={(e) => loadBalances(e.target.value)}>
+              <option value="">Select employee…</option>
+              {people.map((p) => <option key={p.engagement_id} value={p.engagement_id}>{p.full_name}</option>)}
+            </select>
+            {creditMsg ? <div className="mb-2 text-xs text-emerald-700">{creditMsg}</div> : null}
+            {selEng ? (
+              <table className="min-w-full text-sm">
+                <thead><tr className="text-left text-xs uppercase text-slate-400"><th className="py-1">Type</th><th className="text-right">Credits</th><th className="text-right">Used</th><th className="text-right">Remaining</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">
+                  {balances.map((b) => (
+                    <tr key={b.leave_type}>
+                      <td className="py-2">{b.leave_type}</td>
+                      <td className="py-2 text-right"><input key={`${b.leave_type}-${b.credits}`} type="number" className="input max-w-[90px]" defaultValue={b.credits} onBlur={(e) => saveBalance(b.leave_type, e.target.value)} /></td>
+                      <td className="py-2 text-right">{b.used}</td>
+                      <td className="py-2 text-right font-medium">{b.remaining}</td>
+                    </tr>
+                  ))}
+                  {balances.length === 0 ? <tr><td colSpan={4} className="py-4 text-center text-slate-400">Define leave types first.</td></tr> : null}
+                </tbody>
+              </table>
+            ) : <p className="text-xs text-slate-400">Pick an employee to view and set their credits. Blank uses the type default.</p>}
           </div>
         </div>
       </div>

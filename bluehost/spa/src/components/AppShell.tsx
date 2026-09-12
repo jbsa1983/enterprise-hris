@@ -25,6 +25,7 @@ const NAV: { label: string; perm?: string; href: (o?: number) => string }[] = [
   { label: "Loans & Advances", perm: "loan.view", href: (o) => (o ? `/o/${o}/loans` : "#") },
   { label: "Leave & Attendance", perm: "leave.approve", href: (o) => (o ? `/o/${o}/leave` : "#") },
   { label: "Assets", perm: "employee.view", href: (o) => (o ? `/o/${o}/assets` : "#") },
+  { label: "Benefits", perm: "employee.view", href: (o) => (o ? `/o/${o}/benefits` : "#") },
   { label: "Recruitment", perm: "employee.view", href: (o) => (o ? `/o/${o}/recruitment` : "#") },
   { label: "HR Modules", perm: "employee.view", href: (o) => (o ? `/o/${o}/hr` : "#") },
   { label: "Reports", perm: "reports.view", href: (o) => (o ? `/o/${o}/reports` : "#") },

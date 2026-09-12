@@ -14,6 +14,7 @@ import SpecialPay from "@/pages/SpecialPay";
 import Loans from "@/pages/Loans";
 import Leave from "@/pages/Leave";
 import Assets from "@/pages/Assets";
+import Benefits from "@/pages/Benefits";
 import Recruitment from "@/pages/Recruitment";
 import HrModules from "@/pages/HrModules";
 import Reports from "@/pages/Reports";
@@ -42,6 +43,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/o/:orgId/loans" element={<Loans />} />
         <Route path="/o/:orgId/leave" element={<Leave />} />
         <Route path="/o/:orgId/assets" element={<Assets />} />
+        <Route path="/o/:orgId/benefits" element={<Benefits />} />
         <Route path="/o/:orgId/recruitment" element={<Recruitment />} />
         <Route path="/o/:orgId/hr" element={<HrModules />} />
         <Route path="/o/:orgId/reports" element={<Reports />} />

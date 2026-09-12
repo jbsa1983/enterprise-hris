@@ -4,7 +4,7 @@ import AppShell from "@/components/AppShell";
 import { apiFetch, apiOpen } from "@/lib/api";
 import { peso } from "@/lib/format";
 
-const TABS = ["Profile", "Payslips", "13th Month", "Leave", "Attendance", "Overtime", "Loans", "Contributions", "Security"];
+const TABS = ["Profile", "Payslips", "13th Month", "Leave", "Attendance", "Overtime", "Loans", "Benefits", "Assets", "Contributions", "Security"];
 const LOAN_TYPES = ["CASH_ADVANCE", "COMPANY_LOAN", "SALARY_LOAN", "EMERGENCY_LOAN", "TRAVEL_ADVANCE", "OTHER"];
 const loanLabel = (t: string) => t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -19,6 +19,9 @@ export default function SelfServicePage() {
   const [contrib, setContrib] = useState<any[]>([]);
   const [special, setSpecial] = useState<any[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
+  const [leaveBal, setLeaveBal] = useState<any[]>([]);
+  const [assets, setAssets] = useState<any[]>([]);
+  const [benefits, setBenefits] = useState<any[]>([]);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
@@ -31,6 +34,9 @@ export default function SelfServicePage() {
     apiFetch("/me/available-payslips").then(setPayslips).catch(() => {});
     apiFetch("/me/leave").then(setLeave).catch(() => {});
     apiFetch("/me/leave-types").then(setLeaveTypes).catch(() => {});
+    apiFetch("/me/leave-balances").then(setLeaveBal).catch(() => {});
+    apiFetch("/me/assets").then(setAssets).catch(() => {});
+    apiFetch("/me/benefits").then(setBenefits).catch(() => {});
     apiFetch("/me/attendance").then(setAtt).catch(() => {});
     apiFetch("/me/overtime").then(setOt).catch(() => {});
     apiFetch("/me/loans").then(setLoans).catch(() => {});
@@ -181,7 +187,22 @@ export default function SelfServicePage() {
       ) : null}
 
       {tab === "Leave" ? (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          {leaveBal.length ? (
+            <div className="card p-0">
+              <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium">Leave Balances</div>
+              <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+                {leaveBal.map((bb) => (
+                  <div key={bb.leave_type} className="rounded-lg border border-slate-100 p-3">
+                    <div className="text-xs text-slate-500">{bb.leave_type}</div>
+                    <div className="text-lg font-semibold text-slate-900">{bb.remaining}</div>
+                    <div className="text-[11px] text-slate-400">{bb.used} used / {bb.credits} credited</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Section title="Request Leave">
             <div className="space-y-3">
               <div>
@@ -213,6 +234,7 @@ export default function SelfServicePage() {
               {leave.length === 0 ? <tr><td colSpan={4} className="py-6 text-center text-slate-400">No leave requests yet.</td></tr> : null}
             </tbody></table>
           </Section>
+          </div>
         </div>
       ) : null}
 
@@ -270,6 +292,48 @@ export default function SelfServicePage() {
             </tbody></table>
           </Section>
         </div>
+      ) : null}
+
+      {tab === "Benefits" ? (
+        <Section title={`My Benefits (${benefits.length})`}>
+          {benefits.length === 0 ? <p className="py-4 text-center text-slate-400">No benefits on record. HR will add these for you.</p> : (
+            <div className="space-y-4">
+              {benefits.map((b, i) => (
+                <div key={i} className="rounded-lg border border-slate-100 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-medium text-slate-800">{b.benefit_type}{b.provider ? ` · ${b.provider}` : ""}</div>
+                    <span className="badge bg-slate-100 text-slate-600">{b.status}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {b.policy_number ? `Policy ${b.policy_number} · ` : ""}
+                    {b.coverage_amount != null ? `Coverage ${peso(b.coverage_amount)} · ` : ""}
+                    {(b.start_date || "—") + " → " + (b.end_date || "present")}
+                  </div>
+                  {b.beneficiaries?.length ? (
+                    <div className="mt-3">
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Beneficiaries</div>
+                      <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
+                        {b.beneficiaries.map((be: any, j: number) => (<tr key={j}><td className="py-1">{be.name}</td><td className="py-1 text-xs text-slate-500">{be.relationship || "—"}</td><td className="py-1 text-xs text-slate-500">{be.contact || "—"}</td><td className="py-1 text-right">{be.share_percent != null ? `${be.share_percent}%` : "—"}</td></tr>))}
+                      </tbody></table>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      ) : null}
+
+      {tab === "Assets" ? (
+        <Section title={`My Assets (${assets.length})`}>
+          <table className="min-w-full text-sm">
+            <thead><tr className="text-left text-xs uppercase text-slate-400"><th className="py-1">Item</th><th>Serial</th><th>Issued</th><th>Status</th><th>Returned</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {assets.map((a, i) => (<tr key={i}><td className="py-2">{a.item}{a.asset_number ? <span className="ml-1 text-xs text-slate-400">({a.asset_number})</span> : null}</td><td className="py-2 text-xs text-slate-500">{a.serial_number || "—"}</td><td className="py-2 text-xs text-slate-500">{a.issue_date || "—"}</td><td className="py-2"><span className={`badge ${a.status === "RETURNED" ? "bg-slate-100 text-slate-500" : "bg-emerald-100 text-emerald-700"}`}>{a.status}</span></td><td className="py-2 text-xs text-slate-500">{a.returned_date || "—"}</td></tr>))}
+              {assets.length === 0 ? <tr><td colSpan={5} className="py-6 text-center text-slate-400">No assets assigned to you.</td></tr> : null}
+            </tbody>
+          </table>
+        </Section>
       ) : null}
 
       {tab === "Contributions" ? (

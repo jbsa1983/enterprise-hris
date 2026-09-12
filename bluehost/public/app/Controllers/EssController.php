@@ -17,6 +17,9 @@ class EssController
         $r->post('/me/overtime', [self::class, 'requestOvertime']);
         $r->get('/me/loans', [self::class, 'loans']);
         $r->post('/me/loans', [self::class, 'requestLoan']);
+        $r->get('/me/assets', [self::class, 'assets']);
+        $r->get('/me/benefits', [self::class, 'benefits']);
+        $r->get('/me/leave-balances', [self::class, 'leaveBalances']);
         $r->get('/me/special-pay', [self::class, 'specialPay']);
         $r->get('/me/contributions', [self::class, 'contributions']);
         $r->post('/me/password', [self::class, 'password']);
@@ -148,6 +151,61 @@ class EssController
             return ['period' => $r['period'], 'sss' => (float) ($d['sss'] ?? 0), 'philhealth' => (float) ($d['philhealth'] ?? 0),
                 'pagibig' => (float) ($d['pagibig'] ?? 0), 'withholding_tax' => (float) ($d['withholding_tax'] ?? 0)];
         }, $rows));
+    }
+
+    /** Assets assigned to the person — current and previously returned (history). */
+    public static function assets(): void
+    {
+        $u = Auth::require();
+        $pid = self::personId($u);
+        Http::json(array_map(fn($a) => [
+            'asset_number' => $a['asset_number'], 'item' => $a['item'], 'serial_number' => $a['serial_number'],
+            'issue_date' => $a['issue_date'], 'returned_date' => $a['returned_date'],
+            'condition' => $a['condition'], 'status' => $a['status'],
+            'is_employee_payable' => (int) $a['is_employee_payable'] === 1,
+            'outstanding_balance' => $a['outstanding_balance'] !== null ? (float) $a['outstanding_balance'] : null,
+        ], Database::all('SELECT * FROM assets WHERE assigned_person_id = ? ORDER BY (status = "RETURNED"), id DESC', [$pid])));
+    }
+
+    /** The person's own benefits and their beneficiaries. */
+    public static function benefits(): void
+    {
+        $u = Auth::require();
+        $pid = self::personId($u);
+        Http::json(array_map(fn($x) => [
+            'benefit_type' => $x['benefit_type'], 'provider' => $x['provider'], 'policy_number' => $x['policy_number'],
+            'coverage_amount' => $x['coverage_amount'] !== null ? (float) $x['coverage_amount'] : null,
+            'start_date' => $x['start_date'], 'end_date' => $x['end_date'], 'status' => $x['status'],
+            'beneficiaries' => array_map(fn($be) => [
+                'name' => $be['name'], 'relationship' => $be['relationship'],
+                'share_percent' => $be['share_percent'] !== null ? (float) $be['share_percent'] : null, 'contact' => $be['contact'],
+            ], Database::all('SELECT * FROM benefit_beneficiaries WHERE benefit_id = ? ORDER BY id', [$x['id']])),
+        ], Database::all('SELECT * FROM benefits WHERE person_id = ? ORDER BY id DESC', [$pid])));
+    }
+
+    /** The person's remaining leave balance per type (credits − used). */
+    public static function leaveBalances(): void
+    {
+        $u = Auth::require();
+        $eng = self::primaryEngagement(self::personId($u));
+        if (!$eng) { Http::json([]); return; }
+        $o = (int) $eng['organization_id']; $engId = (int) $eng['id'];
+        $bal = [];
+        foreach (Database::all('SELECT leave_type, credits, used FROM leave_balances WHERE organization_id = ? AND engagement_id = ?', [$o, $engId]) as $b) {
+            $bal[$b['leave_type']] = $b;
+        }
+        $out = [];
+        foreach (Database::all('SELECT name, default_credits FROM leave_types WHERE organization_id = ? ORDER BY name', [$o]) as $t) {
+            $row = $bal[$t['name']] ?? null;
+            $credits = $row ? (float) $row['credits'] : (float) $t['default_credits'];
+            $used = $row ? (float) $row['used'] : 0;
+            $out[] = ['leave_type' => $t['name'], 'credits' => $credits, 'used' => $used, 'remaining' => $credits - $used];
+            unset($bal[$t['name']]);
+        }
+        foreach ($bal as $name => $row) {
+            $out[] = ['leave_type' => $name, 'credits' => (float) $row['credits'], 'used' => (float) $row['used'], 'remaining' => (float) $row['credits'] - (float) $row['used']];
+        }
+        Http::json($out);
     }
 
     /** The person's own overtime requests (employees and consultants alike). */
