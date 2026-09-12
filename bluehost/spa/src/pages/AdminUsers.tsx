@@ -8,16 +8,18 @@ interface Role { id: number; name: string; }
 interface Org { id: number; name: string; }
 interface AdminUser {
   id: number; email: string; full_name: string; is_active: boolean; is_superadmin: boolean;
-  roles: string[]; organizations: { organization_id: number; name: string }[];
+  person_id: number | null; roles: string[]; organizations: { organization_id: number; name: string }[];
 }
+interface Person { id: number; name: string; orgs: string | null; employee_numbers: string | null; }
 
 const EMPTY = { email: "", full_name: "", password: "", is_superadmin: false, is_active: true,
-  role_ids: [] as number[], organization_ids: [] as number[] };
+  person_id: "", role_ids: [] as number[], organization_ids: [] as number[] };
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [orgs, setOrgs] = useState<Org[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [editing, setEditing] = useState<AdminUser | "new" | null>(null);
   const [form, setForm] = useState({ ...EMPTY });
   const [msg, setMsg] = useState("");
@@ -44,8 +46,11 @@ export default function AdminUsersPage() {
     apiFetch<AdminUser[]>("/admin/users").then(setUsers).catch((e) => setErr(e.message));
     apiFetch<Role[]>("/admin/roles").then(setRoles).catch(() => {});
     apiFetch<Org[]>("/admin/organizations").then(setOrgs).catch(() => {});
+    apiFetch<Person[]>("/admin/people").then(setPeople).catch(() => {});
   }, []);
   useEffect(load, [load]);
+
+  const personName = (id: number | null) => (id ? people.find((p) => p.id === id)?.name || `#${id}` : null);
 
   function openCreate() {
     setForm({ ...EMPTY }); setEditing("new"); setErr("");
@@ -53,7 +58,7 @@ export default function AdminUsersPage() {
   function openEdit(u: AdminUser) {
     setForm({
       email: u.email, full_name: u.full_name, password: "", is_superadmin: u.is_superadmin,
-      is_active: u.is_active,
+      is_active: u.is_active, person_id: u.person_id ? String(u.person_id) : "",
       role_ids: roles.filter((r) => u.roles.includes(r.name)).map((r) => r.id),
       organization_ids: u.organizations.map((o) => o.organization_id),
     });
@@ -65,14 +70,15 @@ export default function AdminUsersPage() {
 
   async function save() {
     setErr("");
+    const pid = form.person_id ? Number(form.person_id) : null;
     try {
       if (editing === "new") {
-        await apiFetch("/admin/users", { method: "POST", body: JSON.stringify(form) });
+        await apiFetch("/admin/users", { method: "POST", body: JSON.stringify({ ...form, person_id: pid }) });
         setMsg("User created.");
       } else if (editing) {
         const body: any = {
           full_name: form.full_name, email: form.email, is_active: form.is_active,
-          is_superadmin: form.is_superadmin, role_ids: form.role_ids, organization_ids: form.organization_ids,
+          is_superadmin: form.is_superadmin, person_id: pid, role_ids: form.role_ids, organization_ids: form.organization_ids,
         };
         await apiFetch(`/admin/users/${editing.id}`, { method: "PUT", body: JSON.stringify(body) });
         if (form.password) await apiFetch(`/admin/users/${editing.id}/password`, { method: "POST", body: JSON.stringify({ password: form.password }) });
@@ -115,7 +121,9 @@ export default function AdminUsersPage() {
             {users.map((u) => (
               <tr key={u.id} className="hover:bg-slate-50">
                 <td className="px-4 py-2">{u.email}{u.is_superadmin ? <span className="ml-2 badge bg-amber-100 text-amber-700">SUPERADMIN</span> : null}</td>
-                <td className="px-4 py-2">{u.full_name}</td>
+                <td className="px-4 py-2">{u.full_name}
+                  {u.person_id ? <div className="text-[11px] text-emerald-600">↳ {personName(u.person_id)}</div> : <div className="text-[11px] text-slate-400">not linked</div>}
+                </td>
                 <td className="px-4 py-2 text-xs text-slate-600">{u.roles.join(", ") || "—"}</td>
                 <td className="px-4 py-2 text-xs text-slate-500">{u.organizations.map((o) => o.name).join(", ") || "—"}</td>
                 <td className="px-4 py-2"><span className={`badge ${u.is_active ? statusColor("ACTIVE") : "bg-slate-200 text-slate-500"}`}>{u.is_active ? "Active" : "Inactive"}</span></td>
@@ -143,6 +151,14 @@ export default function AdminUsersPage() {
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Active</label>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_superadmin} onChange={(e) => setForm({ ...form, is_superadmin: e.target.checked })} /> Superadmin (all access)</label>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-slate-600">Linked employee record</label>
+                <select className="input" value={form.person_id} onChange={(e) => setForm({ ...form, person_id: e.target.value })}>
+                  <option value="">— not linked —</option>
+                  {people.map((p) => <option key={p.id} value={p.id}>{p.name}{p.orgs ? ` — ${p.orgs}` : ""}{p.employee_numbers ? ` (${p.employee_numbers})` : ""}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-slate-400">Link this login to an employee so their own payslips, leave, loans, benefits and assets show in My Self-Service.</p>
               </div>
               <div>
                 <label className="mb-1 block text-sm text-slate-600">Roles (permission scopes)</label>

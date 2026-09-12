@@ -17,6 +17,7 @@ class AdminController
         $r->post('/admin/users/{id}/password', [self::class, 'resetPassword']);
         $r->post('/admin/users/{id}/deactivate', [self::class, 'deactivate']);
         $r->post('/admin/provision-ess', [self::class, 'provisionEss']);
+        $r->get('/admin/people', [self::class, 'allPeople']);
         $r->get('/admin/organizations', [self::class, 'allOrgs']);
         $r->post('/admin/organizations', [self::class, 'createOrganization']);
         $r->put('/admin/organizations/{id}', [self::class, 'updateOrganization']);
@@ -140,10 +141,13 @@ class AdminController
         $email = strtolower(trim($b['email'] ?? ''));
         if (Database::one('SELECT id FROM users WHERE email = ?', [$email])) throw new HttpError('Email already exists', 409);
         self::checkPw($b['password'] ?? '');
+        $pid = ($b['person_id'] ?? null);
+        $pid = ($pid === '' || $pid === null) ? null : (int) $pid;
+        if ($pid !== null && Database::one('SELECT id FROM users WHERE person_id = ?', [$pid])) throw new HttpError('That employee is already linked to another user', 409);
         $id = Database::insert('users', ['uuid' => Util::uuid(), 'email' => $email, 'full_name' => $b['full_name'] ?? '',
             'hashed_password' => password_hash($b['password'], PASSWORD_BCRYPT),
             'is_active' => !empty($b['is_active']) || !isset($b['is_active']) ? 1 : 0,
-            'is_superadmin' => !empty($b['is_superadmin']) ? 1 : 0, 'person_id' => $b['person_id'] ?? null]);
+            'is_superadmin' => !empty($b['is_superadmin']) ? 1 : 0, 'person_id' => $pid]);
         self::setRoles($id, $b['role_ids'] ?? []);
         self::setOrgs($id, $b['organization_ids'] ?? []);
         Audit::record('user.create', $actor, ['entity' => 'user', 'entity_id' => $id]);
@@ -168,6 +172,11 @@ class AdminController
         $upd = [];
         foreach (['full_name', 'is_active', 'is_superadmin', 'person_id'] as $f) {
             if (array_key_exists($f, $b)) $upd[$f] = in_array($f, ['is_active', 'is_superadmin']) ? (int) (bool) $b[$f] : $b[$f];
+        }
+        if (array_key_exists('person_id', $upd)) {
+            $upd['person_id'] = ($upd['person_id'] === '' || $upd['person_id'] === null) ? null : (int) $upd['person_id'];
+            if ($upd['person_id'] !== null && Database::one('SELECT id FROM users WHERE person_id = ? AND id != ?', [$upd['person_id'], $u['id']]))
+                throw new HttpError('That employee is already linked to another user', 409);
         }
         if (isset($b['email'])) {
             $ne = strtolower(trim($b['email']));
@@ -201,6 +210,25 @@ class AdminController
         if ((int) $u['is_superadmin'] === 1 && self::lastSuperadmin((int) $u['id'])) throw new HttpError('Cannot deactivate the last active Superadmin', 409);
         Database::update('users', (int) $u['id'], ['is_active' => 0]);
         Http::json(['ok' => true, 'is_active' => false]);
+    }
+
+    /** All employee records (people) across orgs, for linking a login to a person. */
+    public static function allPeople(): void
+    {
+        Auth::requirePerm('system.admin');
+        $rows = Database::all(
+            "SELECT p.id, p.first_name, p.middle_name, p.last_name, p.suffix,
+                    GROUP_CONCAT(DISTINCT o.name ORDER BY o.name SEPARATOR ', ') AS orgs,
+                    GROUP_CONCAT(DISTINCT e.employee_number ORDER BY e.employee_number SEPARATOR ', ') AS emp_nos
+               FROM people p
+               LEFT JOIN engagements e ON e.person_id = p.id
+               LEFT JOIN organizations o ON o.id = e.organization_id
+              GROUP BY p.id
+              ORDER BY p.last_name, p.first_name");
+        Http::json(array_map(function ($r) {
+            $name = trim(implode(' ', array_filter([$r['first_name'], $r['middle_name'], $r['last_name'], $r['suffix']])));
+            return ['id' => (int) $r['id'], 'name' => $name, 'orgs' => $r['orgs'], 'employee_numbers' => $r['emp_nos']];
+        }, $rows));
     }
 
     public static function provisionEss(): void
