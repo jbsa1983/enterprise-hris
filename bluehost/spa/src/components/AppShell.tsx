@@ -52,6 +52,7 @@ export default function AppShell({
   const pathname = usePathname();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [orgs, setOrgs] = useState<{ id: number; name: string }[]>([]);
+  const [license, setLicense] = useState<{ active: boolean; enforced: boolean; reason: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useIdleLogout(IDLE_MINUTES);
@@ -76,6 +77,9 @@ export default function AppShell({
     apiFetch<{ id: number; name: string }[]>("/organizations")
       .then(setOrgs)
       .catch(() => setOrgs([]));
+    apiFetch<{ active: boolean; enforced: boolean; reason: string }>("/license")
+      .then(setLicense)
+      .catch(() => setLicense(null));
   }, [router]);
 
   function logout() {
@@ -159,6 +163,16 @@ export default function AppShell({
 
       {/* Main */}
       <div className="flex flex-1 flex-col">
+        {license && !license.active && (license.enforced || isAdmin) ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-500 px-6 py-2 text-sm text-white">
+            <span>⚠ This installation is not activated{license.reason ? ` — ${license.reason}` : ""}.</span>
+            {isAdmin ? (
+              <Link href="/admin/license" className="rounded bg-white/20 px-3 py-1 font-medium hover:bg-white/30">Activate license →</Link>
+            ) : (
+              <span className="opacity-90">Please contact your administrator.</span>
+            )}
+          </div>
+        ) : null}
         {/* Top bar */}
         <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-3">
           <div className="flex items-center gap-3">
