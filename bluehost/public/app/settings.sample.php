@@ -1,6 +1,6 @@
 <?php
-// Copy this file to config.php and fill in your Bluehost/Zoom MySQL details
-// (from cPanel → MySQL Databases). config.php is gitignored; never commit secrets.
+// Copy this file to settings.php and fill in your Bluehost/Zoom MySQL details
+// (from cPanel → MySQL Databases). settings.php is gitignored; never commit secrets.
 return [
     'db_host'     => getenv('DB_HOST') ?: 'localhost',
     'db_port'     => getenv('DB_PORT') ?: '3306',
@@ -12,5 +12,11 @@ return [
     'access_ttl'  => 1800,      // access token lifetime (seconds)
     'refresh_ttl' => 604800,    // refresh token lifetime (seconds)
     'storage_path'=> getenv('STORAGE_PATH') ?: (__DIR__ . '/../storage'),
+    // Optional: folder where DB backups are written (counted in the storage card).
+    'backup_path' => getenv('BACKUP_PATH') ?: null,
+    // Optional: your hosting plan's storage limit in GB. When set, the dashboard
+    // "Real-Time Storage" card shows usage against your plan. Leave 0/unset to
+    // fall back to the (shared) server disk. See cPanel → Statistics for your limit.
+    'storage_quota_gb' => (float) (getenv('STORAGE_QUOTA_GB') ?: 0),
     'cors_origin' => getenv('CORS_ORIGIN') ?: '',   // set to your domain if API is cross-origin
 ];

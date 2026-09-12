@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { storageStatusColor } from "@/lib/format";
+import { storageStatusColor, fmtSize } from "@/lib/format";
 import type { StorageOverview } from "@/lib/types";
 
 export default function StorageWidget() {
@@ -47,7 +47,7 @@ export default function StorageWidget() {
         <div className="flex items-end justify-between">
           <div className="stat-value">{data.percent_used}%</div>
           <div className="text-xs text-slate-500">
-            {data.used_gb} GB / {data.total_gb} GB
+            {fmtSize(data.used_bytes)} / {fmtSize(data.total_bytes)}
           </div>
         </div>
         <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
@@ -66,16 +66,18 @@ export default function StorageWidget() {
         </div>
       </div>
       <div className="mt-4 space-y-1">
-        {Object.entries(data.breakdown).map(([k, v]) => (
+        {Object.entries(data.breakdown_bytes).map(([k, v]) => (
           <div key={k} className="flex justify-between text-xs text-slate-500">
             <span className="capitalize">{k.replace(/_/g, " ")}</span>
-            <span>{v} GB</span>
+            <span>{fmtSize(v)}</span>
           </div>
         ))}
       </div>
       <div className="mt-3 text-[11px] text-slate-400">
         Auto-refresh every {data.refresh_seconds}s
-        {data.simulated_capacity ? " · simulated capacity" : ""}
+        {data.capacity_basis === "server-disk"
+          ? " · capacity = shared server disk (set storage_quota_gb for your plan)"
+          : " · capacity = your plan limit"}
       </div>
     </div>
   );

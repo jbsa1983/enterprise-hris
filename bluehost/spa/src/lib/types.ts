@@ -29,11 +29,16 @@ export interface EngagementRow {
 }
 
 export interface StorageOverview {
+  used_bytes: number;
+  available_bytes: number;
+  total_bytes: number;
   used_gb: number;
   available_gb: number;
   total_gb: number;
   percent_used: number;
   status: string;
+  capacity_basis: "plan-quota" | "server-disk";
+  breakdown_bytes: Record<string, number>;
   breakdown: Record<string, number>;
   refresh_seconds: number;
   simulated_capacity: boolean;
