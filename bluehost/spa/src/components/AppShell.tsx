@@ -39,6 +39,7 @@ const ADMIN_NAV = [
   { label: "Roles & Scopes", href: "/admin/roles" },
   { label: "Branding", href: "/admin/branding" },
   { label: "License", href: "/admin/license" },
+  { label: "Backup & Migration", href: "/admin/backup" },
 ];
 
 export default function AppShell({
