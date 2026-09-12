@@ -101,7 +101,10 @@ export default function AppShell({
     apiFetch<{ active: boolean; enforced: boolean; reason: string }>("/license", { silent: true })
       .then(setLicense)
       .catch(() => setLicense(null));
-  }, [router]);
+    // Run once when the shell mounts (not on every render) — router/pathname are
+    // captured intentionally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function logout() {
     clearTokens();

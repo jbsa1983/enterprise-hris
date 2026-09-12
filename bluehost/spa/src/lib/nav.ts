@@ -1,13 +1,19 @@
 // Shims so components written for Next's `next/navigation` work under react-router.
+import { useMemo } from "react";
 import { useNavigate, useLocation, useParams as rrUseParams, useSearchParams as rrUseSearchParams } from "react-router-dom";
 
 export function useRouter() {
   const navigate = useNavigate();
-  return {
-    push: (url: string) => navigate(url),
-    replace: (url: string) => navigate(url, { replace: true }),
-    back: () => navigate(-1),
-  };
+  // Memoized so the returned object is stable across renders — otherwise any
+  // effect that lists `router` as a dependency would re-run on every render.
+  return useMemo(
+    () => ({
+      push: (url: string) => navigate(url),
+      replace: (url: string) => navigate(url, { replace: true }),
+      back: () => navigate(-1),
+    }),
+    [navigate],
+  );
 }
 
 export function usePathname(): string {
