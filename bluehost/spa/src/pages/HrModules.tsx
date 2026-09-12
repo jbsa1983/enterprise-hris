@@ -4,6 +4,15 @@ import { useParams } from "@/lib/nav";
 import AppShell from "@/components/AppShell";
 import { apiFetch } from "@/lib/api";
 
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="card p-0">
+      <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium">{title}</div>
+      <div className="max-h-80 overflow-y-auto">{children}</div>
+    </div>
+  );
+}
+
 export default function HrModulesPage() {
   const orgId = Number(useParams().orgId);
   const [tickets, setTickets] = useState<any[]>([]);
@@ -17,13 +26,6 @@ export default function HrModulesPage() {
     apiFetch(`/organizations/${orgId}/training/assignments`).then(setTraining).catch(() => setTraining([]));
     apiFetch(`/organizations/${orgId}/approvals`).then(setApprovals).catch(() => setApprovals([]));
   }, [orgId]);
-
-  const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="card p-0">
-      <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium">{title}</div>
-      <div className="max-h-80 overflow-y-auto">{children}</div>
-    </div>
-  );
 
   return (
     <AppShell orgId={orgId}>

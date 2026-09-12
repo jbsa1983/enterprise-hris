@@ -107,13 +107,6 @@ export default function SelfServicePage() {
     } catch (e: any) { setErr(e.message); }
   }
 
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="card p-0">
-      <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium">{title}</div>
-      <div className="p-4">{children}</div>
-    </div>
-  );
-
   return (
     <AppShell>
       <h1 className="mb-1 text-lg font-semibold text-slate-900">My Self-Service</h1>
@@ -358,6 +351,15 @@ export default function SelfServicePage() {
         </Section>
       ) : null}
     </AppShell>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="card p-0">
+      <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium">{title}</div>
+      <div className="p-4">{children}</div>
+    </div>
   );
 }
 
