@@ -83,7 +83,11 @@ export default function AdminBrandingPage() {
               </button>
             ) : null}
           </div>
-          <p className="mt-2 text-xs text-slate-400">PNG, JPG, WEBP, GIF, or SVG · up to 2 MB. A wide, transparent PNG works best (it sits on a dark sidebar).</p>
+          <p className="mt-2 text-xs text-slate-400">
+            <strong>Recommended:</strong> a transparent <strong>PNG</strong>, wide format, about <strong>400 × 120 px</strong>
+            (2–3× that for sharp high-resolution screens). PNG, JPG, WEBP, GIF, or SVG · up to 2 MB.
+            Light or white artwork shows best on the dark sidebar.
+          </p>
         </div>
 
         <div className="card">

@@ -287,7 +287,7 @@
 <main class="wrap">
 
   <section id="intro" style="padding-top:38px;">
-    <p class="lead">The HRIS is your personal window into your employment records. From any browser you can check your profile and government IDs, review your attendance and leave, see your loans and contributions, and generate your own payslip as a PDF — all in one place, available anytime.</p>
+    <p class="lead">The HRIS is your personal window into your employment records. From any browser you can check your profile and government IDs, review your attendance, leave balances, benefits and assigned assets, generate your own payslip as a PDF, and file leave, overtime, or cash-advance requests — all in one place, available anytime.</p>
 
     <nav class="toc no-print" aria-label="Contents">
       <h4>In this guide</h4>
@@ -295,6 +295,7 @@
         <li><a href="#start">Getting started &amp; signing in</a></li>
         <li><a href="#password">Set your own password</a></li>
         <li><a href="#selfservice">Your Self-Service area</a></li>
+        <li><a href="#requests">Requests &amp; approvals</a></li>
         <li><a href="#payslip">Download your payslip</a></li>
         <li><a href="#contributions">Reading your contributions</a></li>
         <li><a href="#tips">Good to know</a></li>
@@ -342,15 +343,34 @@
     <div class="tabgrid">
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-blue)"></span>Profile</div><p>Your personal details, bank on file, government IDs (TIN, SSS, PhilHealth, Pag-IBIG), and your employment record — employee number, company, engagement type, and rate.</p></div>
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-green)"></span>Payslips</div><p>Every finalized payroll period, with the net pay and a button to generate and download your payslip as a PDF.</p></div>
-      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>Leave</div><p>Your leave records — type, dates, number of days, and the current status of each request.</p></div>
-      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-red)"></span>Attendance</div><p>Your recent daily logs — hours worked, late minutes, overtime, and the status for each day.</p></div>
-      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-bluedark)"></span>Loans</div><p>Any company loans or cash advances, with the original amount and the remaining balance.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>13th Month</div><p>Your own 13th-month pay and bonus amounts, once each run is finalized.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-red)"></span>Leave</div><p>Your leave <strong>balances</strong> per type, a form to <strong>request leave</strong>, and the status of every request.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-bluedark)"></span>Attendance</div><p>Your recent daily logs — hours worked, late minutes, overtime, and the status for each day.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-green)"></span>Overtime</div><p>File an <strong>overtime request</strong> (date and hours) and track its approval.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>Loans</div><p><strong>Request a loan or cash advance</strong>, and see your existing obligations with the remaining balance.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-blue)"></span>Benefits</div><p>Your benefits (such as HMO / health coverage) and the beneficiaries linked to each.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-red)"></span>Assets</div><p>Company items issued to you — laptop, phone, etc. — including anything you've already returned.</p></div>
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-green)"></span>Contributions</div><p>Your government contributions by period — SSS, PhilHealth, Pag-IBIG, and withholding tax.</p></div>
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>Security</div><p>Change your password. Do this on day one, and any time you think someone else may know it.</p></div>
     </div>
     <div class="note tip">
       <span class="lbl">Something look wrong?</span>
-      <p>Your profile, bank details, and government IDs are maintained by HR — you view them here but can't edit them yourself. If anything is out of date or incorrect, contact HR and they'll update it for you.</p>
+      <p>Your profile, bank details, government IDs, benefits, and assigned assets are maintained by HR — you view them here but can't edit them yourself. If anything is out of date or incorrect, contact HR and they'll update it for you.</p>
+    </div>
+  </section>
+
+  <section id="requests">
+    <div class="eyebrow">Requests &amp; approvals</div>
+    <h2>Filing leave, overtime &amp; cash advances</h2>
+    <p>You can submit three kinds of requests yourself from <strong>My Self-Service</strong>. Each is sent for review and is approved — or rejected — by your <strong>Department Head or HR</strong>.</p>
+    <div class="tabgrid">
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>Request leave</div><p><strong>Leave</strong> tab → pick a leave type and the dates, then submit. Your remaining balance per type is shown, and an approved leave is deducted from it automatically.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-green)"></span>Request overtime</div><p><strong>Overtime</strong> tab → enter the date and number of hours, then submit for approval.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-blue)"></span>Request a loan / advance</div><p><strong>Loans</strong> tab → choose the type, amount, and reason, then submit. Once approved it appears with its balance.</p></div>
+    </div>
+    <div class="note tip">
+      <span class="lbl">Tracking status</span>
+      <p>After you submit, a request shows as <strong>Pending</strong>. It becomes <strong>Approved</strong> or <strong>Rejected</strong> once your Department Head or HR acts on it — check back on the same tab.</p>
     </div>
   </section>
 
@@ -431,14 +451,16 @@
       <li><span class="m">Projects</span><span class="d">Projects with budgets, plus loans and cash-advance tracking.</span></li>
       <li><span class="m">Payroll</span><span class="d">Prepare, review, and finalize payroll runs.</span></li>
       <li><span class="m">13th Month &amp; Bonuses</span><span class="d">Special-pay runs, processed in bulk.</span></li>
-      <li><span class="m">Loans &amp; Advances</span><span class="d">Issue and manage company loans and cash advances.</span></li>
-      <li><span class="m">Leave &amp; Attendance</span><span class="d">Attendance uploads (CSV / biometric / API) and leave management.</span></li>
-      <li><span class="m">Assets</span><span class="d">Company assets — add, edit, and remove.</span></li>
+      <li><span class="m">Loans &amp; Advances</span><span class="d">Issue and manage company loans and cash advances, and approve employee requests.</span></li>
+      <li><span class="m">Leave &amp; Attendance</span><span class="d">Attendance uploads (CSV / biometric / API), leave and overtime approvals, and leave types &amp; credits.</span></li>
+      <li><span class="m">Benefits</span><span class="d">Record benefits (HMO / health, etc.) per employee, with beneficiaries.</span></li>
+      <li><span class="m">Assets</span><span class="d">Company assets — issue, edit, return or reassign (with remarks), and bulk-return on separation.</span></li>
       <li><span class="m">Recruitment</span><span class="d">Staffing requisitions with placement, timeline, and budget.</span></li>
       <li><span class="m">HR Modules</span><span class="d">Performance, training, tickets, and lifecycle checklists.</span></li>
       <li><span class="m">Reports</span><span class="d">Reports by staff, period, project, or organization.</span></li>
       <li><span class="m">Org Setup</span><span class="d">Departments and positions for an organization.</span></li>
-      <li><span class="m">Administration</span><span class="d">Organizations, Users, and Roles &amp; Scopes (administrators only).</span></li>
+      <li><span class="m">Administration</span><span class="d">Organizations, Users (including linking a login to an employee record), and Roles &amp; Scopes.</span></li>
+      <li><span class="m">Branding</span><span class="d">Superadmin: upload your own logo to replace the GEEK logo. Best as a transparent <strong>PNG</strong>, about <strong>400 × 120 px</strong> (wide) and up to 2 MB.</span></li>
     </ul>
   </section>
 
