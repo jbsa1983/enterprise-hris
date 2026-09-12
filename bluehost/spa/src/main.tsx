@@ -18,6 +18,8 @@ import Recruitment from "@/pages/Recruitment";
 import HrModules from "@/pages/HrModules";
 import Reports from "@/pages/Reports";
 import SelfService from "@/pages/SelfService";
+import OrgSetup from "@/pages/OrgSetup";
+import AdminOrganizations from "@/pages/AdminOrganizations";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminRoles from "@/pages/AdminRoles";
 
@@ -43,7 +45,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/o/:orgId/recruitment" element={<Recruitment />} />
         <Route path="/o/:orgId/hr" element={<HrModules />} />
         <Route path="/o/:orgId/reports" element={<Reports />} />
+        <Route path="/o/:orgId/setup" element={<OrgSetup />} />
         <Route path="/me" element={<SelfService />} />
+        <Route path="/admin/organizations" element={<AdminOrganizations />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/roles" element={<AdminRoles />} />
         <Route path="*" element={<Home />} />

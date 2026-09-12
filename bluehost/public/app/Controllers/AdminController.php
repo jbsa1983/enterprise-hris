@@ -18,6 +18,8 @@ class AdminController
         $r->post('/admin/users/{id}/deactivate', [self::class, 'deactivate']);
         $r->post('/admin/provision-ess', [self::class, 'provisionEss']);
         $r->get('/admin/organizations', [self::class, 'allOrgs']);
+        $r->post('/admin/organizations', [self::class, 'createOrganization']);
+        $r->put('/admin/organizations/{id}', [self::class, 'updateOrganization']);
     }
 
     private static function checkPw(string $pw): void
@@ -249,7 +251,42 @@ class AdminController
     {
         Auth::requirePerm('system.admin');
         Http::json(array_map(fn($o) => ['id' => (int) $o['id'], 'name' => $o['name'], 'code' => $o['code'],
+            'legal_name' => $o['legal_name'], 'tin' => $o['tin'], 'address' => $o['address'],
             'is_active' => (int) $o['is_active'] === 1, 'enterprise_id' => (int) $o['enterprise_id']],
             Database::all('SELECT * FROM organizations ORDER BY name')));
+    }
+
+    public static function createOrganization(): void
+    {
+        $actor = Auth::requirePerm('organization.manage');
+        $b = Http::body();
+        if (empty($b['name']) || empty($b['code'])) throw new HttpError('name and code are required', 422);
+        if (Database::one('SELECT id FROM organizations WHERE code = ?', [$b['code']])) throw new HttpError('Organization code already exists', 409);
+        // Attach to the given enterprise, or the first one, creating a default group if none exists.
+        $entId = $b['enterprise_id'] ?? null;
+        if (!$entId) {
+            $ent = Database::one('SELECT id FROM enterprises ORDER BY id LIMIT 1');
+            $entId = $ent ? (int) $ent['id'] : Database::insert('enterprises', ['uuid' => Util::uuid(), 'name' => 'Enterprise Group', 'code' => 'GROUP']);
+        }
+        $id = Database::insert('organizations', ['uuid' => Util::uuid(), 'enterprise_id' => (int) $entId, 'name' => $b['name'],
+            'code' => $b['code'], 'legal_name' => $b['legal_name'] ?? null, 'tin' => $b['tin'] ?? null, 'address' => $b['address'] ?? null, 'is_active' => 1]);
+        // Grant a non-superadmin creator access so it shows in their selector.
+        if (!$actor['is_superadmin']) Database::insert('organization_users', ['organization_id' => $id, 'user_id' => $actor['id'], 'is_primary' => 0]);
+        Audit::record('organization.create', $actor, ['organization_id' => $id, 'entity' => 'organization', 'entity_id' => $id, 'after' => ['code' => $b['code']]]);
+        Http::json(['id' => $id, 'name' => $b['name'], 'code' => $b['code']]);
+    }
+
+    public static function updateOrganization(array $p): void
+    {
+        $actor = Auth::requirePerm('organization.manage');
+        $org = Database::one('SELECT * FROM organizations WHERE id = ?', [(int) $p['id']]);
+        if (!$org) throw new HttpError('Organization not found', 404);
+        $b = Http::body();
+        $u = [];
+        foreach (['name', 'legal_name', 'tin', 'address'] as $f) if (isset($b[$f])) $u[$f] = $b[$f];
+        if (isset($b['is_active'])) $u['is_active'] = (int) (bool) $b['is_active'];
+        if ($u) Database::update('organizations', (int) $org['id'], $u);
+        Audit::record('organization.update', $actor, ['organization_id' => $org['id'], 'entity' => 'organization', 'entity_id' => $org['id']]);
+        Http::json(['id' => (int) $org['id'], 'name' => $b['name'] ?? $org['name'], 'is_active' => isset($b['is_active']) ? (bool) $b['is_active'] : (int) $org['is_active'] === 1]);
     }
 }

@@ -20,10 +20,12 @@ const NAV = [
   { label: "Recruitment", href: (o?: number) => (o ? `/o/${o}/recruitment` : "#") },
   { label: "HR Modules", href: (o?: number) => (o ? `/o/${o}/hr` : "#") },
   { label: "Reports", href: (o?: number) => (o ? `/o/${o}/reports` : "#") },
+  { label: "Org Setup", href: (o?: number) => (o ? `/o/${o}/setup` : "#") },
   { label: "My Self-Service", href: (o?: number) => "/me" },
 ];
 
 const ADMIN_NAV = [
+  { label: "Organizations", href: "/admin/organizations" },
   { label: "Users", href: "/admin/users" },
   { label: "Roles & Scopes", href: "/admin/roles" },
 ];
@@ -38,6 +40,7 @@ export default function AppShell({
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [orgs, setOrgs] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,6 +52,11 @@ export default function AppShell({
       .then((u) => setUser(u))
       .catch(() => router.replace("/login"))
       .finally(() => setLoading(false));
+    // Selector shows every organization the user can access (all of them for a
+    // Superadmin), independent of explicit memberships.
+    apiFetch<{ id: number; name: string }[]>("/organizations")
+      .then(setOrgs)
+      .catch(() => setOrgs([]));
   }, [router]);
 
   function logout() {
@@ -134,8 +142,8 @@ export default function AppShell({
               onChange={onOrgChange}
             >
               <option value="">Select organization…</option>
-              {user.organizations.map((o) => (
-                <option key={o.organization_id} value={o.organization_id}>
+              {orgs.map((o) => (
+                <option key={o.id} value={o.id}>
                   {o.name}
                 </option>
               ))}
