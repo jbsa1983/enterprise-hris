@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<title>GEEK HRIS Install Guide</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    --geek-red:#EA4335; --geek-amber:#F9AB00; --geek-green:#34A853; --geek-blue:#4285F4; --geek-bluedark:#1A73E8;
+    --bg:#F5F7FA; --surface:#FFFFFF; --surface-2:#FBFCFE; --ink:#19212E; --muted:#5C6672; --faint:#8A929E;
+    --line:#E3E7ED; --accent:#1A73E8; --accent-soft:rgba(26,115,232,.08);
+    --tip:#1E8E4E; --tip-soft:rgba(52,168,83,.10); --warn:#B5730B; --warn-soft:rgba(249,171,0,.12);
+    --danger:#C5372C; --danger-soft:rgba(234,67,53,.09);
+    --measure:70ch; --radius:14px; --shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.05);
+  }
+  :root:not([data-theme="light"]) { @media (prefers-color-scheme: dark) {
+    --bg:#0D1320; --surface:#151D2C; --surface-2:#111827; --ink:#E8EDF4; --muted:#9AA6B8; --faint:#6C788C;
+    --line:#263149; --accent:#6EA6FF; --accent-soft:rgba(110,166,255,.12);
+    --tip:#5BD08A; --tip-soft:rgba(52,168,83,.16); --warn:#F2C15A; --warn-soft:rgba(249,171,0,.14);
+    --danger:#FF8B80; --danger-soft:rgba(234,67,53,.16); --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  } }
+  :root[data-theme="dark"] {
+    --bg:#0D1320; --surface:#151D2C; --surface-2:#111827; --ink:#E8EDF4; --muted:#9AA6B8; --faint:#6C788C;
+    --line:#263149; --accent:#6EA6FF; --accent-soft:rgba(110,166,255,.12);
+    --tip:#5BD08A; --tip-soft:rgba(52,168,83,.16); --warn:#F2C15A; --warn-soft:rgba(249,171,0,.14);
+    --danger:#FF8B80; --danger-soft:rgba(234,67,53,.16); --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:16px; line-height:1.65; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:900px; margin:0 auto; padding:0 24px; }
+
+  .rail { display:flex; height:6px; } .rail>span{flex:1;}
+  .rail .r{background:var(--geek-red);} .rail .a{background:var(--geek-amber);} .rail .g{background:var(--geek-green);} .rail .b{background:var(--geek-blue);}
+  header.masthead { background:var(--surface); border-bottom:1px solid var(--line); }
+  .masthead-inner { padding:30px 0 34px; }
+  .brand { display:flex; align-items:center; gap:14px; }
+  .mark { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:3px; width:38px; height:38px; flex:none; }
+  .mark span { border-radius:5px; } .mark .s1{background:var(--geek-red);} .mark .s2{background:var(--geek-blue);} .mark .s3{background:var(--geek-green);} .mark .s4{background:var(--geek-amber);}
+  .wordmark { font-family:"Manrope",sans-serif; font-weight:800; font-size:26px; letter-spacing:-.5px; }
+  .wordmark .g1{color:var(--geek-red);} .wordmark .e1{color:var(--geek-amber);} .wordmark .e2{color:var(--geek-green);} .wordmark .k1{color:var(--geek-blue);}
+  .wordmark .grp{color:var(--faint); font-weight:600; font-size:15px; letter-spacing:3px; margin-left:8px;}
+  h1.doc-title { font-family:"Manrope",sans-serif; font-weight:800; font-size:clamp(30px,5vw,42px); line-height:1.08; letter-spacing:-1px; margin:24px 0 8px; text-wrap:balance; max-width:22ch; }
+  .doc-sub { color:var(--muted); font-size:18px; max-width:var(--measure); margin:0; }
+  .doc-meta { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:20px; font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.5px; }
+  .doc-meta b { color:var(--muted); font-weight:600; }
+
+  main { padding:8px 0 72px; }
+  section { padding-top:44px; scroll-margin-top:20px; }
+  .eyebrow { font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:var(--accent); display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .eyebrow .num { background:var(--accent); color:#fff; border-radius:6px; padding:1px 8px; font-weight:700; letter-spacing:1px; }
+  h2 { font-family:"Manrope",sans-serif; font-weight:700; font-size:25px; letter-spacing:-.4px; margin:0 0 6px; text-wrap:balance; }
+  h3 { font-family:"Manrope",sans-serif; font-weight:600; font-size:17px; margin:24px 0 6px; }
+  p { max-width:var(--measure); margin:0 0 14px; }
+  a { color:var(--accent); text-underline-offset:2px; }
+  strong { font-weight:600; }
+  code, .url { font-family:"IBM Plex Mono",monospace; font-size:.88em; background:var(--accent-soft); color:color-mix(in srgb,var(--accent) 82%,var(--ink)); padding:1px 6px; border-radius:6px; white-space:nowrap; }
+
+  .cmd { font-family:"IBM Plex Mono",monospace; font-size:13.5px; background:var(--surface-2); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:8px; padding:11px 14px; margin:10px 0 16px; overflow-x:auto; white-space:pre; max-width:100%; }
+
+  .lead { font-size:18.5px; color:var(--ink); max-width:var(--measure); }
+
+  nav.toc { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:20px 22px; margin-top:26px; box-shadow:var(--shadow); }
+  nav.toc h4 { margin:0 0 12px; font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--faint); font-weight:600; }
+  nav.toc ol { margin:0; padding:0; list-style:none; counter-reset:toc; display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:4px 26px; }
+  nav.toc li { counter-increment:toc; }
+  nav.toc a { display:flex; gap:12px; align-items:baseline; padding:7px 4px; border-radius:8px; text-decoration:none; color:var(--ink); }
+  nav.toc a::before { content:counter(toc,decimal-leading-zero); font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--accent); font-weight:600; flex:none; width:20px; }
+  nav.toc a:hover { background:var(--accent-soft); }
+
+  ol.steps { list-style:none; counter-reset:step; margin:18px 0 8px; padding:0; }
+  ol.steps>li { counter-increment:step; position:relative; padding:0 0 20px 50px; max-width:calc(var(--measure) + 50px); }
+  ol.steps>li::before { content:counter(step); position:absolute; left:0; top:-2px; width:32px; height:32px; display:grid; place-items:center; background:var(--accent); color:#fff; border-radius:50%; font-family:"Manrope",sans-serif; font-weight:700; font-size:14px; }
+  ol.steps>li::after { content:""; position:absolute; left:15.5px; top:34px; bottom:2px; width:2px; background:var(--line); }
+  ol.steps>li:last-child { padding-bottom:0; } ol.steps>li:last-child::after{display:none;}
+  ol.steps .st-title { font-weight:600; } ol.steps p { margin:4px 0 0; }
+
+  .note { border:1px solid var(--line); border-left-width:4px; border-radius:10px; background:var(--surface); padding:14px 16px; margin:16px 0; max-width:var(--measure); }
+  .note p { margin:0; } .note p + p { margin-top:8px; }
+  .note .lbl { font-family:"Manrope",sans-serif; font-weight:700; font-size:13px; display:block; margin-bottom:3px; }
+  .note.tip { border-left-color:var(--tip); background:var(--tip-soft); } .note.tip .lbl{color:var(--tip);}
+  .note.warn { border-left-color:var(--warn); background:var(--warn-soft); } .note.warn .lbl{color:var(--warn);}
+  .note.danger { border-left-color:var(--danger); background:var(--danger-soft); } .note.danger .lbl{color:var(--danger);}
+
+  .tablewrap { overflow-x:auto; margin:16px 0; border:1px solid var(--line); border-radius:12px; }
+  table { border-collapse:collapse; width:100%; font-size:14.5px; min-width:460px; }
+  thead th { text-align:left; background:var(--surface-2); color:var(--faint); font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:11.5px; letter-spacing:1px; text-transform:uppercase; padding:11px 16px; border-bottom:1px solid var(--line); }
+  tbody td { padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tbody tr:last-child td { border-bottom:none; } tbody td:first-child { font-weight:600; white-space:nowrap; }
+
+  hr.div { border:none; border-top:1px solid var(--line); margin:44px 0 0; }
+  footer { padding:30px 0 60px; color:var(--faint); font-size:13.5px; }
+  footer .mark { width:26px; height:26px; } footer .wordmark { font-size:18px; }
+
+  @media print {
+    :root { --bg:#fff; --surface:#fff; --surface-2:#f4f4f4; --ink:#111; --muted:#333; --line:#cfd4da; --shadow:none; }
+    body { font-size:11pt; } .no-print{display:none!important;}
+    section { padding-top:22px; break-inside:avoid-page; } .note,.tablewrap,.cmd{break-inside:avoid;}
+    h2{break-after:avoid;} a{color:#111;}
+  }
+</style>
+</head>
+<body>
+
+
+<header class="masthead">
+  <div class="rail"><span class="r"></span><span class="a"></span><span class="g"></span><span class="b"></span></div>
+  <div class="wrap masthead-inner">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span><span class="s4"></span></div>
+      <div class="wordmark"><span class="g1">G</span><span class="e1">E</span><span class="e2">E</span><span class="k1">K</span><span class="grp">GROUP</span></div>
+    </div>
+    <h1 class="doc-title">Installation Guide</h1>
+    <p class="doc-sub">Deploy the GEEK Enterprise HRIS on standard cPanel shared hosting — from creating the subdomain to first sign-in.</p>
+    <div class="doc-meta">
+      <span><b>For:</b> Installer / IT</span>
+      <span><b>Platform:</b> cPanel · PHP 8 · MySQL 8</span>
+      <span><b>Time:</b> ~20–30 minutes</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="intro" style="padding-top:34px;">
+    <p class="lead">This guide installs the HRIS into a subdomain on your hosting account. You'll create a subdomain and a MySQL database, upload and extract the package, point it at the database, seed the first administrator, enable HTTPS, and sign in. No server software needs to be compiled.</p>
+
+    <div class="note tip">
+      <span class="lbl">Before you start — have these ready</span>
+      <p>① Access to your hosting <strong>cPanel</strong>. ② The <strong>application package</strong> ZIP. ③ A subdomain name you want (e.g. <span class="url">hris.yourdomain.com</span>). ④ Your <strong>license key</strong> (if your copy requires activation).</p>
+    </div>
+
+    <nav class="toc no-print" aria-label="Contents">
+      <h4>Steps</h4>
+      <ol>
+        <li><a href="#subdomain">Create the subdomain</a></li>
+        <li><a href="#database">Create the database &amp; user</a></li>
+        <li><a href="#upload">Upload &amp; extract the package</a></li>
+        <li><a href="#schema">Import the database schema</a></li>
+        <li><a href="#settings">Configure settings.php</a></li>
+        <li><a href="#seed">Seed the first administrator</a></li>
+        <li><a href="#ssl">Turn on HTTPS (SSL)</a></li>
+        <li><a href="#activate">Activate the license</a></li>
+        <li><a href="#firstlogin">First sign-in &amp; setup</a></li>
+        <li><a href="#trouble">Troubleshooting</a></li>
+      </ol>
+    </nav>
+  </section>
+
+  <section id="subdomain">
+    <div class="eyebrow"><span class="num">Step 1</span> Subdomain</div>
+    <h2>Create the subdomain</h2>
+    <ol class="steps">
+      <li><span class="st-title">Open Domains → Subdomains.</span><p>In cPanel, find the <strong>Domains</strong> section and click <strong>Subdomains</strong> (on some themes it's under <strong>Domains → Create a New Domain</strong>).</p></li>
+      <li><span class="st-title">Enter the subdomain.</span><p>Type the prefix, e.g. <span class="url">hris</span>, and choose your domain. cPanel fills a <strong>Document Root</strong> automatically (e.g. <span class="url">/home/USER/hris.yourdomain.com</span>). Note this path — the package goes here.</p></li>
+      <li><span class="st-title">Create it.</span><p>Click <strong>Create</strong>. The subdomain is live within a minute or two.</p></li>
+    </ol>
+  </section>
+
+  <section id="database">
+    <div class="eyebrow"><span class="num">Step 2</span> Database</div>
+    <h2>Create the database &amp; user</h2>
+    <p>Use the <strong>MySQL Database Wizard</strong> (Databases section) — it does all three parts in order.</p>
+    <ol class="steps">
+      <li><span class="st-title">Create a database.</span><p>Give it a short name, e.g. <span class="url">hris</span>. cPanel prefixes it with your account, so the real name becomes something like <span class="url">youracct_hris</span> — note the full name.</p></li>
+      <li><span class="st-title">Create a database user.</span><p>Set a username (e.g. <span class="url">hris_admin</span> → real name <span class="url">youracct_hris_admin</span>) and a <strong>strong password</strong>. Note all three: <strong>database name, user, password</strong>.</p></li>
+      <li><span class="st-title">Grant ALL PRIVILEGES.</span><p>On the privileges screen, tick <strong>ALL PRIVILEGES</strong> and finish. The user now owns the database.</p></li>
+    </ol>
+    <div class="note warn">
+      <span class="lbl">Write these down</span>
+      <p>You'll paste the <strong>database name</strong>, <strong>user</strong>, and <strong>password</strong> into the configuration file in Step 5. Keep them handy.</p>
+    </div>
+  </section>
+
+  <section id="upload">
+    <div class="eyebrow"><span class="num">Step 3</span> Files</div>
+    <h2>Upload &amp; extract the package</h2>
+    <ol class="steps">
+      <li><span class="st-title">Open File Manager.</span><p>cPanel → <strong>Files → File Manager</strong>. Navigate into your subdomain's <strong>Document Root</strong> from Step 1.</p></li>
+      <li><span class="st-title">Upload the ZIP.</span><p>Click <strong>Upload</strong>, choose the package ZIP, and wait for it to reach 100%.</p></li>
+      <li><span class="st-title">Extract it here.</span><p>Back in File Manager, right-click the ZIP → <strong>Extract</strong> → extract into the same subdomain folder. You should now see <span class="url">index.html</span>, <span class="url">api/</span>, <span class="url">app/</span>, <span class="url">assets/</span>, and <span class="url">db/</span>.</p></li>
+      <li><span class="st-title">Delete the ZIP.</span><p>Remove the uploaded ZIP to keep the folder clean.</p></li>
+    </ol>
+    <div class="note warn">
+      <span class="lbl">Files must sit at the root of the subdomain</span>
+      <p>If extracting created a wrapper folder (e.g. everything inside <span class="url">geek-hris/</span>), move the contents <strong>up one level</strong> so <span class="url">index.html</span> is directly in the subdomain's Document Root.</p>
+    </div>
+  </section>
+
+  <section id="schema">
+    <div class="eyebrow"><span class="num">Step 4</span> Schema</div>
+    <h2>Import the database schema</h2>
+    <p>Load the tables into the database you created. Either method works — Terminal is fastest and avoids timeouts.</p>
+    <h3>Option A — Terminal (recommended)</h3>
+    <p>cPanel → <strong>Advanced → Terminal</strong>, then (replace the names with yours):</p>
+    <div class="cmd">cd ~/hris.yourdomain.com
+mysql -u youracct_hris_admin -p youracct_hris &lt; db/schema.sql</div>
+    <p>Enter the database password when prompted (nothing shows as you type).</p>
+    <h3>Option B — phpMyAdmin</h3>
+    <ol class="steps">
+      <li><span class="st-title">Open phpMyAdmin</span><p>cPanel → <strong>Databases → phpMyAdmin</strong>, then select your database on the left.</p></li>
+      <li><span class="st-title">Import the file</span><p><strong>Import</strong> tab → choose <span class="url">db/schema.sql</span> from the package → <strong>Go</strong>. If it times out on a large import, use Option A instead.</p></li>
+    </ol>
+  </section>
+
+  <section id="settings">
+    <div class="eyebrow"><span class="num">Step 5</span> Configure</div>
+    <h2>Point the app at your database</h2>
+    <ol class="steps">
+      <li><span class="st-title">Copy the sample config.</span><p>In File Manager, open the <span class="url">app/</span> folder. Copy <span class="url">settings.sample.php</span> and rename the copy to <span class="url">settings.php</span>.</p></li>
+      <li><span class="st-title">Edit settings.php.</span><p>Right-click → <strong>Edit</strong>. Fill in your <strong>database name, user, and password</strong> from Step 2.</p></li>
+      <li><span class="st-title">Set a JWT secret.</span><p>Replace the <span class="url">jwt_secret</span> value with a long random string. Generate one in Terminal:</p></li>
+    </ol>
+    <div class="cmd">php -r "echo bin2hex(random_bytes(48)).PHP_EOL;"</div>
+    <p>Paste the output as the <span class="url">jwt_secret</span>. Save the file.</p>
+    <div class="note tip">
+      <span class="lbl">Optional settings</span>
+      <p><span class="url">storage_quota_gb</span> — your plan's storage limit, so the dashboard shows real usage. <span class="url">backup_path</span> — a folder for DB backups. Both can be left as-is.</p>
+    </div>
+  </section>
+
+  <section id="seed">
+    <div class="eyebrow"><span class="num">Step 6</span> Seed</div>
+    <h2>Create the first administrator</h2>
+    <p>This creates the roles, permissions, statutory rules, and your <strong>Super Admin</strong> login. Run once, in Terminal:</p>
+    <div class="cmd">cd ~/hris.yourdomain.com
+php db/seed.php --minimal</div>
+    <p>The default login is <span class="url">admin@demo-hris.local</span> / <span class="url">Admin123!</span> — <strong>change it immediately</strong> after first sign-in. To set your own from the start, run instead:</p>
+    <div class="cmd">DEFAULT_ADMIN_EMAIL="you@yourdomain.com" DEFAULT_ADMIN_PASSWORD="A-strong-pass1" php db/seed.php --minimal</div>
+    <div class="note tip">
+      <span class="lbl">Clean up the installer files (optional)</span>
+      <p>After seeding you can delete the <span class="url">db/</span> folder (schema + seeders) — the app doesn't need it to run. Keep a copy locally.</p>
+    </div>
+  </section>
+
+  <section id="ssl">
+    <div class="eyebrow"><span class="num">Step 7</span> HTTPS</div>
+    <h2>Turn on HTTPS (SSL)</h2>
+    <ol class="steps">
+      <li><span class="st-title">Run AutoSSL.</span><p>cPanel → <strong>Security → SSL/TLS Status</strong>. Find your subdomain and click <strong>Run AutoSSL</strong>. A free certificate is issued in a few minutes.</p></li>
+      <li><span class="st-title">Confirm it's secure.</span><p>Visit <span class="url">https://hris.yourdomain.com</span> — you should see the sign-in page over a secure (padlock) connection.</p></li>
+    </ol>
+  </section>
+
+  <section id="activate">
+    <div class="eyebrow"><span class="num">Step 8</span> License</div>
+    <h2>Activate the license</h2>
+    <p>If your copy requires activation, you'll see an amber <strong>“not activated”</strong> banner after signing in.</p>
+    <ol class="steps">
+      <li><span class="st-title">Sign in as the administrator.</span></li>
+      <li><span class="st-title">Open Administration → License.</span></li>
+      <li><span class="st-title">Paste your key and click Activate.</span><p>The key is issued for this exact domain; once accepted the banner disappears and the app is fully unlocked.</p></li>
+    </ol>
+    <div class="note">
+      <span class="lbl">No banner?</span>
+      <p>Then activation isn't required for this installation — you're ready to go.</p>
+    </div>
+  </section>
+
+  <section id="firstlogin">
+    <div class="eyebrow"><span class="num">Step 9</span> Go live</div>
+    <h2>First sign-in &amp; setup</h2>
+    <ol class="steps">
+      <li><span class="st-title">Change the admin password.</span><p><strong>My Self-Service → Security</strong>.</p></li>
+      <li><span class="st-title">Brand it.</span><p><strong>Administration → Branding</strong> — upload your logo (a wide transparent PNG, about 400×120 px).</p></li>
+      <li><span class="st-title">Create your organization(s).</span><p><strong>Administration → Organizations → New Organization</strong>. Each new org starts with default leave types.</p></li>
+      <li><span class="st-title">Set up departments &amp; positions.</span><p>Open the org, then <strong>Org Setup</strong>.</p></li>
+      <li><span class="st-title">Add people &amp; give them logins.</span><p>Add employees under <strong>People</strong>, then <strong>Administration → Users → Provision Employee Logins</strong> to create self-service accounts in bulk.</p></li>
+    </ol>
+    <div class="note tip">
+      <span class="lbl">Hand staff the user guide</span>
+      <p>The employee guide is built in at <span class="url">https://hris.yourdomain.com/manual.html</span> and via the <strong>Help</strong> link inside the app.</p>
+    </div>
+  </section>
+
+  <hr class="div">
+
+  <section id="trouble">
+    <div class="eyebrow">Troubleshooting</div>
+    <h2>If something isn't right</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Symptom</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr><td>"Could not open input file: db/schema.sql"</td><td>You're not in the subdomain folder. <code>cd</code> into it first (Step 4), or run <code>find ~ -name schema.sql</code> to locate it.</td></tr>
+          <tr><td>"Access denied for user…"</td><td>The database name/user/password in <span class="url">app/settings.php</span> don't match Step 2. Re-check the account-prefixed names.</td></tr>
+          <tr><td>"Table … doesn't exist"</td><td>The schema import didn't complete (often a phpMyAdmin timeout). Re-run the import via Terminal (Step 4, Option A).</td></tr>
+          <tr><td>Signed out immediately / at random</td><td>The host stripped the Authorization header. The bundled <span class="url">.htaccess</span> already handles this — make sure it was extracted (enable "show hidden files" in File Manager).</td></tr>
+          <tr><td>Blank page / 500 error</td><td>Confirm PHP 8 is selected (cPanel → MultiPHP Manager) and that <span class="url">settings.php</span> exists with valid values.</td></tr>
+          <tr><td>Logo upload fails</td><td>Create an empty <span class="url">uploads</span> folder in the subdomain root via File Manager, then retry.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="brand" style="margin-bottom:10px;">
+      <div class="mark" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span><span class="s4"></span></div>
+      <div class="wordmark"><span class="g1">G</span><span class="e1">E</span><span class="e2">E</span><span class="k1">K</span><span class="grp">GROUP</span></div>
+    </div>
+    GEEK Group · Enterprise HRIS — Installation Guide. Support: GEEK Admin · 0917 891 7232 · geekhr@exssi.com
+  </div>
+</footer>
+
+</body>
+</html>
