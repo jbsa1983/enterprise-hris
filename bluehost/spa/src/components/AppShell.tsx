@@ -117,6 +117,12 @@ export default function AppShell({
     router.replace("/login");
   }
 
+  // Remember the last organization the user was in, so non-org pages (like My
+  // Self-Service) keep the org context instead of resetting the picker.
+  useEffect(() => {
+    if (orgId) { try { localStorage.setItem("hris_last_org", String(orgId)); } catch { /* ignore */ } }
+  }, [orgId]);
+
   function onOrgChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const id = e.target.value;
     if (id) router.push(`/o/${id}/dashboard`);
@@ -133,6 +139,12 @@ export default function AppShell({
 
   const isAdmin = user.is_superadmin || (user.permissions || []).includes("system.admin");
 
+  // Org used for the sidebar links + picker: the current org page, else the last
+  // org visited, else the user's only org.
+  const rememberedOrg = (() => { try { return Number(localStorage.getItem("hris_last_org")) || undefined; } catch { return undefined; } })();
+  const singleOrg = user.organizations && user.organizations.length === 1 ? user.organizations[0].organization_id : undefined;
+  const navOrg = orgId ?? rememberedOrg ?? singleOrg;
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
@@ -142,7 +154,7 @@ export default function AppShell({
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">
           {NAV.filter((item) => !item.perm || user.is_superadmin || (user.permissions || []).includes(item.perm)).map((item) => {
-            const href = item.href(orgId);
+            const href = item.href(navOrg);
             const disabled = href === "#";
             const active = pathname === href.split("?")[0];
             return (
@@ -209,7 +221,7 @@ export default function AppShell({
             <label className="text-xs font-medium text-slate-500">Organization</label>
             <select
               className="input max-w-xs"
-              value={orgId ?? ""}
+              value={navOrg ?? ""}
               onChange={onOrgChange}
             >
               <option value="">Select organization…</option>
