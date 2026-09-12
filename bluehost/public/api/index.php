@@ -49,8 +49,9 @@ TelegramController::routes($router);
 // When license enforcement is on, lock everything except sign-in and activation
 // until a valid license is installed.
 if (License::ENFORCE) {
-    $allow = ['/health', '/branding', '/license', '/auth/login', '/auth/refresh', '/auth/me', '/admin/license', '/telegram/webhook'];
-    if (!in_array($path, $allow, true) && !License::status()['active']) {
+    $allow = ['/health', '/branding', '/license', '/auth/login', '/auth/refresh', '/auth/me', '/admin/license'];
+    $allowed = in_array($path, $allow, true) || str_starts_with($path, '/telegram/webhook');
+    if (!$allowed && !License::status()['active']) {
         Http::error('This installation is not activated. Enter a valid license key in Administration → License.', 403);
     }
 }

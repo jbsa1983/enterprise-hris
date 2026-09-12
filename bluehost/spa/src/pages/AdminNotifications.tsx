@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { apiFetch } from "@/lib/api";
 
-interface TgStatus { configured: boolean; bot_username: string | null; webhook_set: boolean; }
+interface TgStatus { configured: boolean; bot_username: string | null; webhook_set: boolean; webhook_error?: string | null; webhook_url?: string | null; }
 
 export default function AdminNotificationsPage() {
   const [st, setSt] = useState<TgStatus | null>(null);
@@ -17,7 +17,14 @@ export default function AdminNotificationsPage() {
     setErr(""); setMsg(""); setBusy(true);
     try {
       const s = await apiFetch<TgStatus>("/admin/telegram", { method: "POST", body: JSON.stringify({ bot_token: token.trim() }) });
-      setSt(s); setToken(""); setMsg(s.webhook_set ? "Connected to Telegram." : "Saved, but the webhook couldn't be set — check that your site is on HTTPS.");
+      setSt(s); setToken(""); setMsg(s.webhook_set ? "Connected to Telegram." : "Token saved, but the webhook couldn't be registered — see the error below.");
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  }
+  async function retryWebhook() {
+    setErr(""); setMsg(""); setBusy(true);
+    try {
+      const s = await apiFetch<TgStatus>("/admin/telegram/webhook", { method: "POST" });
+      setSt(s); setMsg(s.webhook_set ? "Webhook registered ✔" : "Still couldn't register the webhook — see the error.");
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   }
 
@@ -41,12 +48,24 @@ export default function AdminNotificationsPage() {
           {st?.configured ? (
             <p className="mb-3 text-sm text-slate-600">Bot: <span className="font-mono">@{st.bot_username}</span></p>
           ) : null}
+          {st?.configured && !st.webhook_set ? (
+            <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+              Webhook not registered — messages from staff won't reach the app.{st.webhook_error ? <> Telegram said: <b>{st.webhook_error}</b></> : null}
+              <div className="mt-2"><button className="rounded border border-red-300 px-2 py-1 font-medium hover:bg-red-100" onClick={retryWebhook} disabled={busy}>Re-register webhook</button></div>
+            </div>
+          ) : null}
+          {st?.configured && st.webhook_set ? (
+            <div className="mb-3 flex items-center gap-3">
+              <span className="badge bg-emerald-100 text-emerald-700">Webhook active</span>
+              <button className="text-xs text-slate-500 hover:underline" onClick={retryWebhook} disabled={busy}>re-register</button>
+            </div>
+          ) : null}
           <label className="mb-1 block text-xs text-slate-500">Bot token (from @BotFather)</label>
           <input className="input font-mono text-xs" value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:AA..." />
           <div className="mt-3">
             <button className="btn-primary" onClick={save} disabled={busy || !token.trim()}>{busy ? "Connecting…" : st?.configured ? "Update token" : "Connect bot"}</button>
           </div>
-          <p className="mt-2 text-xs text-slate-400">Saving verifies the token and registers the webhook automatically.</p>
+          <p className="mt-2 text-xs text-slate-400">Saving verifies the token and registers the webhook automatically (needs HTTPS).</p>
         </div>
 
         <div className="card">

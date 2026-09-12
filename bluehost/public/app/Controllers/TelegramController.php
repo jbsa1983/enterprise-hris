@@ -3,20 +3,20 @@ class TelegramController
 {
     public static function routes(Router $r): void
     {
-        $r->post('/telegram/webhook', [self::class, 'webhook']);   // public — Telegram calls this
+        $r->post('/telegram/webhook/{secret}', [self::class, 'webhook']);   // public — Telegram calls this
         $r->get('/admin/telegram', [self::class, 'adminStatus']);
         $r->post('/admin/telegram', [self::class, 'adminSave']);
+        $r->post('/admin/telegram/webhook', [self::class, 'retryWebhook']);
         $r->get('/me/telegram', [self::class, 'meStatus']);
         $r->post('/me/telegram/unlink', [self::class, 'meUnlink']);
         $r->post('/me/telegram/test', [self::class, 'meTest']);
     }
 
-    /** Telegram pushes updates here. Handles "/start <code>" to link a chat. */
-    public static function webhook(): void
+    /** Telegram delivers updates here; the secret is a path segment (never stripped like a header). */
+    public static function webhook(array $p): void
     {
         $secret = Telegram::secret();
-        $got = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
-        if (!$secret || !hash_equals($secret, (string) $got)) { http_response_code(403); echo 'forbidden'; exit; }
+        if (!$secret || !hash_equals($secret, (string) ($p['secret'] ?? ''))) { http_response_code(403); echo 'forbidden'; exit; }
         $update = json_decode((string) file_get_contents('php://input'), true) ?: [];
         $msg = $update['message'] ?? null;
         if ($msg && isset($msg['text']) && strpos($msg['text'], '/start') === 0) {
@@ -34,12 +34,36 @@ class TelegramController
         exit;
     }
 
+    private static function webhookUrl(): string
+    {
+        $host = preg_replace('/^www\./', '', (string) ($_SERVER['HTTP_HOST'] ?? ''));
+        return 'https://' . $host . '/api/v1/telegram/webhook/' . Telegram::ensureSecret(); // Telegram requires https
+    }
+
+    private static function register(): array
+    {
+        $url = self::webhookUrl();
+        [$ok, $err] = Telegram::setWebhook($url);
+        $cfg = Telegram::config();
+        $cfg['webhook_set'] = $ok;
+        $cfg['webhook_error'] = $ok ? null : $err;
+        $cfg['webhook_url'] = $url;
+        Telegram::saveConfig($cfg);
+        return [$ok, $err, $url];
+    }
+
+    private static function status(): array
+    {
+        $cfg = Telegram::config();
+        return ['configured' => Telegram::configured(), 'bot_username' => $cfg['bot_username'] ?? null,
+            'webhook_set' => !empty($cfg['webhook_set']), 'webhook_error' => $cfg['webhook_error'] ?? null,
+            'webhook_url' => $cfg['webhook_url'] ?? null];
+    }
+
     public static function adminStatus(): void
     {
         Auth::requirePerm('system.admin');
-        $cfg = Telegram::config();
-        Http::json(['configured' => Telegram::configured(), 'bot_username' => $cfg['bot_username'] ?? null,
-            'webhook_set' => !empty($cfg['webhook_set'])]);
+        Http::json(self::status());
     }
 
     public static function adminSave(): void
@@ -49,19 +73,24 @@ class TelegramController
         if ($token === '') throw new HttpError('Paste your bot token from @BotFather', 422);
         $cfg = Telegram::config();
         $cfg['bot_token'] = $token;
-        if (empty($cfg['webhook_secret'])) $cfg['webhook_secret'] = bin2hex(random_bytes(16));
         Telegram::saveConfig($cfg);
 
         $me = Telegram::getMe();
         if (!$me || empty($me['username'])) throw new HttpError('Could not reach Telegram with that token — double-check it', 422);
+        $cfg = Telegram::config();
         $cfg['bot_username'] = $me['username'];
-
-        $host = $_SERVER['HTTP_HOST'] ?? '';
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $cfg['webhook_set'] = Telegram::setWebhook("$scheme://$host/api/v1/telegram/webhook", $cfg['webhook_secret']);
         Telegram::saveConfig($cfg);
 
-        Http::json(['configured' => true, 'bot_username' => $cfg['bot_username'], 'webhook_set' => $cfg['webhook_set']]);
+        self::register();
+        Http::json(self::status());
+    }
+
+    public static function retryWebhook(): void
+    {
+        Auth::requirePerm('system.admin');
+        if (!Telegram::token()) throw new HttpError('Set the bot token first', 422);
+        self::register();
+        Http::json(self::status());
     }
 
     public static function meStatus(): void

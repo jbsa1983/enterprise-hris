@@ -50,10 +50,20 @@ class Telegram
         return ($r && !empty($r['ok'])) ? $r['result'] : null;
     }
 
-    public static function setWebhook(string $url, string $secret): bool
+    /** [ok(bool), error(?string)]. The URL carries the secret in its path. */
+    public static function setWebhook(string $url): array
     {
-        $r = self::api('setWebhook', ['url' => $url, 'secret_token' => $secret, 'allowed_updates' => json_encode(['message'])]);
-        return $r && !empty($r['ok']);
+        $r = self::api('setWebhook', ['url' => $url, 'allowed_updates' => json_encode(['message'])]);
+        if ($r && !empty($r['ok'])) return [true, null];
+        return [false, $r['description'] ?? 'No response from Telegram — check the server can make outbound HTTPS calls (cURL).'];
+    }
+
+    /** Ensure a webhook secret exists (persisted). */
+    public static function ensureSecret(): string
+    {
+        $cfg = self::config();
+        if (empty($cfg['webhook_secret'])) { $cfg['webhook_secret'] = bin2hex(random_bytes(16)); self::saveConfig($cfg); }
+        return $cfg['webhook_secret'];
     }
 
     public static function send(string $chatId, string $text): bool
