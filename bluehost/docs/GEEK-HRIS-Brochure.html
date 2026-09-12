@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<title>GEEK HRIS Brochure</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    --geek-red: #EA4335; --geek-amber: #F9AB00; --geek-green: #34A853; --geek-blue: #4285F4; --geek-bluedark: #1A73E8;
+    --bg: #F4F6F9; --surface: #FFFFFF; --surface-2: #FBFCFE; --ink: #16202E; --muted: #57616E; --faint: #8B93A0;
+    --line: #E2E6EC; --accent: #1A73E8; --accent-soft: rgba(26,115,232,.08);
+    --radius: 16px; --measure: 66ch;
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 10px 30px rgba(16,24,40,.06);
+  }
+  :root:not([data-theme="light"]) { @media (prefers-color-scheme: dark) {
+    --bg: #0C1220; --surface: #141C2B; --surface-2: #101827; --ink: #E9EEF5; --muted: #9BA7B8; --faint: #6B7688;
+    --line: #253048; --accent: #6EA6FF; --accent-soft: rgba(110,166,255,.12);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 34px rgba(0,0,0,.4);
+  } }
+  :root[data-theme="dark"] {
+    --bg: #0C1220; --surface: #141C2B; --surface-2: #101827; --ink: #E9EEF5; --muted: #9BA7B8; --faint: #6B7688;
+    --line: #253048; --accent: #6EA6FF; --accent-soft: rgba(110,166,255,.12);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 34px rgba(0,0,0,.4);
+  }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif; font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 28px; }
+
+  .rail { display: flex; height: 6px; }
+  .rail > span { flex: 1; }
+  .rail .r { background: var(--geek-red); } .rail .a { background: var(--geek-amber); }
+  .rail .g { background: var(--geek-green); } .rail .b { background: var(--geek-blue); }
+
+  /* Brand mark */
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .mark { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 3px; width: 40px; height: 40px; flex: none; }
+  .mark span { border-radius: 5px; }
+  .mark .s1 { background: var(--geek-red); } .mark .s2 { background: var(--geek-blue); }
+  .mark .s3 { background: var(--geek-green); } .mark .s4 { background: var(--geek-amber); }
+  .wordmark { font-family: "Manrope", sans-serif; font-weight: 800; font-size: 27px; letter-spacing: -.5px; }
+  .wordmark .g1 { color: var(--geek-red); } .wordmark .e1 { color: var(--geek-amber); }
+  .wordmark .e2 { color: var(--geek-green); } .wordmark .k1 { color: var(--geek-blue); }
+  .wordmark .grp { color: var(--faint); font-weight: 600; font-size: 15px; letter-spacing: 3px; margin-left: 8px; }
+
+  /* Hero */
+  header.hero { background: var(--surface); border-bottom: 1px solid var(--line); }
+  .hero-inner { padding: 30px 0 42px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .eyebrow { font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+  h1 { font-family: "Manrope", sans-serif; font-weight: 800; letter-spacing: -1.4px; line-height: 1.04;
+    font-size: clamp(34px, 6vw, 60px); margin: 22px 0 14px; text-wrap: balance; max-width: 16ch; }
+  .tagline { font-size: clamp(17px, 2.4vw, 21px); color: var(--muted); max-width: 46ch; margin: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+  .chip { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; font-weight: 600; color: var(--ink);
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 7px; }
+  .chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  main { padding: 8px 0 40px; }
+  section { padding-top: 52px; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .sec-head .eyebrow::before { content: ""; display: inline-block; width: 22px; height: 2px; background: var(--accent); border-radius: 2px; margin-right: 9px; vertical-align: middle; }
+  h2 { font-family: "Manrope", sans-serif; font-weight: 700; font-size: 27px; letter-spacing: -.5px; margin: 6px 0 4px; text-wrap: balance; }
+  .lead { font-size: 18px; color: var(--muted); max-width: var(--measure); }
+
+  /* Feature grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 22px; }
+  .fcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .fcard h3 { font-family: "Manrope", sans-serif; font-weight: 700; font-size: 16.5px; margin: 0 0 12px; display: flex; align-items: center; gap: 10px; }
+  .fcard h3 .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .fcard ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .fcard li { position: relative; padding-left: 20px; font-size: 14.5px; color: var(--muted); }
+  .fcard li::before { content: ""; position: absolute; left: 2px; top: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); opacity: .55; }
+  .fcard li b { color: var(--ink); font-weight: 600; }
+
+  /* Package list */
+  .pkg { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 22px; }
+  .pkg-item { display: flex; gap: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 15px 16px; box-shadow: var(--shadow); }
+  .pkg-item .n { font-family: "Manrope", sans-serif; font-weight: 800; font-size: 13px; color: #fff; background: var(--accent); width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+  .pkg-item .t { font-weight: 600; font-size: 14.5px; }
+  .pkg-item .s { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  /* Spec + table */
+  .tablewrap { overflow-x: auto; margin-top: 22px; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 460px; background: var(--surface); }
+  tbody td { padding: 13px 18px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { font-family: "Manrope", sans-serif; font-weight: 700; white-space: nowrap; width: 210px; }
+  tbody td b { color: var(--ink); }
+
+  /* Licensing callout */
+  .license { margin-top: 22px; background: linear-gradient(180deg, var(--accent-soft), transparent); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+  .license h3 { font-family: "Manrope", sans-serif; font-weight: 700; font-size: 18px; margin: 0 0 10px; }
+  .license .keydemo { font-family: "IBM Plex Mono", monospace; font-size: 14px; letter-spacing: 1px; background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 14px; display: inline-block; margin: 6px 0 14px; color: var(--accent); }
+  .license ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14.5px; display: grid; gap: 6px; max-width: var(--measure); }
+
+  .cta { margin-top: 52px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; box-shadow: var(--shadow); }
+  .cta .h { font-family: "Manrope", sans-serif; font-weight: 800; font-size: 22px; letter-spacing: -.4px; }
+  .cta .contact { font-size: 14.5px; color: var(--muted); }
+  .cta .contact b { color: var(--ink); }
+  .cta a { color: var(--accent); }
+
+  footer { padding: 30px 0 60px; color: var(--faint); font-size: 12.5px; }
+  footer .mark { width: 24px; height: 24px; } footer .wordmark { font-size: 17px; }
+
+  @media print {
+    :root { --bg:#fff; --surface:#fff; --surface-2:#fff; --ink:#111; --muted:#333; --line:#cfd4da; --shadow:none; }
+    body { font-size: 10.5pt; } .no-print { display:none !important; }
+    section { break-inside: avoid; padding-top: 20px; } .fcard, .pkg-item, .license, .cta, .tablewrap { break-inside: avoid; box-shadow:none; }
+    h1 { font-size: 30pt; } a { color:#111; }
+  }
+</style>
+</head>
+<body>
+
+
+<header class="hero">
+  <div class="rail"><span class="r"></span><span class="a"></span><span class="g"></span><span class="b"></span></div>
+  <div class="wrap hero-inner">
+    <div class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span><span class="s4"></span></div>
+        <div class="wordmark"><span class="g1">G</span><span class="e1">E</span><span class="e2">E</span><span class="k1">K</span><span class="grp">GROUP</span></div>
+      </div>
+      <div class="eyebrow">Product Brochure &amp; Specifications</div>
+    </div>
+    <h1>Enterprise HRIS</h1>
+    <p class="tagline">Multi-company Philippine payroll &amp; HR — a complete, self-hosted system that runs on your own standard web hosting. No monthly SaaS fees.</p>
+    <div class="chips">
+      <span class="chip"><i style="background:var(--geek-red)"></i>Multi-company</span>
+      <span class="chip"><i style="background:var(--geek-amber)"></i>PH statutory payroll</span>
+      <span class="chip"><i style="background:var(--geek-green)"></i>Employee self-service</span>
+      <span class="chip"><i style="background:var(--geek-blue)"></i>16 roles · 30+ permissions</span>
+      <span class="chip"><i style="background:var(--geek-bluedark)"></i>Runs on shared hosting</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="overview" style="padding-top:40px;">
+    <p class="lead">GEEK Enterprise HRIS manages people, payroll, time, benefits, assets and HR workflows across multiple companies from a single installation. It ships as a ready-to-deploy package for standard cPanel shared hosting (PHP + MySQL) — you own the software and the data, with role-based access control and employee self-service built in.</p>
+  </section>
+
+  <section id="features">
+    <div class="sec-head"><span class="eyebrow">What's inside</span></div>
+    <h2>Full feature set</h2>
+    <div class="grid">
+
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-green)"></span>Payroll &amp; Compliance</h3>
+        <ul>
+          <li>Multi-company payroll runs — <b>prepare, compute, approve, lock</b></li>
+          <li>Philippine statutory: <b>SSS, PhilHealth, Pag-IBIG, withholding tax</b></li>
+          <li><b>13th-month &amp; bonuses</b> — special-pay runs in bulk</li>
+          <li>Payslip <b>PDF generation</b>, per employee &amp; period</li>
+          <li><b>Bank file export</b> for salary crediting</li>
+          <li>Government contribution reporting</li>
+        </ul>
+      </div>
+
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-blue)"></span>Employee Self-Service</h3>
+        <ul>
+          <li>Own profile, government IDs &amp; bank on file</li>
+          <li><b>Generate &amp; download own payslips</b> and 13th-month</li>
+          <li>Leave balances &amp; <b>file leave requests</b></li>
+          <li><b>Overtime</b> and <b>loan / cash-advance</b> requests</li>
+          <li>View <b>benefits, beneficiaries &amp; assigned assets</b></li>
+          <li>Self-service password change</li>
+        </ul>
+      </div>
+
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-amber)"></span>Time, Leave &amp; Attendance</h3>
+        <ul>
+          <li>Attendance import — <b>CSV, biometric, or API</b></li>
+          <li>Configurable <b>leave types &amp; credits</b> per company</li>
+          <li>Balances that <b>auto-deduct on approval</b></li>
+          <li>Leave &amp; overtime <b>approval workflow</b> (Dept Head / HR)</li>
+          <li>Daily logs: hours, late, overtime, status</li>
+        </ul>
+      </div>
+
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-red)"></span>Benefits &amp; Assets</h3>
+        <ul>
+          <li>Record <b>benefits</b> (HMO / health, life, and custom types)</li>
+          <li><b>Beneficiaries</b> with relationship &amp; share</li>
+          <li>Company <b>asset issuance</b> (laptops, phones, etc.)</li>
+          <li><b>Return / reassign with remarks</b> &amp; full history</li>
+          <li><b>Bulk asset return</b> on separation</li>
+        </ul>
+      </div>
+
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-bluedark)"></span>HR &amp; Talent</h3>
+        <ul>
+          <li><b>Recruitment</b> — requisitions with placement, timeline, budget</li>
+          <li>Applications &amp; interview tracking</li>
+          <li><b>Performance</b> cycles &amp; <b>training</b> records</li>
+          <li>Service tickets &amp; requests</li>
+          <li><b>Onboarding / offboarding</b> checklists</li>
+        </ul>
+      </div>
+
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-green)"></span>Projects &amp; Finance</h3>
+        <ul>
+          <li>Projects with <b>budgets</b> by period</li>
+          <li>Loan &amp; cash-advance ledgers with balances</li>
+          <li>Payroll-deductible obligations</li>
+          <li><b>Reports</b> by staff, period, project, or organization</li>
+        </ul>
+      </div>
+
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-blue)"></span>Administration &amp; Security</h3>
+        <ul>
+          <li><b>Role-based access</b> — 16 roles, 30+ granular permissions</li>
+          <li>Multi-organization scoping enforced on the backend</li>
+          <li>Create users, <b>link logins to employee records</b></li>
+          <li><b>Bulk-provision</b> employee logins (with CSV of credentials)</li>
+          <li>JWT sign-in, <b>15-minute idle logout</b>, hashed passwords, audit trail</li>
+        </ul>
+      </div>
+
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-amber)"></span>Branding &amp; Dashboards</h3>
+        <ul>
+          <li><b>White-label</b> — upload your own logo</li>
+          <li>Enterprise &amp; per-organization dashboards</li>
+          <li>Org setup: departments &amp; positions</li>
+          <li>Real-time storage monitoring</li>
+          <li>Works on desktop &amp; mobile browsers</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <section id="package">
+    <div class="sec-head"><span class="eyebrow">Deliverables</span></div>
+    <h2>What's in the package</h2>
+    <p class="lead">Everything needed to install and run the system on your hosting, plus documentation for staff and administrators.</p>
+    <div class="pkg">
+      <div class="pkg-item"><div class="n">1</div><div><div class="t">Full application package</div><div class="s">Deployable ZIP — extract into your subdomain's folder. PHP backend + built web app.</div></div></div>
+      <div class="pkg-item"><div class="n">2</div><div><div class="t">Database schema &amp; seeders</div><div class="s">MySQL schema plus one-command seeding for roles, permissions, and defaults.</div></div></div>
+      <div class="pkg-item"><div class="n">3</div><div><div class="t">Installation manual</div><div class="s">Step-by-step cPanel setup: database, import, file upload, SSL, and go-live.</div></div></div>
+      <div class="pkg-item"><div class="n">4</div><div><div class="t">Employee user guide</div><div class="s">Branded PDF plus an in-app Help page hosted at your own domain.</div></div></div>
+      <div class="pkg-item"><div class="n">5</div><div><div class="t">Admin quick-start</div><div class="s">Creating organizations, users, roles, leave types, and branding.</div></div></div>
+      <div class="pkg-item"><div class="n">6</div><div><div class="t">License / activation key</div><div class="s">A single-use key that activates your installation (see below).</div></div></div>
+    </div>
+  </section>
+
+  <section id="specs">
+    <div class="sec-head"><span class="eyebrow">Technical</span></div>
+    <h2>Specifications &amp; requirements</h2>
+    <div class="tablewrap">
+      <table><tbody>
+        <tr><td>Backend</td><td><b>PHP 8</b> with PDO — no framework, no Composer packages required</td></tr>
+        <tr><td>Database</td><td><b>MySQL 8</b> (or MariaDB) via phpMyAdmin</td></tr>
+        <tr><td>Front-end</td><td>Pre-built single-page web app (static) — nothing to compile on the server</td></tr>
+        <tr><td>Hosting</td><td>Standard <b>cPanel shared hosting</b> (e.g. Bluehost, Zoom Hosting) — Apache/LiteSpeed</td></tr>
+        <tr><td>Needs</td><td>MySQL database, File Manager or FTP, SSL (free AutoSSL), optional SSH &amp; cron</td></tr>
+        <tr><td>Security</td><td>JWT authentication, bcrypt passwords, role/permission checks, idle auto-logout, audit log</td></tr>
+        <tr><td>Footprint</td><td>Lightweight — the whole app is a few MB; data grows with your records</td></tr>
+        <tr><td>Ownership</td><td>Self-hosted — your server, <b>your data</b>, no per-seat SaaS fees</td></tr>
+      </tbody></table>
+    </div>
+  </section>
+
+  <section id="license">
+    <div class="sec-head"><span class="eyebrow">Licensing</span></div>
+    <h2>One installation, one key</h2>
+    <div class="license">
+      <h3>Single-use activation</h3>
+      <div class="keydemo">GEEK-HRIS-XXXXX-XXXXX-XXXXX</div>
+      <ul>
+        <li>Each deployment is activated with a <b>single-use key</b> you generate for the customer.</li>
+        <li>The key <b>locks to the installation's domain</b> and is marked used, so it can't be reused elsewhere.</li>
+        <li>Optional <b>expiry date</b> for subscription or trial licensing.</li>
+        <li>Until activated, the app runs in a limited/locked state.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="cta">
+    <div class="cta">
+      <div>
+        <div class="h">Ready to deploy on your hosting.</div>
+        <div class="contact" style="margin-top:6px;">Talk to <b>GEEK Admin</b> · 0917 891 7232 · <a href="mailto:geekhr@exssi.com">geekhr@exssi.com</a></div>
+      </div>
+      <span class="chip"><i style="background:var(--geek-green)"></i>Self-hosted · You own it</span>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="brand" style="margin-bottom:8px;">
+      <div class="mark" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span><span class="s4"></span></div>
+      <div class="wordmark"><span class="g1">G</span><span class="e1">E</span><span class="e2">E</span><span class="k1">K</span><span class="grp">GROUP</span></div>
+    </div>
+    GEEK Group · Enterprise HRIS — Product brochure &amp; specifications. Feature availability depends on configuration and licensed edition.
+  </div>
+</footer>
+
+</body>
+</html>
