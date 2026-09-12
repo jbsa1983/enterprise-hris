@@ -52,6 +52,7 @@ export async function apiFetch<T = any>(path: string, options: FetchOpts = {}, a
     ...(init.headers as Record<string, string>),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) headers["X-Auth-Token"] = token;
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
   if (res.status === 401) {
@@ -88,6 +89,7 @@ async function apiBlob(path: string, options: RequestInit = {}): Promise<Blob> {
   const token = getAccessToken();
   const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) headers["X-Auth-Token"] = token;
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!res.ok) throw new ApiError(res.status, res.statusText);
   return res.blob();
@@ -116,6 +118,7 @@ export async function apiUpload<T = any>(path: string, formData: FormData): Prom
   const token = getAccessToken();
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) headers["X-Auth-Token"] = token;
   const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: formData });
   if (!res.ok) {
     let detail = res.statusText;

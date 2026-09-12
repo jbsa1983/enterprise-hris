@@ -7,6 +7,10 @@ class Auth
 
     private static function bearerToken(): ?string
     {
+        // 0. Preferred: a custom header that shared hosts (LiteSpeed/CGI) never
+        //    strip — avoids the Authorization-header dropping entirely.
+        if (!empty($_SERVER['HTTP_X_AUTH_TOKEN'])) return trim((string) $_SERVER['HTTP_X_AUTH_TOKEN']);
+
         $hdr = null;
         // 1. LiteSpeed/Apache usually expose the header via getallheaders().
         if (function_exists('getallheaders')) {
