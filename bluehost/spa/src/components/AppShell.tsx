@@ -57,6 +57,7 @@ export default function AppShell({
   const [license, setLicense] = useState<{ active: boolean; enforced: boolean; reason: string } | null>(null);
   const [notif, setNotif] = useState<{ unread: number; items: any[] }>({ unread: 0, items: [] });
   const [notifOpen, setNotifOpen] = useState(false);
+  const [mobileNav, setMobileNav] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useIdleLogout(IDLE_MINUTES);
@@ -145,63 +146,80 @@ export default function AppShell({
   const singleOrg = user.organizations && user.organizations.length === 1 ? user.organizations[0].organization_id : undefined;
   const navOrg = orgId ?? rememberedOrg ?? singleOrg;
 
-  return (
-    <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <aside className="hidden w-60 flex-shrink-0 flex-col bg-brand-900 text-slate-100 md:flex">
-        <div className="border-b border-white/10 px-5 py-4">
-          <GeekLogo onDark subtitle="Enterprise HRIS" />
-        </div>
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {NAV.filter((item) => !item.perm || user.is_superadmin || (user.permissions || []).includes(item.perm)).map((item) => {
-            const href = item.href(navOrg);
-            const disabled = href === "#";
-            const active = pathname === href.split("?")[0];
+  const sidebarInner = (
+    <>
+      <div className="border-b border-white/10 px-5 py-4">
+        <GeekLogo onDark subtitle="Enterprise HRIS" />
+      </div>
+      <nav className="flex-1 space-y-1 px-3 py-4">
+        {NAV.filter((item) => !item.perm || user.is_superadmin || (user.permissions || []).includes(item.perm)).map((item) => {
+          const href = item.href(navOrg);
+          const disabled = href === "#";
+          const active = pathname === href.split("?")[0];
+          return (
+            <Link
+              key={item.label}
+              href={disabled ? "#" : href}
+              className={`block rounded-lg px-3 py-2 text-sm ${
+                active
+                  ? "bg-geek-blue/25 font-medium text-white ring-1 ring-geek-blue/40"
+                  : disabled
+                    ? "cursor-not-allowed text-slate-500"
+                    : "text-slate-200 hover:bg-white/10"
+              }`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <a
+        href="/manual.html"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mx-3 mb-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-white/10"
+      >
+        <span aria-hidden="true">📘</span> Help &amp; User Guide
+      </a>
+      {isAdmin ? (
+        <div className="border-t border-white/10 px-3 py-3">
+          <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            Administration
+          </div>
+          {ADMIN_NAV.map((item) => {
+            const active = pathname === item.href;
             return (
-              <Link
-                key={item.label}
-                href={disabled ? "#" : href}
-                className={`block rounded-lg px-3 py-2 text-sm ${
-                  active
-                    ? "bg-geek-blue/25 font-medium text-white ring-1 ring-geek-blue/40"
-                    : disabled
-                      ? "cursor-not-allowed text-slate-500"
-                      : "text-slate-200 hover:bg-white/10"
-                }`}
-              >
+              <Link key={item.label} href={item.href}
+                className={`block rounded-lg px-3 py-2 text-sm ${active ? "bg-geek-blue/25 font-medium text-white ring-1 ring-geek-blue/40" : "text-slate-200 hover:bg-white/10"}`}>
                 {item.label}
               </Link>
             );
           })}
-        </nav>
-        <a
-          href="/manual.html"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mx-3 mb-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-white/10"
-        >
-          <span aria-hidden="true">📘</span> Help &amp; User Guide
-        </a>
-        {isAdmin ? (
-          <div className="border-t border-white/10 px-3 py-3">
-            <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-              Administration
-            </div>
-            {ADMIN_NAV.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link key={item.label} href={item.href}
-                  className={`block rounded-lg px-3 py-2 text-sm ${active ? "bg-geek-blue/25 font-medium text-white ring-1 ring-geek-blue/40" : "text-slate-200 hover:bg-white/10"}`}>
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        ) : null}
-        <div className="border-t border-white/10 px-5 py-3 text-[11px] text-slate-400">
-          GEEK Group · Enterprise HRIS
         </div>
+      ) : null}
+      <div className="border-t border-white/10 px-5 py-3 text-[11px] text-slate-400">
+        GEEK Group · Enterprise HRIS
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-screen">
+      {/* Desktop sidebar */}
+      <aside className="hidden w-60 flex-shrink-0 flex-col bg-brand-900 text-slate-100 md:flex">
+        {sidebarInner}
       </aside>
+
+      {/* Mobile drawer */}
+      {mobileNav ? (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileNav(false)} />
+          <aside className="absolute inset-y-0 left-0 flex w-64 max-w-[82%] flex-col overflow-y-auto bg-brand-900 text-slate-100 shadow-xl"
+            onClick={() => setMobileNav(false)}>
+            {sidebarInner}
+          </aside>
+        </div>
+      ) : null}
 
       {/* Main */}
       <div className="flex flex-1 flex-col">
@@ -216,11 +234,18 @@ export default function AppShell({
           </div>
         ) : null}
         {/* Top bar */}
-        <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-3">
-          <div className="flex items-center gap-3">
-            <label className="text-xs font-medium text-slate-500">Organization</label>
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              className="-ml-1 rounded p-2 text-slate-600 hover:bg-slate-100 md:hidden"
+              onClick={() => setMobileNav(true)}
+              aria-label="Open menu"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+            <label className="hidden text-xs font-medium text-slate-500 sm:block">Organization</label>
             <select
-              className="input max-w-xs"
+              className="input max-w-[10rem] sm:max-w-xs"
               value={navOrg ?? ""}
               onChange={onOrgChange}
             >
@@ -272,11 +297,11 @@ export default function AppShell({
               href="/manual.html"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-slate-500 hover:text-geek-blue"
+              className="hidden text-sm text-slate-500 hover:text-geek-blue sm:inline"
             >
               Help
             </a>
-            <div className="text-right">
+            <div className="hidden text-right sm:block">
               <div className="text-sm font-medium text-slate-800">{user.full_name}</div>
               <div className="text-[11px] text-slate-500">{user.roles.join(", ") || "—"}</div>
             </div>
