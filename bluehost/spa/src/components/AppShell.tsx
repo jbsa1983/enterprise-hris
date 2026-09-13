@@ -29,6 +29,7 @@ const NAV: { label: string; perm?: string; href: (o?: number) => string }[] = [
   { label: "Recruitment", perm: "employee.view", href: (o) => (o ? `/o/${o}/recruitment` : "#") },
   { label: "HR Modules", perm: "employee.view", href: (o) => (o ? `/o/${o}/hr` : "#") },
   { label: "Reports", perm: "reports.view", href: (o) => (o ? `/o/${o}/reports` : "#") },
+  { label: "BIR Forms", perm: "payroll.view", href: (o) => (o ? `/o/${o}/bir` : "#") },
   { label: "Org Setup", perm: "organization.view", href: (o) => (o ? `/o/${o}/setup` : "#") },
   { label: "My Self-Service", href: () => "/me" },
 ];

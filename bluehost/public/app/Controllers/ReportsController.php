@@ -56,12 +56,57 @@ class ReportsController
             case 'thirteenth_month':
                 return Database::all("SELECT r.name run, r.pay_type, r.year, e.employee_number, CONCAT_WS(' ', pe.first_name, pe.last_name) name, COALESCE(l.override_amount, l.computed_amount) amount, r.status
                     FROM special_pay_lines l JOIN special_pay_runs r ON r.id = l.run_id JOIN engagements e ON e.id = l.engagement_id JOIN people pe ON pe.id = e.person_id WHERE r.organization_id = ? ORDER BY r.year DESC, r.id DESC", [$o]);
+            case 'bir_1601c':          // monthly compensation withholding (1601-C) totals
+                return self::birMonthly($o, false);
+            case 'bir_ewt':            // monthly expanded withholding (0619-E / 2307 / 1604-E) totals
+                return self::birMonthly($o, true);
         }
         throw new HttpError('Unknown dataset', 400);
     }
 
+    // Aggregate posted payroll withholding by month. $ewt=false -> compensation WT
+    // (employees, feeds 1601-C); $ewt=true -> expanded WT (consultants, feeds 0619-E/2307/1604-E).
+    private static function birMonthly(int $o, bool $ewt): array
+    {
+        $c = implode(',', array_fill(0, count(self::CONSULTANT_TYPES), '?'));
+        $op = $ewt ? 'IN' : 'NOT IN';
+        $rows = Database::all(
+            "SELECT YEAR(COALESCE(pp.pay_date, pp.period_end)) y, MONTH(COALESCE(pp.pay_date, pp.period_end)) m,
+                    prp.engagement_id, prp.gross_pay, prp.deductions
+               FROM payroll_run_people prp
+               JOIN payroll_runs pr ON pr.id = prp.run_id
+               JOIN payroll_periods pp ON pp.id = pr.period_id
+               JOIN engagements e ON e.id = prp.engagement_id
+              WHERE pr.organization_id = ? AND e.engagement_type $op ($c)",
+            array_merge([$o], self::CONSULTANT_TYPES));
+        $by = [];
+        foreach ($rows as $r) {
+            $y = (int) $r['y']; $m = (int) $r['m']; if (!$y || !$m) continue;
+            $key = sprintf('%04d-%02d', $y, $m);
+            $d = json_decode($r['deductions'] ?: '{}', true) ?: [];
+            if (!isset($by[$key])) $by[$key] = ['key' => $key, 'period' => date('F Y', mktime(0, 0, 0, $m, 1, $y)),
+                'year' => $y, 'month' => $m, 'people' => [], 'base' => 0.0, 'tax' => 0.0];
+            $by[$key]['people'][(int) $r['engagement_id']] = true;
+            if ($ewt) {
+                $by[$key]['base'] += round((float) $r['gross_pay'], 2);
+                $by[$key]['tax'] += round((float) ($d['withholding_tax_ewt'] ?? 0), 2);
+            } else {
+                $taxable = max((float) $r['gross_pay'] - (float) ($d['sss'] ?? 0) - (float) ($d['philhealth'] ?? 0) - (float) ($d['pagibig'] ?? 0), 0);
+                $by[$key]['base'] += round($taxable, 2);
+                $by[$key]['tax'] += round((float) ($d['withholding_tax'] ?? 0), 2);
+            }
+        }
+        krsort($by);
+        if ($ewt) {
+            return array_map(fn($g) => ['period' => $g['period'], 'year' => $g['year'], 'month' => $g['month'],
+                'payees' => count($g['people']), 'income_payments' => round($g['base'], 2), 'expanded_tax_withheld' => round($g['tax'], 2)], array_values($by));
+        }
+        return array_map(fn($g) => ['period' => $g['period'], 'year' => $g['year'], 'month' => $g['month'],
+            'employees' => count($g['people']), 'taxable_compensation' => round($g['base'], 2), 'tax_withheld' => round($g['tax'], 2)], array_values($by));
+    }
+
     const NAMES = ['employees', 'consultants', 'payroll', 'payroll_by_period', 'payroll_by_project', 'loans', 'projects',
-        'statutory_contributions', 'leave', 'attendance', 'benefits', 'assets', 'thirteenth_month'];
+        'statutory_contributions', 'leave', 'attendance', 'benefits', 'assets', 'thirteenth_month', 'bir_1601c', 'bir_ewt'];
 
     // Column lists (match the SELECT aliases in dataset()) — used for the dataset
     // picker so we don't run every query just to read column names.
@@ -79,6 +124,8 @@ class ReportsController
         'benefits' => ['name', 'benefit_type', 'provider', 'policy_number', 'coverage_amount', 'start_date', 'end_date', 'status', 'beneficiaries'],
         'assets' => ['asset_number', 'item', 'serial_number', 'assigned_to', 'status', 'condition', 'issue_date', 'returned_date', 'cost'],
         'thirteenth_month' => ['run', 'pay_type', 'year', 'employee_number', 'name', 'amount', 'status'],
+        'bir_1601c' => ['period', 'year', 'month', 'employees', 'taxable_compensation', 'tax_withheld'],
+        'bir_ewt' => ['period', 'year', 'month', 'payees', 'income_payments', 'expanded_tax_withheld'],
     ];
 
     public static function datasets(array $p): void
