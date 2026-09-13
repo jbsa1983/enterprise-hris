@@ -22,6 +22,7 @@ import Reports from "@/pages/Reports";
 import BirForms from "@/pages/BirForms";
 import SelfService from "@/pages/SelfService";
 import OrgSetup from "@/pages/OrgSetup";
+import OpeningBalances from "@/pages/OpeningBalances";
 import AdminOrganizations from "@/pages/AdminOrganizations";
 import AdminBranding from "@/pages/AdminBranding";
 import AdminLicense from "@/pages/AdminLicense";
@@ -57,6 +58,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/o/:orgId/reports" element={<Reports />} />
         <Route path="/o/:orgId/bir" element={<BirForms />} />
         <Route path="/o/:orgId/setup" element={<OrgSetup />} />
+        <Route path="/o/:orgId/opening-balances" element={<OpeningBalances />} />
         <Route path="/me" element={<SelfService />} />
         <Route path="/admin/organizations" element={<AdminOrganizations />} />
         <Route path="/admin/branding" element={<AdminBranding />} />
