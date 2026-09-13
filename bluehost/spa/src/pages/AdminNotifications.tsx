@@ -103,7 +103,8 @@ export default function AdminNotificationsPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs text-slate-500">SMTP host</label>
-              <input className="input" value={mf.host} onChange={(e) => setMf({ ...mf, host: e.target.value })} placeholder="mail.hris.exssi.com" />
+              <input className="input" value={mf.host} onChange={(e) => setMf({ ...mf, host: e.target.value })} placeholder="localhost" />
+              <p className="mt-1 text-xs text-slate-400">On shared hosting the app and mailbox share one server — try <button type="button" className="font-mono text-blue-600 hover:underline" onClick={() => setMf({ ...mf, host: "localhost" })}>localhost</button> first. If a mail host “could not resolve / Name or service not known”, that hostname has no DNS record — use <span className="font-mono">localhost</span> or your main domain (e.g. <span className="font-mono">hris.exssi.com</span>) instead.</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

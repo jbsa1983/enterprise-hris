@@ -20,6 +20,7 @@ export default function AdminAuditPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [isSuper, setIsSuper] = useState(false);
 
   const load = useCallback((off: number) => {
     setBusy(true); setErr("");
@@ -38,8 +39,23 @@ export default function AdminAuditPage() {
   useEffect(() => {
     apiFetch<string[]>("/admin/audit/actions").then(setActions).catch(() => {});
     apiFetch<Org[]>("/admin/organizations").then(setOrgs).catch(() => {}); // optional; needs admin
+    apiFetch<any>("/auth/me").then((u) => setIsSuper(!!u.is_superadmin)).catch(() => {});
   }, []);
   useEffect(() => { load(0); }, [load]);
+
+  async function clearLogs() {
+    const msg = f.to
+      ? `Delete all audit entries on or before ${f.to}? This cannot be undone.`
+      : "Delete the ENTIRE audit trail? This cannot be undone.";
+    if (!window.confirm(msg)) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await apiFetch<{ deleted: number }>("/admin/audit", { method: "DELETE", body: JSON.stringify({ before: f.to || "" }) });
+      window.alert(`${r.deleted.toLocaleString()} entr${r.deleted === 1 ? "y" : "ies"} deleted.`);
+      apiFetch<string[]>("/admin/audit/actions").then(setActions).catch(() => {});
+      load(0);
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  }
 
   const pretty = (s: string | null) => { if (!s) return null; try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; } };
   const page = Math.floor(offset / PAGE) + 1;
@@ -47,9 +63,17 @@ export default function AdminAuditPage() {
 
   return (
     <AppShell>
-      <div className="mb-4">
-        <h1 className="text-lg font-semibold text-slate-900">Audit trail</h1>
-        <p className="text-sm text-slate-500">Every recorded action — logins, approvals, edits, uploads — with who, when, and from where.</p>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">Audit trail</h1>
+          <p className="text-sm text-slate-500">Every recorded action — logins, approvals, edits, uploads — with who, when, and from where.</p>
+        </div>
+        {isSuper ? (
+          <button className="whitespace-nowrap rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-40"
+            onClick={clearLogs} disabled={busy}>
+            {f.to ? `Clear up to ${f.to}` : "Clear all logs"}
+          </button>
+        ) : null}
       </div>
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
 

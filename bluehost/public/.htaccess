@@ -1,5 +1,6 @@
 # GEEK Group HRIS — Apache config for shared hosting (Bluehost / Zoom)
 Options -Indexes
+DirectoryIndex index.html
 
 # --- Make the Authorization (Bearer token) header reach PHP -------------------
 # Shared hosting (LiteSpeed/CGI/FastCGI) often strips it, which causes random
@@ -17,11 +18,13 @@ Options -Indexes
     # API → PHP front controller.
     RewriteRule ^api/v1(/.*)?$ api/index.php [QSA,L]
 
-    # SPA fallback: serve index.html for any non-file, non-API route.
+    # SPA fallback: serve index.html for any non-file, non-API route, so that
+    # refreshing or deep-linking a client route (e.g. /admin/audit) works instead
+    # of returning a blank 404. Absolute /index.html so it resolves from any depth.
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} !^/api/
-    RewriteRule ^ index.html [L]
+    RewriteRule ^ /index.html [L]
 </IfModule>
 
 # --- Performance: compress text assets, cache hashed build files -------------
