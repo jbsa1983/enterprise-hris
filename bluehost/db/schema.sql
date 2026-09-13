@@ -739,4 +739,31 @@ CREATE TABLE IF NOT EXISTS asset_events (
   INDEX (asset_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- --- Login brute-force throttle ----------------------------------------------
+CREATE TABLE IF NOT EXISTS login_throttle (
+  identifier VARCHAR(255) PRIMARY KEY,   -- lowercased email + '|' + client IP
+  fails INT DEFAULT 0,
+  first_fail_at DATETIME NULL,
+  locked_until DATETIME NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX (locked_until)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --- Employee 201-file documents ---------------------------------------------
+CREATE TABLE IF NOT EXISTS employee_documents (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  uuid CHAR(36) NOT NULL UNIQUE,
+  organization_id INT NOT NULL,
+  person_id INT NOT NULL,
+  category VARCHAR(60) NULL,             -- Contract, Government ID, Resume, Certificate, Other...
+  title VARCHAR(255) NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  object_key VARCHAR(255) NOT NULL,      -- path under storage/documents (never web-served)
+  content_type VARCHAR(120) NULL,
+  size_bytes INT DEFAULT 0,
+  uploaded_by INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (organization_id), INDEX (person_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;

@@ -33,7 +33,9 @@ const NAV: { label: string; perm?: string; href: (o?: number) => string }[] = [
   { label: "My Self-Service", href: () => "/me" },
 ];
 
-const ADMIN_NAV = [
+// Items with a `perm` are visible to anyone holding that permission (e.g. an
+// Auditor); items without one are superadmin / system.admin tools only.
+const ADMIN_NAV: { label: string; href: string; perm?: string }[] = [
   { label: "Organizations", href: "/admin/organizations" },
   { label: "Users", href: "/admin/users" },
   { label: "Roles & Scopes", href: "/admin/roles" },
@@ -41,6 +43,7 @@ const ADMIN_NAV = [
   { label: "License", href: "/admin/license" },
   { label: "Backup & Migration", href: "/admin/backup" },
   { label: "Notifications", href: "/admin/notifications" },
+  { label: "Audit Trail", href: "/admin/audit", perm: "audit.view" },
 ];
 
 export default function AppShell({
@@ -139,6 +142,9 @@ export default function AppShell({
   if (!user) return null;
 
   const isAdmin = user.is_superadmin || (user.permissions || []).includes("system.admin");
+  const adminNav = ADMIN_NAV.filter((item) =>
+    item.perm ? user.is_superadmin || (user.permissions || []).includes(item.perm) : isAdmin,
+  );
 
   // Org used for the sidebar links + picker: the current org page, else the last
   // org visited, else the user's only org.
@@ -181,12 +187,12 @@ export default function AppShell({
       >
         <span aria-hidden="true">📘</span> Help &amp; User Guide
       </a>
-      {isAdmin ? (
+      {adminNav.length > 0 ? (
         <div className="border-t border-white/10 px-3 py-3">
           <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
             Administration
           </div>
-          {ADMIN_NAV.map((item) => {
+          {adminNav.map((item) => {
             const active = pathname === item.href;
             return (
               <Link key={item.label} href={item.href}

@@ -28,6 +28,7 @@ import AdminBackup from "@/pages/AdminBackup";
 import AdminNotifications from "@/pages/AdminNotifications";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminRoles from "@/pages/AdminRoles";
+import AdminAudit from "@/pages/AdminAudit";
 
 function Home() {
   return <Navigate to={getAccessToken() ? "/dashboard" : "/login"} replace />;
@@ -62,6 +63,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/admin/notifications" element={<AdminNotifications />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/roles" element={<AdminRoles />} />
+        <Route path="/admin/audit" element={<AdminAudit />} />
         <Route path="*" element={<Home />} />
       </Routes>
     </BrowserRouter>

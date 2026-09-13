@@ -10,6 +10,7 @@ require __DIR__ . '/Database.php';
 require __DIR__ . '/Jwt.php';
 require __DIR__ . '/Tokens.php';
 require __DIR__ . '/Auth.php';
+require __DIR__ . '/LoginThrottle.php';
 require __DIR__ . '/Rbac.php';
 require __DIR__ . '/License.php';
 require __DIR__ . '/Audit.php';

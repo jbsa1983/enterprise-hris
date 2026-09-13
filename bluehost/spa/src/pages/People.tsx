@@ -1,10 +1,119 @@
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "@/lib/nav";
 import AppShell from "@/components/AppShell";
 import { apiFetch, apiDownload, apiUpload } from "@/lib/api";
 import { peso, statusColor } from "@/lib/format";
 import type { EngagementRow } from "@/lib/types";
+
+// --- 201-file documents (defined at module scope so typing in the upload
+//     fields never remounts the component / loses focus) --------------------
+const DOC_CATEGORIES = ["Contract", "Government ID", "Resume / CV", "Certificate",
+  "Clearance", "Payroll / BIR form", "Medical", "Photo", "Other"];
+
+// Cached once per session so opening a person doesn't refetch permissions.
+let _permsCache: { perms: string[]; superadmin: boolean } | null = null;
+
+function humanSize(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+interface EmpDoc { id: number; category: string | null; title: string; file_name: string; size_bytes: number; created_at: string; }
+
+function DocumentsSection({ orgId, engagementId }: { orgId: number; engagementId: number }) {
+  const [docs, setDocs] = useState<EmpDoc[]>([]);
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState(DOC_CATEGORIES[0]);
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [canUpload, setCanUpload] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const reload = useCallback(() => {
+    apiFetch<EmpDoc[]>(`/organizations/${orgId}/people/${engagementId}/documents`).then(setDocs).catch(() => {});
+  }, [orgId, engagementId]);
+
+  useEffect(() => {
+    reload();
+    const apply = (c: { perms: string[]; superadmin: boolean }) => setCanUpload(c.superadmin || c.perms.includes("documents.upload"));
+    if (_permsCache) apply(_permsCache);
+    else apiFetch<any>("/auth/me").then((u) => { _permsCache = { perms: u.permissions || [], superadmin: !!u.is_superadmin }; apply(_permsCache); }).catch(() => {});
+  }, [reload]);
+
+  async function upload() {
+    if (!file) { setErr("Choose a file first."); return; }
+    setBusy(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("title", title || file.name);
+      fd.append("category", category);
+      await apiUpload(`/organizations/${orgId}/people/${engagementId}/documents`, fd);
+      setTitle(""); setFile(null); if (fileRef.current) fileRef.current.value = "";
+      reload();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  }
+  async function remove(id: number) {
+    if (!window.confirm("Delete this document permanently?")) return;
+    setErr("");
+    try { await apiFetch(`/organizations/${orgId}/documents/${id}`, { method: "DELETE" }); reload(); }
+    catch (e: any) { setErr(e.message); }
+  }
+
+  return (
+    <div>
+      <div className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">201 File — Documents</div>
+      {docs.length === 0 ? (
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-400">No documents uploaded yet.</p>
+      ) : (
+        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+          {docs.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+              <div className="min-w-0">
+                <div className="truncate font-medium text-slate-800">{d.title}</div>
+                <div className="text-xs text-slate-400">
+                  {d.category ? <span className="mr-2 rounded bg-slate-100 px-1.5 py-0.5">{d.category}</span> : null}
+                  <span className="font-mono">{d.file_name}</span> · {humanSize(d.size_bytes)} · {d.created_at?.slice(0, 10)}
+                </div>
+              </div>
+              <div className="flex flex-shrink-0 gap-3">
+                <button className="text-brand-700 hover:underline" onClick={() => apiDownload(`/organizations/${orgId}/documents/${d.id}/download`, d.file_name)}>Download</button>
+                {canUpload ? <button className="text-red-600 hover:underline" onClick={() => remove(d.id)}>Delete</button> : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {canUpload ? (
+        <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">Category</label>
+              <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+                {DOC_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs text-slate-500">Title (optional)</label>
+              <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Employment contract 2026" />
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input ref={fileRef} type="file" className="text-sm"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.txt"
+              onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            <button className="btn-primary" onClick={upload} disabled={busy || !file}>{busy ? "Uploading…" : "Upload"}</button>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">Max 10 MB per file. Allowed: PDF, images, Word, Excel, text.</p>
+          {err ? <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
+        </div>
+      ) : err ? <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
+    </div>
+  );
+}
 
 const ENG_TYPES = ["REGULAR", "PROBATIONARY", "PROJECT_BASED", "FIXED_TERM", "DAILY_PAID",
   "HOURLY_PAID", "PART_TIME", "CONSULTANT_INDIVIDUAL", "CONSULTANT_COMPANY", "CONTRACTOR", "OJT", "TRAINEE"];
@@ -201,6 +310,7 @@ export default function PeoplePage() {
                 </select></div>
               {F("start_date", "Start date", { type: "date" })}
             </div>
+            {typeof editing === "number" ? <DocumentsSection orgId={orgId} engagementId={editing} /> : null}
             {err ? <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
             <div className="mt-5 flex justify-end gap-2">
               <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={() => setEditing(null)}>Cancel</button>

@@ -53,11 +53,26 @@ class AuthController
         $b = Http::body();
         $email = strtolower(trim($b['email'] ?? ''));
         $password = $b['password'] ?? '';
+
+        // Brute-force protection: block further attempts once this email+IP is locked.
+        $lock = LoginThrottle::lockedFor($email);
+        if ($lock > 0) {
+            $mins = max(1, (int) ceil($lock / 60));
+            Http::error("Too many failed sign-in attempts. Please try again in about $mins minute" . ($mins === 1 ? '' : 's') . ".", 429);
+        }
+
         $u = Database::one('SELECT * FROM users WHERE email = ?', [$email]);
         if (!$u || !password_verify($password, $u['hashed_password'])) {
+            $locked = LoginThrottle::fail($email);
+            Audit::record('auth.login_failed', $u ? ['id' => $u['id'], 'email' => $u['email']] : ['email' => $email],
+                ['entity' => 'user', 'entity_id' => $u['id'] ?? null]);
+            if ($locked > 0) {
+                Http::error("Too many failed sign-in attempts. Please try again in about 15 minutes.", 429);
+            }
             Http::error('Invalid email or password', 401);
         }
         if ((int) $u['is_active'] !== 1) Http::error('Account is disabled', 403);
+        LoginThrottle::clear($email);
         Audit::record('auth.login', ['id' => $u['id'], 'email' => $u['email']],
             ['entity' => 'user', 'entity_id' => $u['id']]);
         Http::json([
