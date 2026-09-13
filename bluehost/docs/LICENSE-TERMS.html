@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<title>GEEK HRIS License Terms</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  :root{
+    --geek-red:#EA4335;--geek-amber:#F9AB00;--geek-green:#34A853;--geek-blue:#4285F4;
+    --bg:#F4F6F9;--surface:#FFFFFF;--surface-2:#FBFCFE;--ink:#16202E;--muted:#4B5563;--faint:#8B93A0;
+    --line:#E2E6EC;--accent:#1A73E8;--accent-soft:rgba(26,115,232,.08);--radius:14px;--measure:74ch;
+    --shadow:0 1px 2px rgba(16,24,40,.04),0 10px 30px rgba(16,24,40,.06);
+  }
+  :root:not([data-theme="light"]){@media (prefers-color-scheme:dark){
+    --bg:#0C1220;--surface:#141C2B;--surface-2:#101827;--ink:#E9EEF5;--muted:#AAB4C4;--faint:#6B7688;
+    --line:#253048;--accent:#6EA6FF;--accent-soft:rgba(110,166,255,.12);--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0C1220;--surface:#141C2B;--surface-2:#101827;--ink:#E9EEF5;--muted:#AAB4C4;--faint:#6B7688;
+    --line:#253048;--accent:#6EA6FF;--accent-soft:rgba(110,166,255,.12);--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4);
+  }
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;font-size:15.5px;line-height:1.62;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;padding:0 26px}
+  .rail{display:flex;height:6px}.rail>span{flex:1}
+  .rail .r{background:var(--geek-red)}.rail .a{background:var(--geek-amber)}.rail .g{background:var(--geek-green)}.rail .b{background:var(--geek-blue)}
+  header.mast{background:var(--surface);border-bottom:1px solid var(--line)}
+  .mast-in{padding:26px 0 30px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .mark{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:3px;width:36px;height:36px;flex:none}
+  .mark span{border-radius:5px}.mark .s1{background:var(--geek-red)}.mark .s2{background:var(--geek-blue)}.mark .s3{background:var(--geek-green)}.mark .s4{background:var(--geek-amber)}
+  .wordmark{font-family:"Manrope",sans-serif;font-weight:800;font-size:24px;letter-spacing:-.5px}
+  .wordmark .g1{color:var(--geek-red)}.wordmark .e1{color:var(--geek-amber)}.wordmark .e2{color:var(--geek-green)}.wordmark .k1{color:var(--geek-blue)}
+  .wordmark .grp{color:var(--faint);font-weight:600;font-size:14px;letter-spacing:3px;margin-left:7px}
+  h1{font-family:"Manrope",sans-serif;font-weight:800;letter-spacing:-.8px;font-size:34px;margin:20px 0 6px}
+  .sub{color:var(--muted);margin:0;max-width:var(--measure)}
+  .meta{margin-top:16px;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--faint);text-transform:uppercase;letter-spacing:.5px;display:flex;gap:6px 18px;flex-wrap:wrap}
+  .meta b{color:var(--muted);font-weight:600}
+  main{padding:10px 0 40px}
+  .intro{background:var(--accent-soft);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:16px 18px;margin:26px 0;max-width:var(--measure)}
+  .intro p{margin:0;font-size:14.5px}
+  section.clause{padding-top:26px;max-width:var(--measure)}
+  h2{font-family:"Manrope",sans-serif;font-weight:700;font-size:19px;letter-spacing:-.2px;margin:0 0 6px;display:flex;gap:11px;align-items:baseline}
+  h2 .no{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--accent);font-weight:600;flex:none;min-width:24px}
+  p{margin:0 0 11px}
+  ul{margin:6px 0 12px;padding-left:20px}li{margin:4px 0}
+  strong{font-weight:600}
+  code,.url{font-family:"IBM Plex Mono",monospace;font-size:.9em;background:var(--accent-soft);color:color-mix(in srgb,var(--accent) 82%,var(--ink));padding:1px 6px;border-radius:6px}
+  .callout{border:1px solid var(--line);border-left:4px solid var(--geek-amber);background:rgba(249,171,0,.09);border-radius:10px;padding:12px 15px;margin:14px 0;max-width:var(--measure);font-size:14px;color:var(--muted)}
+  .callout b{color:var(--ink)}
+  hr.d{border:none;border-top:1px solid var(--line);margin:30px 0 0}
+  footer{padding:26px 0 56px;color:var(--faint);font-size:12.5px}
+  a{color:var(--accent)}
+  @media print{:root{--bg:#fff;--surface:#fff;--surface-2:#fff;--ink:#111;--muted:#333;--line:#cfd4da;--shadow:none}body{font-size:10.5pt}section.clause{break-inside:avoid;padding-top:16px}.intro,.callout{break-inside:avoid}h1{font-size:26pt}a{color:#111}}
+</style>
+</head>
+<body>
+<header class="mast">
+  <div class="rail"><span class="r"></span><span class="a"></span><span class="g"></span><span class="b"></span></div>
+  <div class="wrap mast-in">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span><span class="s4"></span></div>
+      <div class="wordmark"><span class="g1">G</span><span class="e1">E</span><span class="e2">E</span><span class="k1">K</span><span class="grp">GROUP</span></div>
+    </div>
+    <h1>Software License Terms &amp; Conditions</h1>
+    <p class="sub">GEEK Enterprise HRIS — the terms under which this software is licensed, trialed, and used.</p>
+    <div class="meta"><span><b>Product:</b> GEEK Enterprise HRIS</span><span><b>Version:</b> 1.0</span><span><b>Effective:</b> September 2026</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="intro">
+    <p>These Terms &amp; Conditions ("Terms") govern the installation and use of the GEEK Enterprise HRIS software ("Software") provided by GEEK Group ("Licensor", "we", "us") to you ("Customer", "you"). By installing, activating, or using the Software — including during the free trial — you agree to these Terms. If you do not agree, do not install or use the Software.</p>
+  </div>
+
+  <section class="clause">
+    <h2><span class="no">1</span> Definitions</h2>
+    <ul>
+      <li><strong>Software</strong> — the GEEK Enterprise HRIS application, including its code, database schema, documentation, and updates we provide.</li>
+      <li><strong>Installation</strong> — one deployment of the Software on a single internet domain or sub-domain that you control.</li>
+      <li><strong>License Key</strong> — the signed activation code we issue that unlocks the Software for a specific domain, edition, and (where applicable) period.</li>
+      <li><strong>Edition</strong> — the licensed tier (Starter, Business, or Enterprise) that sets the maximum number of Active Employees.</li>
+      <li><strong>Active Employee</strong> — a person with an active engagement record in the Software (employees and consultants). Administrator or HR logins that are not also engagement records do not count toward the limit.</li>
+    </ul>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">2</span> Free trial</h2>
+    <p>A new Installation runs on a <strong>14-day free trial</strong> with full functionality and no License Key required. When the trial ends, the Software locks and requires a valid License Key to continue. <strong>No Customer data is deleted</strong> when the trial ends. The trial is provided for evaluation only and may not be used for ongoing production operations without a paid license.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">3</span> Grant of license</h2>
+    <p>Upon payment of the applicable fee and issuance of a License Key, we grant you a <strong>non-exclusive, non-transferable</strong> license to install and use one Installation of the Software on the <strong>single domain</strong> the Key is issued for, for the <strong>Edition and term</strong> stated on your Key (perpetual, or expiring on the date encoded in the Key). The license is limited to the maximum Active Employees of your Edition.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">4</span> Restrictions</h2>
+    <p>You may not:</p>
+    <ul>
+      <li>resell, rent, sublicense, distribute, or make the Software available to any third party as a service (SaaS) or otherwise;</li>
+      <li>share, publish, or transfer your License Key, or use it on a domain other than the one it was issued for;</li>
+      <li>remove, disable, bypass, or tamper with the licensing, activation, trial, or employee-limit mechanisms;</li>
+      <li>exceed the Active Employee limit of your Edition;</li>
+      <li>remove or alter our copyright, trademark, or attribution notices (branding/white-label features provided in the Software are permitted for your own organizations only).</li>
+    </ul>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">5</span> Ownership</h2>
+    <p>The Software and all intellectual property rights in it remain the exclusive property of GEEK Group. These Terms grant a license to use the Software, not a sale of the Software. <strong>You own all data you enter into the Software</strong> ("Customer Data"); we claim no rights over it and, because the Software is self-hosted, we have no access to it.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">6</span> Fees &amp; payment</h2>
+    <p>License fees are those quoted for your chosen Edition and license type (perpetual or term). The free trial carries no fee. Paid License Keys are issued after payment is received. Except where required by law, license fees are <strong>non-refundable</strong> once a paid Key is issued, as the trial period gives you the opportunity to evaluate the Software before purchase. Optional support and updates, where purchased, are billed separately per their stated period.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">7</span> Updates &amp; support</h2>
+    <p>We may provide updates, fixes, and improvements from time to time. Any support and updates included with your purchase, or purchased separately, are provided for the period stated at the time of sale. We are not obligated to maintain compatibility with every hosting environment; the requirements in our documentation apply.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">8</span> Hosting, security &amp; data protection</h2>
+    <p>The Software is <strong>self-hosted</strong> — you provide and control the hosting, server, database, and network. You are solely responsible for the security, availability, and backup of your Installation and Customer Data. In respect of personal data processed in the Software, <strong>you are the Personal Information Controller</strong> under the Philippine Data Privacy Act of 2012 (Republic Act No. 10173) and are responsible for lawful processing, security measures, and data-subject rights. We do not host, access, or process your Customer Data.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">9</span> Statutory &amp; compliance disclaimer</h2>
+    <p>The Software includes Philippine statutory computations (SSS, PhilHealth, Pag-IBIG, and BIR withholding) and generates working copies of government forms (e.g. 1601-C, 0619-E, 2307, 2316) <strong>for convenience only</strong>. Rates, tables, and forms change by government issuance. <strong>You are responsible for verifying all figures and filings against the latest official issuances</strong> of the relevant agencies and for filing and paying through the proper channels (e.g. eBIRForms / eFPS). The Software is not a substitute for professional accounting, tax, or legal advice, and we are not liable for filings, penalties, or assessments arising from your use of it.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">10</span> Warranty disclaimer</h2>
+    <p>The Software is provided <strong>"as is" and "as available"</strong>, without warranties of any kind, whether express or implied, including merchantability, fitness for a particular purpose, and non-infringement. We do not warrant that the Software will be error-free or uninterrupted, or that it will meet every requirement.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">11</span> Limitation of liability</h2>
+    <p>To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special, consequential, or exemplary damages, or for loss of profits, revenue, data, or goodwill, arising out of or relating to the Software. Our total aggregate liability under these Terms shall not exceed the license fees you actually paid for the Installation giving rise to the claim.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">12</span> Term &amp; termination</h2>
+    <p>These Terms apply for as long as you use the Software. Your license terminates automatically if you breach these Terms (including exceeding your Edition limit or tampering with licensing) or, for a term license, on the expiry date of your Key. On termination you must stop using the Software; your Customer Data remains yours to export or retain from your own hosting.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">13</span> Governing law</h2>
+    <p>These Terms are governed by the laws of the <strong>Republic of the Philippines</strong>. The parties submit to the exclusive jurisdiction of the competent courts of the Philippines, without regard to conflict-of-laws rules.</p>
+  </section>
+
+  <section class="clause">
+    <h2><span class="no">14</span> Contact</h2>
+    <p>For licensing, activation, or these Terms:<br>
+      <strong>GEEK Team</strong><br>
+      Sales: <a href="mailto:geekhris_sales@exssi.com">geekhris_sales@exssi.com</a> · Licensing: <a href="mailto:geekhris@exssi.com">geekhris@exssi.com</a><br>
+      Phone: <span class="url">+63 917 891 7232</span></p>
+  </section>
+
+  <div class="callout">
+    <b>Note:</b> This document is a general template provided for convenience. Before using it commercially, have it reviewed and adapted by qualified legal counsel to fit your business, pricing, and jurisdiction.
+  </div>
+
+  <hr class="d">
+</main>
+
+<footer>
+  <div class="wrap">GEEK Group · Enterprise HRIS — Software License Terms &amp; Conditions v1.0 · September 2026</div>
+</footer>
+</body>
+</html>
