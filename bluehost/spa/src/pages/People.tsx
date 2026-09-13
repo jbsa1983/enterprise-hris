@@ -138,10 +138,14 @@ export default function PeoplePage() {
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [isSuper, setIsSuper] = useState(false);
+  const [orgs, setOrgs] = useState<{ id: number; name: string }[]>([]);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [xferOrg, setXferOrg] = useState("");
 
   useEffect(() => {
-    if (_permsCache) { setIsSuper(_permsCache.superadmin); return; }
-    apiFetch<any>("/auth/me").then((u) => { _permsCache = { perms: u.permissions || [], superadmin: !!u.is_superadmin }; setIsSuper(!!u.is_superadmin); }).catch(() => {});
+    const apply = (sup: boolean) => { setIsSuper(sup); if (sup) apiFetch<{ id: number; name: string }[]>("/organizations").then(setOrgs).catch(() => {}); };
+    if (_permsCache) { apply(_permsCache.superadmin); return; }
+    apiFetch<any>("/auth/me").then((u) => { _permsCache = { perms: u.permissions || [], superadmin: !!u.is_superadmin }; apply(!!u.is_superadmin); }).catch(() => {});
   }, []);
 
   const endpoint = type === "employees" ? "employees" : type === "consultants" ? "consultants" : "people";
@@ -228,6 +232,36 @@ export default function PeoplePage() {
     r.full_name.toLowerCase().includes(q.toLowerCase()) ||
     (r.employee_number || "").toLowerCase().includes(q.toLowerCase()));
 
+  function toggleSel(id: number) {
+    setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function toggleAll() {
+    setSelected((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((r) => r.engagement_id))));
+  }
+  async function bulkDelete() {
+    const ids = [...selected];
+    if (!ids.length) return;
+    if (!window.confirm(`Permanently DELETE ${ids.length} selected record(s)?\n\nAnyone with payroll history will be skipped (archive them instead). This cannot be undone.`)) return;
+    setErr(""); setMsg("");
+    try {
+      const r = await apiFetch<{ deleted: number[]; skipped: any[] }>(`/organizations/${orgId}/people/bulk-delete`, { method: "POST", body: JSON.stringify({ engagement_ids: ids }) });
+      setMsg(`Deleted ${r.deleted.length}.${r.skipped.length ? ` Skipped ${r.skipped.length} (payroll history or in use).` : ""}`);
+      setSelected(new Set()); load();
+    } catch (e: any) { setErr(e.message); }
+  }
+  async function bulkTransfer() {
+    const ids = [...selected];
+    if (!ids.length || !xferOrg) return;
+    const orgName = orgs.find((o) => String(o.id) === xferOrg)?.name || "the selected organization";
+    if (!window.confirm(`Transfer ${ids.length} selected employee(s) to ${orgName}?\n\nTheir engagement, leave credits, benefits, active loans and 201 documents move over. Payroll history and activity logs stay with the current organization, and department/position are cleared for re-assignment.`)) return;
+    setErr(""); setMsg("");
+    try {
+      const r = await apiFetch<{ moved: number[] }>(`/organizations/${orgId}/people/bulk-transfer`, { method: "POST", body: JSON.stringify({ engagement_ids: ids, target_organization_id: Number(xferOrg) }) });
+      setMsg(`Transferred ${r.moved.length} to ${orgName}.`);
+      setSelected(new Set()); setXferOrg(""); load();
+    } catch (e: any) { setErr(e.message); }
+  }
+
   const F = (k: string, label: string, extra: any = {}) => (
     <div><label className="mb-1 block text-xs text-slate-500">{label}</label>
       <input className="input" value={form[k] ?? ""} onChange={(e) => setForm({ ...form, [k]: e.target.value })} {...extra} /></div>
@@ -266,15 +300,32 @@ export default function PeoplePage() {
       {msg ? <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{msg}</div> : null}
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
 
+      {isSuper && selected.size > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+          <span className="font-medium text-slate-700">{selected.size} selected</span>
+          <div className="flex items-center gap-2">
+            <select className="input max-w-[220px] py-1.5" value={xferOrg} onChange={(e) => setXferOrg(e.target.value)}>
+              <option value="">Transfer to…</option>
+              {orgs.filter((o) => o.id !== orgId).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+            <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 hover:bg-slate-100 disabled:opacity-40" disabled={!xferOrg} onClick={bulkTransfer}>Transfer</button>
+          </div>
+          <button className="rounded-lg border border-red-300 px-3 py-1.5 text-red-700 hover:bg-red-50" onClick={bulkDelete}>Delete selected</button>
+          <button className="ml-auto text-slate-500 hover:underline" onClick={() => setSelected(new Set())}>Clear</button>
+        </div>
+      ) : null}
+
       <div className="card p-0 overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50"><tr className="text-left text-xs uppercase text-slate-500">
+            {isSuper ? <th className="px-3 py-3"><input type="checkbox" aria-label="Select all" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleAll} /></th> : null}
             <th className="px-4 py-3">Emp. No.</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Type</th>
             <th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Base Rate</th><th className="px-4 py-3"></th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map((r) => (
-              <tr key={r.engagement_id} className="hover:bg-slate-50">
+              <tr key={r.engagement_id} className={`hover:bg-slate-50 ${selected.has(r.engagement_id) ? "bg-blue-50/50" : ""}`}>
+                {isSuper ? <td className="px-3 py-3"><input type="checkbox" aria-label={`Select ${r.full_name}`} checked={selected.has(r.engagement_id)} onChange={() => toggleSel(r.engagement_id)} /></td> : null}
                 <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.employee_number || "—"}</td>
                 <td className="px-4 py-3 font-medium text-slate-800">{r.full_name}</td>
                 <td className="px-4 py-3 text-slate-600">{r.engagement_type}</td>
@@ -287,7 +338,7 @@ export default function PeoplePage() {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 ? <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No records.</td></tr> : null}
+            {filtered.length === 0 ? <tr><td colSpan={isSuper ? 7 : 6} className="px-4 py-8 text-center text-slate-400">No records.</td></tr> : null}
           </tbody>
         </table>
       </div>

@@ -27,6 +27,8 @@ class PeopleController
         $r->post("$b/people/import", [self::class, 'importPeople']);
         $r->get("$b/people/{engagement_id}", [self::class, 'detail']);
         $r->put("$b/people/{engagement_id}", [self::class, 'update']);
+        $r->post("$b/people/bulk-delete", [self::class, 'bulkDestroy']);
+        $r->post("$b/people/bulk-transfer", [self::class, 'bulkTransfer']);
         $r->post("$b/people/{engagement_id}/archive", [self::class, 'archive']);
         $r->delete("$b/people/{engagement_id}", [self::class, 'destroy']);
     }
@@ -180,31 +182,21 @@ class PeopleController
         Http::json(['engagement_id' => (int) $eng['id'], 'status' => $status]);
     }
 
-    /** Permanently delete an engagement (and the person if it was their last one).
-     *  Superadmin only. Refuses when there is payroll history — those records must
-     *  be kept for tax/compliance, so archive instead. */
-    public static function destroy(array $p): void
+    private static function hasPayrollHistory(int $engId): bool
     {
-        $user = Auth::require();
-        if (!$user['is_superadmin']) throw new HttpError('Only a superadmin can permanently delete records. Use Archive instead.', 403);
-        $orgId = (int) ($p['organization_id'] ?? 0);
-        $eng = Database::one('SELECT * FROM engagements WHERE id = ? AND organization_id = ?', [(int) $p['engagement_id'], $orgId]);
-        if (!$eng) throw new HttpError('Engagement not found', 404);
+        return ((int) Database::scalar('SELECT COUNT(*) FROM payroll_run_people WHERE engagement_id = ?', [$engId])
+            + (int) Database::scalar('SELECT COUNT(*) FROM payslips WHERE engagement_id = ?', [$engId])) > 0;
+    }
+
+    /** Cascade-delete one engagement (payroll guard assumed already passed). Runs its
+     *  own transaction; returns whether the person record was removed too. */
+    private static function cascadeDelete(array $eng): bool
+    {
         $engId = (int) $eng['id'];
         $personId = (int) $eng['person_id'];
-
-        // Never delete anything with payroll history — protect financial/tax records.
-        $hasPayroll = (int) Database::scalar('SELECT COUNT(*) FROM payroll_run_people WHERE engagement_id = ?', [$engId])
-            + (int) Database::scalar('SELECT COUNT(*) FROM payslips WHERE engagement_id = ?', [$engId]);
-        if ($hasPayroll > 0) {
-            throw new HttpError('This person has payroll history and cannot be deleted — archive them instead to keep the records intact.', 409);
-        }
-
-        $person = Database::one('SELECT * FROM people WHERE id = ?', [$personId]);
         $pdo = Database::pdo();
         $pdo->beginTransaction();
         try {
-            // Delete this engagement's loans (and their transactions), then the engagement-scoped rows.
             $loanIds = array_column(Database::all('SELECT id FROM loans WHERE engagement_id = ?', [$engId]), 'id');
             foreach ($loanIds as $lid) Database::exec('DELETE FROM loan_transactions WHERE loan_id = ?', [(int) $lid]);
             Database::exec('DELETE FROM loans WHERE engagement_id = ?', [$engId]);
@@ -214,7 +206,6 @@ class PeopleController
             }
             Database::exec('DELETE FROM engagements WHERE id = ?', [$engId]);
 
-            // If that was the person's last engagement, remove the person and person-scoped data.
             $personDeleted = false;
             if ((int) Database::scalar('SELECT COUNT(*) FROM engagements WHERE person_id = ?', [$personId]) === 0) {
                 $benIds = array_column(Database::all('SELECT id FROM benefits WHERE person_id = ?', [$personId]), 'id');
@@ -223,29 +214,105 @@ class PeopleController
                 $pLoanIds = array_column(Database::all('SELECT id FROM loans WHERE person_id = ?', [$personId]), 'id');
                 foreach ($pLoanIds as $lid) Database::exec('DELETE FROM loan_transactions WHERE loan_id = ?', [(int) $lid]);
                 Database::exec('DELETE FROM loans WHERE person_id = ?', [$personId]);
-                // Return any assets to the pool rather than deleting them; drop this person's asset history.
                 Database::exec('UPDATE assets SET assigned_person_id = NULL WHERE assigned_person_id = ?', [$personId]);
                 Database::exec('DELETE FROM asset_events WHERE person_id = ?', [$personId]);
-                // Remove 201-file documents (rows + files on disk).
                 $docs = Database::all('SELECT object_key FROM employee_documents WHERE person_id = ?', [$personId]);
                 $base = dirname(dirname(__DIR__)) . '/storage/documents/';
                 foreach ($docs as $d) { $f = $base . $d['object_key']; if (is_file($f)) @unlink($f); }
                 Database::exec('DELETE FROM employee_documents WHERE person_id = ?', [$personId]);
-                // Unlink any login account from this person (keeps the login, detaches the person).
                 Database::exec('UPDATE users SET person_id = NULL WHERE person_id = ?', [$personId]);
                 Database::exec('DELETE FROM people WHERE id = ?', [$personId]);
                 $personDeleted = true;
             }
             $pdo->commit();
+            return $personDeleted;
         } catch (\Throwable $e) {
             $pdo->rollBack();
-            throw new HttpError('Could not delete this record: ' . $e->getMessage(), 500);
+            throw $e;
         }
+    }
 
-        Audit::record('employee.delete', $user, ['organization_id' => $orgId, 'entity' => 'engagement', 'entity_id' => $engId,
-            'before' => ['person_id' => $personId, 'employee_number' => $eng['employee_number'],
+    /** Permanently delete one engagement. Superadmin only; refuses on payroll history. */
+    public static function destroy(array $p): void
+    {
+        $user = Auth::require();
+        if (!$user['is_superadmin']) throw new HttpError('Only a superadmin can permanently delete records. Use Archive instead.', 403);
+        $orgId = (int) ($p['organization_id'] ?? 0);
+        $eng = Database::one('SELECT * FROM engagements WHERE id = ? AND organization_id = ?', [(int) $p['engagement_id'], $orgId]);
+        if (!$eng) throw new HttpError('Engagement not found', 404);
+        if (self::hasPayrollHistory((int) $eng['id'])) {
+            throw new HttpError('This person has payroll history and cannot be deleted — archive them instead to keep the records intact.', 409);
+        }
+        $person = Database::one('SELECT first_name, last_name FROM people WHERE id = ?', [(int) $eng['person_id']]);
+        try { $personDeleted = self::cascadeDelete($eng); }
+        catch (\Throwable $e) { throw new HttpError('Could not delete this record: ' . $e->getMessage(), 500); }
+        Audit::record('employee.delete', $user, ['organization_id' => $orgId, 'entity' => 'engagement', 'entity_id' => (int) $eng['id'],
+            'before' => ['person_id' => (int) $eng['person_id'], 'employee_number' => $eng['employee_number'],
                 'name' => $person ? trim(($person['first_name'] ?? '') . ' ' . ($person['last_name'] ?? '')) : null]]);
-        Http::json(['ok' => true, 'engagement_id' => $engId, 'person_deleted' => $personDeleted]);
+        Http::json(['ok' => true, 'engagement_id' => (int) $eng['id'], 'person_deleted' => $personDeleted]);
+    }
+
+    /** Delete several engagements at once. Superadmin only. Skips (does not fail on)
+     *  anyone with payroll history and reports them back. */
+    public static function bulkDestroy(array $p): void
+    {
+        $user = Auth::require();
+        if (!$user['is_superadmin']) throw new HttpError('Only a superadmin can permanently delete records. Use Archive instead.', 403);
+        $orgId = (int) ($p['organization_id'] ?? 0);
+        $ids = array_values(array_unique(array_map('intval', (array) (Http::body()['engagement_ids'] ?? []))));
+        if (!$ids) throw new HttpError('No records selected', 422);
+        $deleted = []; $skipped = [];
+        foreach ($ids as $engId) {
+            $eng = Database::one('SELECT * FROM engagements WHERE id = ? AND organization_id = ?', [$engId, $orgId]);
+            if (!$eng) { $skipped[] = ['engagement_id' => $engId, 'reason' => 'not found']; continue; }
+            if (self::hasPayrollHistory($engId)) { $skipped[] = ['engagement_id' => $engId, 'reason' => 'has payroll history — archive instead']; continue; }
+            try { self::cascadeDelete($eng); $deleted[] = $engId; }
+            catch (\Throwable $e) { $skipped[] = ['engagement_id' => $engId, 'reason' => 'error: ' . $e->getMessage()]; }
+        }
+        Audit::record('employee.bulk_delete', $user, ['organization_id' => $orgId, 'entity' => 'engagement',
+            'after' => ['deleted' => count($deleted), 'skipped' => count($skipped)]]);
+        Http::json(['deleted' => $deleted, 'skipped' => $skipped]);
+    }
+
+    /** Move engagements to another organization (superadmin only). Payroll history and
+     *  activity logs stay with the source org; forward-looking HR data follows the person. */
+    public static function bulkTransfer(array $p): void
+    {
+        $user = Auth::require();
+        if (!$user['is_superadmin']) throw new HttpError('Only a superadmin can transfer people between organizations.', 403);
+        $fromOrg = (int) ($p['organization_id'] ?? 0);
+        $body = Http::body();
+        $toOrg = (int) ($body['target_organization_id'] ?? 0);
+        $ids = array_values(array_unique(array_map('intval', (array) ($body['engagement_ids'] ?? []))));
+        if (!$ids) throw new HttpError('No records selected', 422);
+        if (!$toOrg || $toOrg === $fromOrg) throw new HttpError('Choose a different destination organization', 422);
+        if (!Database::one('SELECT id FROM organizations WHERE id = ?', [$toOrg])) throw new HttpError('Destination organization not found', 404);
+
+        $moved = [];
+        $pdo = Database::pdo();
+        $pdo->beginTransaction();
+        try {
+            foreach ($ids as $engId) {
+                $eng = Database::one('SELECT * FROM engagements WHERE id = ? AND organization_id = ?', [$engId, $fromOrg]);
+                if (!$eng) continue;
+                $personId = (int) $eng['person_id'];
+                // Department / position / project belong to the source org — clear them for re-assignment.
+                Database::exec('UPDATE engagements SET organization_id = ?, department_id = NULL, position_id = NULL, project_id = NULL WHERE id = ?', [$toOrg, $engId]);
+                // Forward-looking HR data follows the employee.
+                Database::exec('UPDATE leave_balances SET organization_id = ? WHERE engagement_id = ?', [$toOrg, $engId]);
+                Database::exec('UPDATE loans SET organization_id = ? WHERE engagement_id = ?', [$toOrg, $engId]);
+                Database::exec('UPDATE benefits SET organization_id = ? WHERE person_id = ? AND organization_id = ?', [$toOrg, $personId, $fromOrg]);
+                Database::exec('UPDATE employee_documents SET organization_id = ? WHERE person_id = ? AND organization_id = ?', [$toOrg, $personId, $fromOrg]);
+                $moved[] = $engId;
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw new HttpError('Could not transfer: ' . $e->getMessage(), 500);
+        }
+        Audit::record('employee.transfer', $user, ['organization_id' => $fromOrg, 'entity' => 'engagement',
+            'after' => ['moved' => count($moved), 'to_organization_id' => $toOrg]]);
+        Http::json(['moved' => $moved, 'to_organization_id' => $toOrg]);
     }
 
     private static function rows(int $orgId, ?string $mode): array
