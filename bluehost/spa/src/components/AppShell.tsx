@@ -58,7 +58,7 @@ export default function AppShell({
   const pathname = usePathname();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [orgs, setOrgs] = useState<{ id: number; name: string }[]>([]);
-  const [license, setLicense] = useState<{ active: boolean; enforced: boolean; reason: string } | null>(null);
+  const [license, setLicense] = useState<{ active: boolean; enforced: boolean; reason: string; mode?: string; trial_days_left?: number } | null>(null);
   const [notif, setNotif] = useState<{ unread: number; items: any[] }>({ unread: 0, items: [] });
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
@@ -109,7 +109,7 @@ export default function AppShell({
     apiFetch<{ id: number; name: string }[]>("/organizations", { silent: true })
       .then(setOrgs)
       .catch(() => setOrgs([]));
-    apiFetch<{ active: boolean; enforced: boolean; reason: string }>("/license", { silent: true })
+    apiFetch<{ active: boolean; enforced: boolean; reason: string; mode?: string; trial_days_left?: number }>("/license", { silent: true })
       .then(setLicense)
       .catch(() => setLicense(null));
     // Run once when the shell mounts (not on every render) — router/pathname are
@@ -230,7 +230,23 @@ export default function AppShell({
 
       {/* Main */}
       <div className="flex flex-1 flex-col">
-        {license && !license.active && (license.enforced || isAdmin) ? (
+        {license && license.mode === "trial" ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-geek-bluedark px-6 py-2 text-sm text-white">
+            <span>⏳ Free trial — <strong>{license.trial_days_left} day{license.trial_days_left === 1 ? "" : "s"} left</strong>. Enjoying it? Activate to keep your data and access.</span>
+            {isAdmin ? (
+              <Link href="/admin/license" className="rounded bg-white/20 px-3 py-1 font-medium hover:bg-white/30">Activate / Buy →</Link>
+            ) : null}
+          </div>
+        ) : license && license.mode === "trial_expired" && (license.enforced || isAdmin) ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-red-600 px-6 py-2 text-sm text-white">
+            <span>⛔ Your free trial has ended. Activate a license to continue — your data is safe.</span>
+            {isAdmin ? (
+              <Link href="/admin/license" className="rounded bg-white/20 px-3 py-1 font-medium hover:bg-white/30">Activate license →</Link>
+            ) : (
+              <span className="opacity-90">Please contact your administrator.</span>
+            )}
+          </div>
+        ) : license && !license.active && (license.enforced || isAdmin) ? (
           <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-500 px-6 py-2 text-sm text-white">
             <span>⚠ This installation is not activated{license.reason ? ` — ${license.reason}` : ""}.</span>
             {isAdmin ? (

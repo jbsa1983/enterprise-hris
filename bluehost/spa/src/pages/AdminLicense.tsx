@@ -3,7 +3,8 @@ import AppShell from "@/components/AppShell";
 import { apiFetch } from "@/lib/api";
 
 interface LicenseStatus {
-  active: boolean; reason: string; enforced: boolean;
+  active: boolean; licensed?: boolean; mode?: string; reason: string; enforced: boolean;
+  trial_days_left?: number; trial_ends?: string | null;
   customer: string | null; domain: string | null; edition: string | null; expires: string | null; host: string;
 }
 
@@ -43,12 +44,18 @@ export default function AdminLicensePage() {
       {msg ? <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{msg}</div> : null}
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
 
-      {st && !st.active ? (
-        <div className="card mb-6 border-l-4 border-geek-blue">
-          <div className="mb-1 text-sm font-medium text-slate-700">Get your license key</div>
+      {st && !st.licensed ? (
+        <div className={`card mb-6 border-l-4 ${st.mode === "trial_expired" ? "border-red-500" : "border-geek-blue"}`}>
+          <div className="mb-1 text-sm font-medium text-slate-700">
+            {st.mode === "trial" ? `You're on a free trial — ${st.trial_days_left} day${st.trial_days_left === 1 ? "" : "s"} left`
+              : st.mode === "trial_expired" ? "Your free trial has ended"
+              : "Get your license key"}
+          </div>
           <p className="text-sm text-slate-500">
-            This installation runs on <span className="font-mono text-slate-700">{st.host}</span>. To activate it, request a key for
-            this exact domain from the GEEK Team, then paste it below. Keys are issued per domain, so tell us the domain shown here.
+            {st.mode === "trial" ? <>Your trial ends on <span className="font-mono text-slate-700">{st.trial_ends}</span>. To keep the system running after that — with all your data intact — get a license key now. </>
+              : st.mode === "trial_expired" ? <>The app is locked, but <strong>your data is safe</strong>. Enter a license key to continue. </>
+              : null}
+            This installation runs on <span className="font-mono text-slate-700">{st.host}</span>. Keys are issued for this exact domain — request one from the GEEK Team, then paste it below.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <a className="btn-primary inline-block no-underline"
@@ -65,8 +72,15 @@ export default function AdminLicensePage() {
           <div className="mb-3 flex items-center justify-between">
             <div className="text-sm font-medium text-slate-700">Status</div>
             {st ? (
-              <span className={`badge ${st.active ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                {st.active ? "Active" : "Not activated"}
+              <span className={`badge ${
+                st.mode === "licensed" ? "bg-emerald-100 text-emerald-700"
+                : st.mode === "trial" ? "bg-blue-100 text-blue-700"
+                : st.mode === "trial_expired" ? "bg-red-100 text-red-700"
+                : "bg-amber-100 text-amber-700"}`}>
+                {st.mode === "licensed" ? "Licensed"
+                  : st.mode === "trial" ? `Trial — ${st.trial_days_left}d left`
+                  : st.mode === "trial_expired" ? "Trial ended"
+                  : "Not activated"}
               </span>
             ) : null}
           </div>

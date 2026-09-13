@@ -35,20 +35,29 @@ QUICK PATH (about 20-30 minutes)
 
   2. Sign in as the administrator and change the password.
 
-  3. ACTIVATE YOUR LICENSE
-        - Go to  Administration -> License
-        - It shows your installation's domain
+  3. YOUR 14-DAY FREE TRIAL STARTS AUTOMATICALLY
+        - No key needed to begin — the full system runs free for 14 days
+          from first sign-in.
+        - A banner shows how many trial days remain.
+        - Try it on your own payroll. Your data stays yours.
+
+  4. BEFORE THE TRIAL ENDS — ACTIVATE YOUR LICENSE
+        - Go to  Administration -> License  (it shows your domain and
+          the trial days left).
         - Click "Request key by email" (or email us yourself) to:
 
               geekhris@exssi.com
 
           Include: your domain, company name, edition
           (Starter / Business / Enterprise) and number of employees.
-        - We reply with your activation key. Paste it and click
-          Activate. The app is then fully unlocked.
+        - Once you've paid, we reply with your activation key. Paste it
+          and click Activate — the app stays unlocked, data intact.
 
-     NOTE: License keys are locked to your exact domain, so request the
-     key AFTER your site is live on its final domain.
+     NOTES:
+        - If the trial ends before you activate, the app locks but NO
+          data is lost — just enter a key to continue.
+        - License keys are locked to your exact domain, so activate on
+          the final domain you installed on.
 
 
 EDITIONS
