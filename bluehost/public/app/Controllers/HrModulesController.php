@@ -19,6 +19,7 @@ class HrModulesController
         $r->post("$b/training/courses", [self::class, 'createCourse']);
         $r->get("$b/training/assignments", [self::class, 'assignments']);
         $r->post("$b/training/assignments", [self::class, 'assign']);
+        $r->post("$b/training/assign-bulk", [self::class, 'assignBulk']);
         $r->post("$b/training/assignments/{id}/complete", [self::class, 'completeTraining']);
         $r->post("$b/training/assignments/{id}/reopen", [self::class, 'reopenTraining']);
         $r->delete("$b/training/assignments/{id}", [self::class, 'deleteAssignment']);
@@ -124,6 +125,40 @@ class HrModulesController
         }
         Audit::record('training.assign', $u, ['organization_id' => $o, 'entity' => 'training_assignment', 'entity_id' => $id, 'after' => ['course_id' => $courseId, 'engagement_id' => $engId, 'due_date' => $due]]);
         Http::json(['id' => $id]);
+    }
+    /** Assign one or more courses to one or more employees in a single action. */
+    public static function assignBulk(array $p): void
+    {
+        [$u, $o] = Auth::org($p, 'employee.edit'); $b = Http::body();
+        $engIds = array_values(array_unique(array_map('intval', (array) ($b['engagement_ids'] ?? []))));
+        $courseIds = array_values(array_unique(array_map('intval', (array) ($b['course_ids'] ?? []))));
+        $due = trim((string) ($b['due_date'] ?? '')) ?: null;
+        if (!$engIds || !$courseIds) throw new HttpError('Select at least one employee and one course', 422);
+
+        $created = 0; $perEng = [];
+        foreach ($courseIds as $cid) {
+            $course = Database::one('SELECT points FROM training_courses WHERE id = ? AND organization_id = ?', [$cid, $o]);
+            if (!$course) continue;
+            foreach ($engIds as $eid) {
+                if (!Database::one('SELECT id FROM engagements WHERE id = ? AND organization_id = ?', [$eid, $o])) continue;
+                // Skip if the same course is already open (not completed) for this employee.
+                if (Database::one("SELECT id FROM training_assignments WHERE organization_id = ? AND engagement_id = ? AND course_id = ? AND status <> 'COMPLETED'", [$o, $eid, $cid])) continue;
+                Database::insert('training_assignments', ['organization_id' => $o, 'course_id' => $cid, 'engagement_id' => $eid,
+                    'source' => 'ASSIGNED', 'points' => (float) $course['points'], 'status' => 'ASSIGNED', 'due_date' => $due]);
+                $created++; $perEng[$eid] = ($perEng[$eid] ?? 0) + 1;
+            }
+        }
+        foreach ($perEng as $eid => $n) {
+            $person = Database::scalar('SELECT person_id FROM engagements WHERE id = ?', [$eid]);
+            if ($person) {
+                $by = $due ? " Please complete by $due." : '';
+                Notify::toPerson((int) $person, 'training.assigned', 'New training assigned',
+                    "You've been assigned $n new training" . ($n === 1 ? '' : 's') . ".$by", '/me');
+            }
+        }
+        Audit::record('training.assign_bulk', $u, ['organization_id' => $o, 'entity' => 'training_assignment',
+            'after' => ['created' => $created, 'employees' => count($perEng), 'courses' => count($courseIds)]]);
+        Http::json(['created' => $created]);
     }
     public static function deleteAssignment(array $p): void
     {
