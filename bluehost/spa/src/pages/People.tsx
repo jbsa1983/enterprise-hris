@@ -118,6 +118,14 @@ function DocumentsSection({ orgId, engagementId }: { orgId: number; engagementId
 const ENG_TYPES = ["REGULAR", "PROBATIONARY", "PROJECT_BASED", "FIXED_TERM", "DAILY_PAID",
   "HOURLY_PAID", "PART_TIME", "CONSULTANT_INDIVIDUAL", "CONSULTANT_COMPANY", "CONTRACTOR", "OJT", "TRAINEE"];
 
+const TYPE_LABELS: Record<string, string> = {
+  REGULAR: "Regular Employee", PROBATIONARY: "Probationary", PROJECT_BASED: "Project-based",
+  FIXED_TERM: "Fixed-term", DAILY_PAID: "Daily-paid", HOURLY_PAID: "Hourly-paid", PART_TIME: "Part-time",
+  CONSULTANT_INDIVIDUAL: "Consultant (Individual)", CONSULTANT_COMPANY: "Consultant (Company)",
+  CONTRACTOR: "Contractor", OJT: "OJT", TRAINEE: "Trainee",
+};
+function typeLabel(t: string) { return TYPE_LABELS[t] || t; }
+
 const EMPTY: any = {
   first_name: "", last_name: "", middle_name: "", email: "", mobile: "",
   tin: "", sss_number: "", philhealth_number: "", pagibig_number: "",
@@ -138,14 +146,20 @@ export default function PeoplePage() {
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [isSuper, setIsSuper] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
   const [orgs, setOrgs] = useState<{ id: number; name: string }[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [xferOrg, setXferOrg] = useState("");
+  const [convType, setConvType] = useState("");
 
   useEffect(() => {
-    const apply = (sup: boolean) => { setIsSuper(sup); if (sup) apiFetch<{ id: number; name: string }[]>("/organizations").then(setOrgs).catch(() => {}); };
-    if (_permsCache) { apply(_permsCache.superadmin); return; }
-    apiFetch<any>("/auth/me").then((u) => { _permsCache = { perms: u.permissions || [], superadmin: !!u.is_superadmin }; apply(!!u.is_superadmin); }).catch(() => {});
+    const apply = (c: { perms: string[]; superadmin: boolean }) => {
+      setIsSuper(c.superadmin);
+      setCanEdit(c.superadmin || c.perms.includes("employee.edit"));
+      if (c.superadmin) apiFetch<{ id: number; name: string }[]>("/organizations").then(setOrgs).catch(() => {});
+    };
+    if (_permsCache) { apply(_permsCache); return; }
+    apiFetch<any>("/auth/me").then((u) => { _permsCache = { perms: u.permissions || [], superadmin: !!u.is_superadmin }; apply(_permsCache); }).catch(() => {});
   }, []);
 
   const endpoint = type === "employees" ? "employees" : type === "consultants" ? "consultants" : "people";
@@ -249,6 +263,17 @@ export default function PeoplePage() {
       setSelected(new Set()); load();
     } catch (e: any) { setErr(e.message); }
   }
+  async function bulkConvert() {
+    const ids = [...selected];
+    if (!ids.length || !convType) return;
+    if (!window.confirm(`Change ${ids.length} selected to "${typeLabel(convType)}"? Their records and history are kept — only the engagement type changes.`)) return;
+    setErr(""); setMsg("");
+    try {
+      const r = await apiFetch<{ updated: number }>(`/organizations/${orgId}/people/bulk-reclassify`, { method: "POST", body: JSON.stringify({ engagement_ids: ids, engagement_type: convType }) });
+      setMsg(`Reclassified ${r.updated} to ${typeLabel(convType)}.`);
+      setSelected(new Set()); setConvType(""); load();
+    } catch (e: any) { setErr(e.message); }
+  }
   async function bulkTransfer() {
     const ids = [...selected];
     if (!ids.length || !xferOrg) return;
@@ -300,17 +325,28 @@ export default function PeoplePage() {
       {msg ? <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{msg}</div> : null}
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
 
-      {isSuper && selected.size > 0 ? (
+      {canEdit && selected.size > 0 ? (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
           <span className="font-medium text-slate-700">{selected.size} selected</span>
           <div className="flex items-center gap-2">
-            <select className="input max-w-[220px] py-1.5" value={xferOrg} onChange={(e) => setXferOrg(e.target.value)}>
-              <option value="">Transfer to…</option>
-              {orgs.filter((o) => o.id !== orgId).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            <select className="input max-w-[210px] py-1.5" value={convType} onChange={(e) => setConvType(e.target.value)}>
+              <option value="">Change type to…</option>
+              {ENG_TYPES.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
             </select>
-            <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 hover:bg-slate-100 disabled:opacity-40" disabled={!xferOrg} onClick={bulkTransfer}>Transfer</button>
+            <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 hover:bg-slate-100 disabled:opacity-40" disabled={!convType} onClick={bulkConvert}>Convert</button>
           </div>
-          <button className="rounded-lg border border-red-300 px-3 py-1.5 text-red-700 hover:bg-red-50" onClick={bulkDelete}>Delete selected</button>
+          {isSuper ? (
+            <>
+              <div className="flex items-center gap-2">
+                <select className="input max-w-[210px] py-1.5" value={xferOrg} onChange={(e) => setXferOrg(e.target.value)}>
+                  <option value="">Transfer to…</option>
+                  {orgs.filter((o) => o.id !== orgId).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+                <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 hover:bg-slate-100 disabled:opacity-40" disabled={!xferOrg} onClick={bulkTransfer}>Transfer</button>
+              </div>
+              <button className="rounded-lg border border-red-300 px-3 py-1.5 text-red-700 hover:bg-red-50" onClick={bulkDelete}>Delete selected</button>
+            </>
+          ) : null}
           <button className="ml-auto text-slate-500 hover:underline" onClick={() => setSelected(new Set())}>Clear</button>
         </div>
       ) : null}
@@ -318,14 +354,14 @@ export default function PeoplePage() {
       <div className="card p-0 overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50"><tr className="text-left text-xs uppercase text-slate-500">
-            {isSuper ? <th className="px-3 py-3"><input type="checkbox" aria-label="Select all" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleAll} /></th> : null}
+            {canEdit ? <th className="px-3 py-3"><input type="checkbox" aria-label="Select all" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleAll} /></th> : null}
             <th className="px-4 py-3">Emp. No.</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Type</th>
             <th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Base Rate</th><th className="px-4 py-3"></th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map((r) => (
               <tr key={r.engagement_id} className={`hover:bg-slate-50 ${selected.has(r.engagement_id) ? "bg-blue-50/50" : ""}`}>
-                {isSuper ? <td className="px-3 py-3"><input type="checkbox" aria-label={`Select ${r.full_name}`} checked={selected.has(r.engagement_id)} onChange={() => toggleSel(r.engagement_id)} /></td> : null}
+                {canEdit ? <td className="px-3 py-3"><input type="checkbox" aria-label={`Select ${r.full_name}`} checked={selected.has(r.engagement_id)} onChange={() => toggleSel(r.engagement_id)} /></td> : null}
                 <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.employee_number || "—"}</td>
                 <td className="px-4 py-3 font-medium text-slate-800">{r.full_name}</td>
                 <td className="px-4 py-3 text-slate-600">{r.engagement_type}</td>
@@ -338,7 +374,7 @@ export default function PeoplePage() {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 ? <tr><td colSpan={isSuper ? 7 : 6} className="px-4 py-8 text-center text-slate-400">No records.</td></tr> : null}
+            {filtered.length === 0 ? <tr><td colSpan={canEdit ? 7 : 6} className="px-4 py-8 text-center text-slate-400">No records.</td></tr> : null}
           </tbody>
         </table>
       </div>

@@ -2,6 +2,8 @@
 class PeopleController
 {
     const CONSULTANT_TYPES = ['CONSULTANT_INDIVIDUAL', 'CONSULTANT_COMPANY'];
+    const ENG_TYPES = ['REGULAR', 'PROBATIONARY', 'PROJECT_BASED', 'FIXED_TERM', 'DAILY_PAID', 'HOURLY_PAID',
+        'PART_TIME', 'CONSULTANT_INDIVIDUAL', 'CONSULTANT_COMPANY', 'CONTRACTOR', 'OJT', 'TRAINEE'];
 
     const PERSON_FIELDS = ['first_name', 'middle_name', 'last_name', 'suffix', 'preferred_name', 'birth_date',
         'gender', 'civil_status', 'email', 'mobile', 'address', 'emergency_contact', 'tin', 'sss_number',
@@ -29,6 +31,7 @@ class PeopleController
         $r->put("$b/people/{engagement_id}", [self::class, 'update']);
         $r->post("$b/people/bulk-delete", [self::class, 'bulkDestroy']);
         $r->post("$b/people/bulk-transfer", [self::class, 'bulkTransfer']);
+        $r->post("$b/people/bulk-reclassify", [self::class, 'bulkReclassify']);
         $r->post("$b/people/{engagement_id}/archive", [self::class, 'archive']);
         $r->delete("$b/people/{engagement_id}", [self::class, 'destroy']);
     }
@@ -272,6 +275,27 @@ class PeopleController
         Audit::record('employee.bulk_delete', $user, ['organization_id' => $orgId, 'entity' => 'engagement',
             'after' => ['deleted' => count($deleted), 'skipped' => count($skipped)]]);
         Http::json(['deleted' => $deleted, 'skipped' => $skipped]);
+    }
+
+    /** Reclassify selected engagements — e.g. move an employee to Consultant or back.
+     *  Just changes engagement_type; keeps the person and all their records. */
+    public static function bulkReclassify(array $p): void
+    {
+        [$user, $orgId] = Auth::org($p, 'employee.edit');
+        $body = Http::body();
+        $type = (string) ($body['engagement_type'] ?? '');
+        if (!in_array($type, self::ENG_TYPES, true)) throw new HttpError('Unknown engagement type', 422);
+        $ids = array_values(array_unique(array_map('intval', (array) ($body['engagement_ids'] ?? []))));
+        if (!$ids) throw new HttpError('No records selected', 422);
+        $updated = 0;
+        foreach ($ids as $engId) {
+            if (!Database::one('SELECT id FROM engagements WHERE id = ? AND organization_id = ?', [$engId, $orgId])) continue;
+            Database::update('engagements', $engId, ['engagement_type' => $type]);
+            $updated++;
+        }
+        Audit::record('employee.reclassify', $user, ['organization_id' => $orgId, 'entity' => 'engagement',
+            'after' => ['engagement_type' => $type, 'count' => $updated]]);
+        Http::json(['updated' => $updated, 'engagement_type' => $type]);
     }
 
     /** Move engagements to another organization (superadmin only). Payroll history and
