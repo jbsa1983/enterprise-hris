@@ -18,6 +18,7 @@ import Assets from "@/pages/Assets";
 import Benefits from "@/pages/Benefits";
 import Recruitment from "@/pages/Recruitment";
 import HrModules from "@/pages/HrModules";
+import Training from "@/pages/Training";
 import Reports from "@/pages/Reports";
 import BirForms from "@/pages/BirForms";
 import SelfService from "@/pages/SelfService";
@@ -55,6 +56,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/o/:orgId/benefits" element={<Benefits />} />
         <Route path="/o/:orgId/recruitment" element={<Recruitment />} />
         <Route path="/o/:orgId/hr" element={<HrModules />} />
+        <Route path="/o/:orgId/training" element={<Training />} />
         <Route path="/o/:orgId/reports" element={<Reports />} />
         <Route path="/o/:orgId/bir" element={<BirForms />} />
         <Route path="/o/:orgId/setup" element={<OrgSetup />} />

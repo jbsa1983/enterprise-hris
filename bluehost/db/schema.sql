@@ -548,17 +548,26 @@ CREATE TABLE IF NOT EXISTS training_courses (
   title VARCHAR(150) NOT NULL,
   category VARCHAR(80) NULL,
   provider VARCHAR(120) NULL,
+  points DECIMAL(6,2) DEFAULT 0,
   INDEX (organization_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS training_assignments (
   id INT AUTO_INCREMENT PRIMARY KEY,
   organization_id INT NOT NULL,
-  course_id INT NOT NULL,
+  course_id INT NULL,
   engagement_id INT NOT NULL,
+  source VARCHAR(10) DEFAULT 'ASSIGNED',   -- ASSIGNED (by HR) | SELF (employee credential)
+  self_title VARCHAR(150) NULL,
+  self_provider VARCHAR(120) NULL,
+  points DECIMAL(6,2) DEFAULT 0,
   status VARCHAR(20) DEFAULT 'ASSIGNED',
+  due_date DATE NULL,
   completed_date DATE NULL,
   certificate_expiry DATE NULL,
+  certificate_object_key VARCHAR(255) NULL,
+  certificate_filename VARCHAR(255) NULL,
+  completion_note VARCHAR(255) NULL,
   INDEX (organization_id), INDEX (course_id), INDEX (engagement_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

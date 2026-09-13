@@ -25,6 +25,111 @@ class EssController
         $r->post('/me/password', [self::class, 'password']);
         $r->get('/me/notifications', [self::class, 'notifications']);
         $r->post('/me/notifications/read', [self::class, 'markNotificationsRead']);
+        $r->get('/me/training', [self::class, 'training']);
+        $r->post('/me/training/self', [self::class, 'addSelfTraining']);
+        $r->post('/me/training/{id}/complete', [self::class, 'completeTraining']);
+        $r->get('/me/training/{id}/certificate', [self::class, 'trainingCertificate']);
+    }
+
+    /** Trainings assigned to the signed-in employee. */
+    public static function training(): void
+    {
+        $u = Auth::require();
+        $engs = self::engIds(self::personId($u));
+        if (!$engs) { Http::json([]); return; }
+        $in = implode(',', array_fill(0, count($engs), '?'));
+        $rows = Database::all(
+            "SELECT ta.id, ta.status, ta.source, ta.points, ta.due_date, ta.completed_date, ta.completion_note,
+                    ta.certificate_filename, COALESCE(tc.title, ta.self_title) course_title, COALESCE(tc.provider, ta.self_provider) provider, tc.category
+               FROM training_assignments ta LEFT JOIN training_courses tc ON tc.id = ta.course_id
+              WHERE ta.engagement_id IN ($in) ORDER BY (ta.status = 'COMPLETED'), ta.due_date IS NULL, ta.due_date, ta.id DESC", $engs);
+        Http::json(array_map(fn($t) => [
+            'id' => (int) $t['id'], 'course_title' => $t['course_title'], 'provider' => $t['provider'], 'category' => $t['category'],
+            'source' => $t['source'] ?? 'ASSIGNED', 'points' => (float) ($t['points'] ?? 0),
+            'status' => $t['status'], 'due_date' => $t['due_date'], 'completed_date' => $t['completed_date'],
+            'completion_note' => $t['completion_note'], 'certificate_filename' => $t['certificate_filename'],
+            'has_certificate' => !empty($t['certificate_filename']),
+        ], $rows));
+    }
+
+    /** Employee adds their own external seminar / training as a credential (with points). */
+    public static function addSelfTraining(): void
+    {
+        $u = Auth::require();
+        $eng = self::primaryEngagement(self::personId($u));
+        if (!$eng) throw new HttpError('No active engagement found for your account', 404);
+        $title = trim((string) ($_POST['title'] ?? ''));
+        if ($title === '') throw new HttpError('Please enter the training / seminar title', 422);
+        $date = trim((string) ($_POST['date'] ?? '')) ?: date('Y-m-d');
+        $data = [
+            'organization_id' => (int) $eng['organization_id'], 'engagement_id' => (int) $eng['id'],
+            'course_id' => null, 'source' => 'SELF', 'self_title' => substr($title, 0, 150),
+            'self_provider' => substr(trim((string) ($_POST['provider'] ?? '')), 0, 120) ?: null,
+            'points' => (float) ($_POST['points'] ?? 0), 'status' => 'COMPLETED', 'completed_date' => $date,
+        ];
+        // Reserve the id first so the certificate path can use it.
+        $id = Database::insert('training_assignments', $data);
+        if (!empty($_FILES['certificate']['tmp_name']) && is_uploaded_file($_FILES['certificate']['tmp_name'])) {
+            if (($_FILES['certificate']['size'] ?? 0) > 10485760) throw new HttpError('Certificate must be 10 MB or smaller', 422);
+            $orig = (string) ($_FILES['certificate']['name'] ?? 'certificate');
+            $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif'], true)) throw new HttpError('Certificate must be a PDF or image', 422);
+            $dir = HrModulesController::trainingDir() . '/' . (int) $eng['organization_id'] . '/' . $id;
+            if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) throw new HttpError('Could not save the certificate', 500);
+            $key = (int) $eng['organization_id'] . '/' . $id . '/' . Util::uuid() . '.' . $ext;
+            if (move_uploaded_file($_FILES['certificate']['tmp_name'], HrModulesController::trainingDir() . '/' . $key)) {
+                Database::update('training_assignments', $id, ['certificate_object_key' => $key, 'certificate_filename' => substr($orig, 0, 255)]);
+            }
+        }
+        Notify::toApprovers((int) $eng['organization_id'], 'employee.edit', 'training.self_added', 'Self-added training',
+            ($u['full_name'] ?? 'An employee') . " added a personal training/seminar credential: \"$title\".", '/o/' . (int) $eng['organization_id'] . '/training');
+        Http::json(['id' => $id]);
+    }
+
+    /** Employee marks their own training complete, optionally uploading a certificate. */
+    public static function completeTraining(array $p): void
+    {
+        $u = Auth::require();
+        $engs = self::engIds(self::personId($u));
+        $id = (int) ($p['id'] ?? 0);
+        $t = $engs ? Database::one('SELECT * FROM training_assignments WHERE id = ? AND engagement_id IN (' . implode(',', array_fill(0, count($engs), '?')) . ')', array_merge([$id], $engs)) : null;
+        if (!$t) throw new HttpError('Training assignment not found', 404);
+
+        $data = ['status' => 'COMPLETED', 'completed_date' => date('Y-m-d')];
+        $note = trim((string) ($_POST['note'] ?? ''));
+        if ($note !== '') $data['completion_note'] = substr($note, 0, 255);
+
+        if (!empty($_FILES['certificate']['tmp_name']) && is_uploaded_file($_FILES['certificate']['tmp_name'])) {
+            if (($_FILES['certificate']['size'] ?? 0) > 10485760) throw new HttpError('Certificate must be 10 MB or smaller', 422);
+            $orig = (string) ($_FILES['certificate']['name'] ?? 'certificate');
+            $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif'], true)) throw new HttpError('Certificate must be a PDF or image', 422);
+            $dir = HrModulesController::trainingDir() . '/' . (int) $t['organization_id'] . '/' . $id;
+            if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) throw new HttpError('Could not save the certificate', 500);
+            $key = (int) $t['organization_id'] . '/' . $id . '/' . Util::uuid() . '.' . $ext;
+            if (!move_uploaded_file($_FILES['certificate']['tmp_name'], HrModulesController::trainingDir() . '/' . $key)) throw new HttpError('Could not save the certificate', 500);
+            $data['certificate_object_key'] = $key;
+            $data['certificate_filename'] = substr($orig, 0, 255);
+        }
+        Database::update('training_assignments', $id, $data);
+        // Let HR know it was completed.
+        Notify::toApprovers((int) $t['organization_id'], 'employee.edit', 'training.completed', 'Training completed',
+            ($u['full_name'] ?? 'An employee') . ' marked a training as complete' . (isset($data['certificate_filename']) ? ' and uploaded a certificate.' : '.'),
+            '/o/' . (int) $t['organization_id'] . '/hr');
+        Http::json(['id' => $id, 'status' => 'COMPLETED']);
+    }
+
+    public static function trainingCertificate(array $p): void
+    {
+        $u = Auth::require();
+        $engs = self::engIds(self::personId($u));
+        $id = (int) ($p['id'] ?? 0);
+        $t = $engs ? Database::one('SELECT certificate_object_key, certificate_filename FROM training_assignments WHERE id = ? AND engagement_id IN (' . implode(',', array_fill(0, count($engs), '?')) . ')', array_merge([$id], $engs)) : null;
+        if (!$t || empty($t['certificate_object_key'])) throw new HttpError('No certificate on file', 404);
+        $path = HrModulesController::trainingDir() . '/' . $t['certificate_object_key'];
+        if (!is_file($path)) throw new HttpError('Certificate file is missing', 404);
+        $ext = strtolower(pathinfo($t['certificate_filename'], PATHINFO_EXTENSION));
+        Http::file(file_get_contents($path), 'application/octet-stream', $t['certificate_filename'] ?: 'certificate', in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif'], true));
     }
 
     public static function notifications(): void

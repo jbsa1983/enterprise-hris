@@ -47,8 +47,8 @@ export default function HrModulesPage() {
 
         <Card title={`Training Assignments (${training.length})`}>
           <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
-            {training.map((t) => (<tr key={t.id}><td className="px-4 py-2 text-xs text-slate-500">Course #{t.course_id}</td><td className="px-4 py-2 text-xs text-slate-500">Eng #{t.engagement_id}</td><td className="px-4 py-2"><span className="badge bg-slate-100 text-slate-600">{t.status}</span></td></tr>))}
-            {training.length === 0 ? <tr><td className="px-4 py-6 text-center text-slate-400">No assignments.</td></tr> : null}
+            {training.slice(0, 12).map((t) => (<tr key={t.id}><td className="px-4 py-2">{t.employee || `Eng #${t.engagement_id}`}</td><td className="px-4 py-2 text-slate-600">{t.course_title || `Course #${t.course_id}`}</td><td className="px-4 py-2"><span className={`badge ${t.status === "COMPLETED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{t.status}</span></td></tr>))}
+            {training.length === 0 ? <tr><td className="px-4 py-6 text-center text-slate-400">No assignments. Manage in the Training tab.</td></tr> : null}
           </tbody></table>
         </Card>
 

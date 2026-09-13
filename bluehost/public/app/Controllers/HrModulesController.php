@@ -20,6 +20,9 @@ class HrModulesController
         $r->get("$b/training/assignments", [self::class, 'assignments']);
         $r->post("$b/training/assignments", [self::class, 'assign']);
         $r->post("$b/training/assignments/{id}/complete", [self::class, 'completeTraining']);
+        $r->post("$b/training/assignments/{id}/reopen", [self::class, 'reopenTraining']);
+        $r->delete("$b/training/assignments/{id}", [self::class, 'deleteAssignment']);
+        $r->get("$b/training/assignments/{id}/certificate", [self::class, 'assignmentCertificate']);
         // Service desk
         $r->get("$b/service-tickets", [self::class, 'tickets']);
         $r->post("$b/service-tickets", [self::class, 'createTicket']);
@@ -69,31 +72,97 @@ class HrModulesController
     public static function courses(array $p): void
     {
         [, $o] = Auth::org($p, 'employee.view');
-        Http::json(Database::all('SELECT id, title, category, provider FROM training_courses WHERE organization_id = ?', [$o]));
+        Http::json(Database::all('SELECT id, title, category, provider, points FROM training_courses WHERE organization_id = ?', [$o]));
     }
     public static function createCourse(array $p): void
     {
         [, $o] = Auth::org($p, 'employee.edit'); $b = Http::body();
-        Http::json(['id' => Database::insert('training_courses', ['organization_id' => $o, 'title' => $b['title'], 'category' => $b['category'] ?? null, 'provider' => $b['provider'] ?? null])]);
+        Http::json(['id' => Database::insert('training_courses', ['organization_id' => $o, 'title' => $b['title'],
+            'category' => $b['category'] ?? null, 'provider' => $b['provider'] ?? null, 'points' => (float) ($b['points'] ?? 0)])]);
     }
+    /** Certificate storage dir (deny-all; served only through PHP). */
+    public static function trainingDir(): string { return dirname(dirname(__DIR__)) . '/storage/training'; }
+
     public static function assignments(array $p): void
     {
         [, $o] = Auth::org($p, 'employee.view');
-        Http::json(array_map(fn($t) => ['id' => (int) $t['id'], 'course_id' => (int) $t['course_id'], 'engagement_id' => (int) $t['engagement_id'], 'status' => $t['status'], 'completed_date' => $t['completed_date']],
-            Database::all('SELECT * FROM training_assignments WHERE organization_id = ?', [$o])));
+        $rows = Database::all(
+            "SELECT ta.*, COALESCE(tc.title, ta.self_title) course_title, COALESCE(tc.provider, ta.self_provider) provider, tc.category,
+                    CONCAT_WS(' ', pe.first_name, pe.last_name) employee, e.employee_number
+               FROM training_assignments ta
+               LEFT JOIN training_courses tc ON tc.id = ta.course_id
+               JOIN engagements e ON e.id = ta.engagement_id
+               JOIN people pe ON pe.id = e.person_id
+              WHERE ta.organization_id = ? ORDER BY (ta.status = 'COMPLETED'), ta.due_date IS NULL, ta.due_date, ta.id DESC", [$o]);
+        Http::json(array_map(fn($t) => [
+            'id' => (int) $t['id'], 'course_id' => $t['course_id'] !== null ? (int) $t['course_id'] : null,
+            'engagement_id' => (int) $t['engagement_id'], 'source' => $t['source'] ?? 'ASSIGNED',
+            'course_title' => $t['course_title'], 'provider' => $t['provider'], 'category' => $t['category'],
+            'points' => (float) ($t['points'] ?? 0),
+            'employee' => $t['employee'], 'employee_number' => $t['employee_number'],
+            'status' => $t['status'], 'due_date' => $t['due_date'], 'completed_date' => $t['completed_date'],
+            'completion_note' => $t['completion_note'],
+            'has_certificate' => !empty($t['certificate_object_key']), 'certificate_filename' => $t['certificate_filename'],
+        ], $rows));
     }
     public static function assign(array $p): void
     {
-        [, $o] = Auth::org($p, 'employee.edit'); $b = Http::body();
-        Http::json(['id' => Database::insert('training_assignments', ['organization_id' => $o, 'course_id' => (int) $b['course_id'], 'engagement_id' => (int) $b['engagement_id'], 'status' => 'ASSIGNED'])]);
+        [$u, $o] = Auth::org($p, 'employee.edit'); $b = Http::body();
+        $courseId = (int) $b['course_id']; $engId = (int) $b['engagement_id'];
+        $due = trim((string) ($b['due_date'] ?? '')) ?: null;
+        $course = Database::one('SELECT title, points FROM training_courses WHERE id = ? AND organization_id = ?', [$courseId, $o]);
+        $points = $course ? (float) $course['points'] : 0;
+        $id = Database::insert('training_assignments', ['organization_id' => $o, 'course_id' => $courseId, 'engagement_id' => $engId,
+            'source' => 'ASSIGNED', 'points' => $points, 'status' => 'ASSIGNED', 'due_date' => $due]);
+        // Notify the assigned employee (in-app / email / Telegram).
+        $person = Database::scalar('SELECT person_id FROM engagements WHERE id = ?', [$engId]);
+        if ($person) {
+            $title = $course['title'] ?? 'a course';
+            $by = $due ? " Please complete it by $due." : '';
+            Notify::toPerson((int) $person, 'training.assigned', 'New training assigned',
+                "You've been assigned the training \"$title\".$by", '/me');
+        }
+        Audit::record('training.assign', $u, ['organization_id' => $o, 'entity' => 'training_assignment', 'entity_id' => $id, 'after' => ['course_id' => $courseId, 'engagement_id' => $engId, 'due_date' => $due]]);
+        Http::json(['id' => $id]);
+    }
+    public static function deleteAssignment(array $p): void
+    {
+        [$u, $o] = Auth::org($p, 'employee.edit');
+        $t = Database::one('SELECT * FROM training_assignments WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
+        if (!$t) throw new HttpError('Assignment not found', 404);
+        if (!empty($t['certificate_object_key'])) { $f = self::trainingDir() . '/' . $t['certificate_object_key']; if (is_file($f)) @unlink($f); }
+        Database::exec('DELETE FROM training_assignments WHERE id = ?', [(int) $t['id']]);
+        Audit::record('training.delete', $u, ['organization_id' => $o, 'entity' => 'training_assignment', 'entity_id' => (int) $t['id']]);
+        Http::json(['ok' => true]);
     }
     public static function completeTraining(array $p): void
+    {
+        [, $o] = Auth::org($p, 'employee.edit'); $b = Http::body();
+        $t = Database::one('SELECT id FROM training_assignments WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
+        if (!$t) throw new HttpError('Assignment not found', 404);
+        $data = ['status' => 'COMPLETED', 'completed_date' => date('Y-m-d')];
+        if (isset($b['completion_note'])) $data['completion_note'] = substr((string) $b['completion_note'], 0, 255);
+        Database::update('training_assignments', (int) $t['id'], $data);
+        Http::json(['id' => (int) $t['id'], 'status' => 'COMPLETED']);
+    }
+    public static function reopenTraining(array $p): void
     {
         [, $o] = Auth::org($p, 'employee.edit');
         $t = Database::one('SELECT id FROM training_assignments WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
         if (!$t) throw new HttpError('Assignment not found', 404);
-        Database::update('training_assignments', (int) $t['id'], ['status' => 'COMPLETED', 'completed_date' => date('Y-m-d')]);
-        Http::json(['id' => (int) $t['id'], 'status' => 'COMPLETED']);
+        Database::update('training_assignments', (int) $t['id'], ['status' => 'ASSIGNED', 'completed_date' => null]);
+        Http::json(['id' => (int) $t['id'], 'status' => 'ASSIGNED']);
+    }
+    public static function assignmentCertificate(array $p): void
+    {
+        [, $o] = Auth::org($p, 'employee.view');
+        $t = Database::one('SELECT certificate_object_key, certificate_filename FROM training_assignments WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
+        if (!$t || empty($t['certificate_object_key'])) throw new HttpError('No certificate on file', 404);
+        $path = self::trainingDir() . '/' . $t['certificate_object_key'];
+        if (!is_file($path)) throw new HttpError('Certificate file is missing', 404);
+        $ext = strtolower(pathinfo($t['certificate_filename'], PATHINFO_EXTENSION));
+        $inline = in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif'], true);
+        Http::file(file_get_contents($path), 'application/octet-stream', $t['certificate_filename'] ?: 'certificate', $inline);
     }
 
     public static function tickets(array $p): void

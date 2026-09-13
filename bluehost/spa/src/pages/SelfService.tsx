@@ -1,10 +1,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
-import { apiFetch, apiOpen } from "@/lib/api";
+import { apiFetch, apiOpen, apiUpload } from "@/lib/api";
 import { peso } from "@/lib/format";
 
-const TABS = ["Profile", "Payslips", "13th Month", "Leave", "Attendance", "Overtime", "Loans", "Benefits", "Assets", "Contributions", "Security"];
+const TABS = ["Profile", "Payslips", "13th Month", "Leave", "Attendance", "Overtime", "Loans", "Benefits", "Assets", "Training", "Contributions", "Security"];
 const LOAN_TYPES = ["CASH_ADVANCE", "COMPANY_LOAN", "SALARY_LOAN", "EMERGENCY_LOAN", "TRAVEL_ADVANCE", "OTHER"];
 const loanLabel = (t: string) => t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -22,6 +22,10 @@ export default function SelfServicePage() {
   const [leaveBal, setLeaveBal] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
   const [benefits, setBenefits] = useState<any[]>([]);
+  const [trainings, setTrainings] = useState<any[]>([]);
+  const [certFor, setCertFor] = useState<number | null>(null);
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [certNote, setCertNote] = useState("");
   const [tg, setTg] = useState<any>({ configured: false, linked: false, link_url: null });
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -29,6 +33,7 @@ export default function SelfServicePage() {
   const [leaveForm, setLeaveForm] = useState<any>({ leave_type: "", date_from: "", date_to: "", days: "" });
   const [loanForm, setLoanForm] = useState<any>({ obligation_type: "CASH_ADVANCE", principal: "", description: "" });
   const [otForm, setOtForm] = useState<any>({ ot_date: "", hours: "" });
+  const [selfT, setSelfT] = useState<any>({ title: "", provider: "", date: "", points: "", file: null as File | null });
 
   const load = useCallback(() => {
     apiFetch("/me/profile").then(setProfile).catch((e) => setErr(e.message));
@@ -44,8 +49,35 @@ export default function SelfServicePage() {
     apiFetch("/me/special-pay").then(setSpecial).catch(() => {});
     apiFetch("/me/contributions").then(setContrib).catch(() => {});
     apiFetch("/me/telegram").then(setTg).catch(() => {});
+    apiFetch("/me/training").then(setTrainings).catch(() => {});
   }, []);
   useEffect(load, [load]);
+
+  function reloadTraining() { apiFetch("/me/training").then(setTrainings).catch(() => {}); }
+  async function submitCert(id: number, file: File | null, note: string) {
+    setErr(""); setMsg("");
+    try {
+      const fd = new FormData();
+      if (file) fd.append("certificate", file);
+      if (note) fd.append("note", note);
+      await apiUpload(`/me/training/${id}/complete`, fd);
+      setMsg("Training marked complete."); setCertFor(null); setCertFile(null); setCertNote(""); reloadTraining();
+    } catch (e: any) { setErr(e.message); }
+  }
+  async function addSelfTraining() {
+    if (!selfT.title) { setErr("Enter the training / seminar title."); return; }
+    setErr(""); setMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("title", selfT.title);
+      if (selfT.provider) fd.append("provider", selfT.provider);
+      if (selfT.date) fd.append("date", selfT.date);
+      if (selfT.points) fd.append("points", String(selfT.points));
+      if (selfT.file) fd.append("certificate", selfT.file);
+      await apiUpload("/me/training/self", fd);
+      setMsg("Added to your training credentials."); setSelfT({ title: "", provider: "", date: "", points: "", file: null }); reloadTraining();
+    } catch (e: any) { setErr(e.message); }
+  }
 
   function tgRefresh() { apiFetch("/me/telegram").then(setTg).catch(() => {}); }
   async function tgTest() { setErr(""); setMsg(""); try { await apiFetch("/me/telegram/test", { method: "POST" }); setMsg("Test sent — check your Telegram."); } catch (e: any) { setErr(e.message); } }
@@ -332,6 +364,71 @@ export default function SelfServicePage() {
               {assets.length === 0 ? <tr><td colSpan={5} className="py-6 text-center text-slate-400">No assets assigned to you.</td></tr> : null}
             </tbody>
           </table>
+        </Section>
+      ) : null}
+
+      {tab === "Training" ? (
+        <Section title="My Training & Credentials">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-lg bg-geek-blue/10 px-3 py-1.5 text-sm text-geek-bluedark">
+            <span className="font-semibold">{trainings.filter((t) => t.status === "COMPLETED").reduce((s, t) => s + Number(t.points || 0), 0)}</span> training points earned
+          </div>
+          <div className="space-y-2">
+            {trainings.map((t) => {
+              const overdue = t.status !== "COMPLETED" && t.due_date && t.due_date < new Date().toISOString().slice(0, 10);
+              return (
+                <div key={t.id} className="rounded-lg border border-slate-200 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="font-medium text-slate-800">{t.course_title}
+                        {t.source === "SELF" ? <span className="ml-2 badge bg-slate-100 text-slate-500">Self-added</span> : null}
+                        {Number(t.points) > 0 ? <span className="ml-2 text-xs text-slate-400">{t.points} pts</span> : null}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {t.provider ? <>{t.provider} · </> : null}
+                        {t.status === "COMPLETED" ? <>Completed {t.completed_date}</> : <>Due {t.due_date || "—"}</>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {t.status === "COMPLETED"
+                        ? <>{t.has_certificate ? <button className="text-xs text-brand-700 hover:underline" onClick={() => apiOpen(`/me/training/${t.id}/certificate`)}>Certificate</button> : null}
+                            <span className="badge bg-emerald-100 text-emerald-700">Completed</span></>
+                        : <>
+                            <span className={`badge ${overdue ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>{overdue ? "Overdue" : "To do"}</span>
+                            <button className="rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50" onClick={() => { setCertFor(certFor === t.id ? null : t.id); setCertFile(null); setCertNote(""); }}>Mark complete</button>
+                          </>}
+                    </div>
+                  </div>
+                  {certFor === t.id ? (
+                    <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                      <p className="mb-2 text-xs text-slate-500">Upload your certificate of completion (PDF or image, optional) and add a note.</p>
+                      <input type="file" className="text-sm" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif" onChange={(e) => setCertFile(e.target.files?.[0] || null)} />
+                      <input className="input mt-2" placeholder="Note (optional)" value={certNote} onChange={(e) => setCertNote(e.target.value)} />
+                      <div className="mt-2 flex gap-2">
+                        <button className="btn-primary" onClick={() => submitCert(t.id, certFile, certNote)}>Submit &amp; complete</button>
+                        <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm" onClick={() => setCertFor(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+            {trainings.length === 0 ? <p className="text-sm text-slate-400">No training assigned yet.</p> : null}
+          </div>
+
+          <div className="mt-5 rounded-lg border border-dashed border-slate-300 p-3">
+            <div className="mb-2 text-sm font-medium text-slate-700">Add your own training / seminar</div>
+            <p className="mb-2 text-xs text-slate-500">Attended a seminar or course on your own? Add it here for points and your credentials record.</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input className="input" placeholder="Title *" value={selfT.title} onChange={(e) => setSelfT({ ...selfT, title: e.target.value })} />
+              <input className="input" placeholder="Provider / organizer" value={selfT.provider} onChange={(e) => setSelfT({ ...selfT, provider: e.target.value })} />
+              <div><label className="mb-1 block text-xs text-slate-500">Date</label><input type="date" className="input" value={selfT.date} onChange={(e) => setSelfT({ ...selfT, date: e.target.value })} /></div>
+              <div><label className="mb-1 block text-xs text-slate-500">Points</label><input type="number" className="input" placeholder="0" value={selfT.points} onChange={(e) => setSelfT({ ...selfT, points: e.target.value })} /></div>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input type="file" className="text-sm" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif" onChange={(e) => setSelfT({ ...selfT, file: e.target.files?.[0] || null })} />
+              <button className="btn-primary" onClick={addSelfTraining} disabled={!selfT.title}>Add to my credentials</button>
+            </div>
+          </div>
         </Section>
       ) : null}
 
