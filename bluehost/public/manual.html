@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
-<title>GEEK HRIS Employee Guide</title>
+<title>GEEK HRIS User Guide</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
 
@@ -274,12 +274,12 @@
       <div class="mark" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span><span class="s4"></span></div>
       <div class="wordmark"><span class="g1">G</span><span class="e1">E</span><span class="e2">E</span><span class="k1">K</span><span class="grp">GROUP</span></div>
     </div>
-    <h1 class="doc-title">Employee User Guide</h1>
-    <p class="doc-sub">Everything you need to sign in, view your records, and download your payslip on the GEEK Enterprise HRIS.</p>
+    <h1 class="doc-title">HRIS User Guide</h1>
+    <p class="doc-sub">One guide for everyone — signing in and self-service for staff, plus the HR, administrator, and superadmin tools on the GEEK Enterprise HRIS.</p>
     <div class="doc-meta">
-      <span><b>For:</b> All GEEK staff</span>
+      <span><b>For:</b> Staff · HR &amp; Admin · Superadmin</span>
       <span><b>System:</b> hris.exssi.com</span>
-      <span><b>Time to read:</b> ~6 minutes</span>
+      <span><b>Jump to your role:</b> use the contents below</span>
     </div>
   </div>
 </header>
@@ -287,20 +287,56 @@
 <main class="wrap">
 
   <section id="intro" style="padding-top:38px;">
-    <p class="lead">The HRIS is your personal window into your employment records. From any browser you can check your profile and government IDs, review your attendance, leave balances, benefits and assigned assets, generate your own payslip as a PDF, file leave, overtime, or cash-advance requests, and get notified the moment they're approved — all in one place, available anytime.</p>
+    <p class="lead">The HRIS runs entirely in the browser and serves three kinds of people. <strong>Staff</strong> view their own records, payslips and file requests. <strong>HR &amp; administrators</strong> manage people, payroll, leave, benefits, documents and the BIR forms. <strong>Superadmins</strong> look after the whole installation — email, backups, licensing, branding and the audit trail. Everyone signs in at the same address; what you can see is decided by your role, so you'll only ever be shown the parts that apply to you.</p>
 
     <nav class="toc no-print" aria-label="Contents">
-      <h4>In this guide</h4>
+      <h4>Everyone — getting started</h4>
       <ol>
-        <li><a href="#start">Getting started &amp; signing in</a></li>
+        <li><a href="#start">Signing in</a></li>
+        <li><a href="#forgot">Forgot your password</a></li>
         <li><a href="#password">Set your own password</a></li>
+        <li><a href="#security-basics">Sessions &amp; lockout</a></li>
+      </ol>
+    </nav>
+    <nav class="toc no-print" aria-label="Staff contents">
+      <h4>For staff</h4>
+      <ol>
         <li><a href="#selfservice">Your Self-Service area</a></li>
         <li><a href="#requests">Requests &amp; approvals</a></li>
         <li><a href="#payslip">Download your payslip</a></li>
         <li><a href="#contributions">Reading your contributions</a></li>
+      </ol>
+    </nav>
+    <nav class="toc no-print" aria-label="HR and admin contents">
+      <h4>For HR &amp; administrators</h4>
+      <ol>
+        <li><a href="#hr-people">People &amp; the 201 file</a></li>
+        <li><a href="#hr-leave">Leave credits &amp; benefits</a></li>
+        <li><a href="#hr-assets">Assets</a></li>
+        <li><a href="#hr-import">Bulk employee import</a></li>
+        <li><a href="#hr-payroll">Payroll &amp; 13th month</a></li>
+        <li><a href="#hr-bir">BIR forms</a></li>
+        <li><a href="#hr-reports">Reports &amp; export</a></li>
+        <li><a href="#hr-approvals">Approvals &amp; the digest</a></li>
+      </ol>
+    </nav>
+    <nav class="toc no-print" aria-label="Superadmin contents">
+      <h4>For superadmins</h4>
+      <ol>
+        <li><a href="#sa-email">Email delivery (SMTP)</a></li>
+        <li><a href="#sa-telegram">Telegram alerts</a></li>
+        <li><a href="#sa-branding">Branding</a></li>
+        <li><a href="#sa-backup">Backup &amp; migration</a></li>
+        <li><a href="#sa-license">License</a></li>
+        <li><a href="#sa-audit">Audit trail</a></li>
+        <li><a href="#sa-statutory">Statutory tables</a></li>
+      </ol>
+    </nav>
+    <nav class="toc no-print" aria-label="Reference contents">
+      <h4>Reference</h4>
+      <ol>
         <li><a href="#tips">Good to know</a></li>
         <li><a href="#trouble">Troubleshooting</a></li>
-        <li><a href="#admin">For HR &amp; administrators</a></li>
         <li><a href="#help">Getting help</a></li>
       </ol>
     </nav>
@@ -315,9 +351,20 @@
       <li><span class="st-title">Enter your details.</span><p>Type the <strong>Email</strong> and <strong>Password</strong> you were given, then click <strong>Sign in</strong>.</p></li>
       <li><span class="st-title">You're in.</span><p>Employees go straight to <strong>My Self-Service</strong>; if you belong to just one company you're taken right into it. That self-service menu on the left is your home base — everything about you lives there — and the <strong>🔔 bell</strong> at the top-right shows your notifications.</p></li>
     </ol>
-    <div class="note warn">
-      <span class="lbl">Automatic sign-out</span>
-      <p>For your security, the system signs you out after <strong>3 minutes of inactivity</strong> (no clicking or typing). If that happens you'll see a note on the login page — just sign in again. You can also sign out anytime with the <strong>Sign out</strong> link at the top right.</p>
+  </section>
+
+  <section id="forgot">
+    <div class="eyebrow">Can't get in</div>
+    <h2>Forgot your password</h2>
+    <p>You can reset your own password without waiting for HR — as long as your account uses a working email address.</p>
+    <ol class="steps">
+      <li><span class="st-title">Click "Forgot password?"</span><p>On the sign-in page, click the <strong>Forgot password?</strong> link, enter your work email, and click <strong>Send reset link</strong>.</p></li>
+      <li><span class="st-title">Open the email.</span><p>You'll get a message titled <em>Reset your GEEK HRIS password</em>. Click the link inside — it's valid for <strong>1 hour</strong> and works only once.</p></li>
+      <li><span class="st-title">Set a new password.</span><p>Type a new password (at least 8 characters) twice, then click <strong>Update password</strong> and sign in with it.</p></li>
+    </ol>
+    <div class="note">
+      <span class="lbl">Didn't get the email?</span>
+      <p>For your privacy the page always says "if that email exists, we've sent a link" — so it never reveals who has an account. Check your spam folder. If it still doesn't arrive, your account's email may be missing or wrong; ask HR to check it, or to reset your password for you.</p>
     </div>
   </section>
 
@@ -333,6 +380,20 @@
     <div class="note security">
       <span class="lbl">Keep it private</span>
       <p>Never share your password. GEEK staff will never ask you for it. Use something you don't reuse on other websites.</p>
+    </div>
+  </section>
+
+  <section id="security-basics">
+    <div class="eyebrow">Everyone</div>
+    <h2>Sessions &amp; lockout</h2>
+    <p>Two automatic safeguards protect your account. They're normal — here's what to expect.</p>
+    <div class="note warn">
+      <span class="lbl">Automatic sign-out</span>
+      <p>After <strong>3 minutes of inactivity</strong> (no clicking or typing) the system signs you out and shows a note on the login page — just sign in again. You can also sign out anytime with the <strong>Sign out</strong> link at the top right. On a shared computer, always sign out rather than only closing the tab.</p>
+    </div>
+    <div class="note security">
+      <span class="lbl">Too many wrong passwords</span>
+      <p>If a wrong password is entered <strong>5 times</strong> in a row for the same account, sign-in is <strong>locked for about 15 minutes</strong> as protection against guessing. Wait it out, or use <strong>Forgot password?</strong> to reset — a successful reset clears the lock.</p>
     </div>
   </section>
 
@@ -435,7 +496,8 @@
       <table>
         <thead><tr><th>What you see</th><th>What to do</th></tr></thead>
         <tbody>
-          <tr><td>Forgot your password</td><td>Contact HR or your administrator to reset it. You'll get a new temporary password to sign in, then set your own under Security.</td></tr>
+          <tr><td>Forgot your password</td><td>Use <strong>Forgot password?</strong> on the sign-in page to email yourself a reset link (valid 1 hour). If your account has no email on file, ask HR to reset it for you.</td></tr>
+          <tr><td>"Too many failed sign-in attempts"</td><td>The account is locked for ~15 minutes after 5 wrong passwords. Wait, or reset via Forgot password? — a successful reset clears the lock.</td></tr>
           <tr><td>"Signed out after 3 minutes of inactivity"</td><td>Normal security behavior. Just sign in again.</td></tr>
           <tr><td>"Invalid credentials" on sign-in</td><td>Check for typos and Caps Lock. Make sure you're using your work email exactly as given. Still stuck? Ask HR to confirm your account.</td></tr>
           <tr><td>No payslips listed</td><td>Payslips appear only once a payroll period is finalized. If one is overdue, ask HR.</td></tr>
@@ -446,32 +508,173 @@
     </div>
   </section>
 
-  <section id="admin">
-    <div class="eyebrow">For HR, managers &amp; administrators</div>
-    <h2>Beyond self-service</h2>
-    <p>If your role includes HR, payroll, or administration, you'll see additional menus. What appears depends on the permissions your administrator has granted — access is role-based, so not everyone sees every module.</p>
+  <hr class="div">
+
+  <section id="hr-people">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>People &amp; the 201 file</h2>
+    <p>Under <strong>People</strong> (and <strong>Consultants</strong>) you keep the records for your organization. Access is role-based, so you only see the modules your administrator has granted. Open a person with <strong>Edit</strong> to update their personal details, government IDs, bank, and engagement.</p>
+    <h3>Uploading documents (the 201 file)</h3>
+    <p>Each employee has a <strong>201 File</strong> section inside their Edit window for storing contracts, IDs, certificates and clearances.</p>
+    <ol class="steps">
+      <li><span class="st-title">Open the person.</span><p><strong>People → Edit</strong> on the employee, then scroll to <strong>201 File — Documents</strong>.</p></li>
+      <li><span class="st-title">Pick a category and file.</span><p>Choose a category (Contract, Government ID, Certificate, …), optionally give it a title, choose the file, and click <strong>Upload</strong>.</p></li>
+      <li><span class="st-title">Manage later.</span><p>Each document can be <strong>downloaded</strong> or <strong>deleted</strong>. Files are private — served only to signed-in users with document access, never public.</p></li>
+    </ol>
+    <div class="note warn">
+      <span class="lbl">Upload limit</span>
+      <p>Each file must be <strong>10 MB or smaller</strong>. Allowed types: PDF, images (PNG/JPG/…), Word, Excel, and text. Scan multi-page contracts to a single PDF and keep resolution reasonable to stay under the limit.</p>
+    </div>
+  </section>
+
+  <section id="hr-leave">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>Leave credits &amp; benefits</h2>
+    <p>Give each employee their leave entitlements and benefits, and add your own types when the defaults don't fit your organization.</p>
+    <div class="tabgrid">
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-red)"></span>Leave credits</div><p><strong>Leave &amp; Attendance</strong> → set the credited days per leave type for an employee. Approved leave is deducted from the balance automatically.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-blue)"></span>Custom leave types</div><p>Add types beyond the defaults (Vacation, Sick, Emergency, Birthday, Bereavement, Maternity, Paternity) with their own credit amounts.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-green)"></span>Benefits</div><p><strong>Benefits</strong> → record HMO/health and other coverage per employee, with provider, policy number and coverage amount.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>Beneficiaries</div><p>Attach beneficiaries to a benefit — name, relationship, % share and contact.</p></div>
+    </div>
+    <div class="note tip">
+      <span class="lbl">Only add what you use</span>
+      <p>Benefit and leave types are free-form. If your organization doesn't offer a particular benefit, simply don't add it — nothing is forced on every company.</p>
+    </div>
+  </section>
+
+  <section id="hr-assets">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>Assets</h2>
+    <p>Track company items (laptops, phones, etc.) from issue to return under <strong>Assets</strong>.</p>
     <ul class="adminlist">
-      <li><span class="m">People</span><span class="d">Employee and consultant records for your organization.</span></li>
-      <li><span class="m">Projects</span><span class="d">Projects with budgets, plus loans and cash-advance tracking.</span></li>
-      <li><span class="m">Payroll</span><span class="d">Prepare, review, and finalize payroll runs.</span></li>
-      <li><span class="m">13th Month &amp; Bonuses</span><span class="d">Special-pay runs, processed in bulk.</span></li>
-      <li><span class="m">Loans &amp; Advances</span><span class="d">Issue and manage company loans and cash advances, and approve employee requests.</span></li>
-      <li><span class="m">Leave &amp; Attendance</span><span class="d">Attendance uploads (CSV / biometric / API), leave and overtime approvals, and leave types &amp; credits.</span></li>
-      <li><span class="m">Benefits</span><span class="d">Record benefits (HMO / health, etc.) per employee, with beneficiaries.</span></li>
-      <li><span class="m">Assets</span><span class="d">Company assets — issue, edit, return or reassign (with remarks), and bulk-return on separation.</span></li>
-      <li><span class="m">Recruitment</span><span class="d">Staffing requisitions with placement, timeline, and budget.</span></li>
-      <li><span class="m">HR Modules</span><span class="d">Performance, training, tickets, and lifecycle checklists.</span></li>
-      <li><span class="m">Reports</span><span class="d">Reports by staff, period, project, or organization.</span></li>
-      <li><span class="m">Org Setup</span><span class="d">Departments and positions for an organization.</span></li>
-      <li><span class="m">Administration</span><span class="d">Organizations, Users (including linking a login to an employee record), and Roles &amp; Scopes.</span></li>
-      <li><span class="m">Branding</span><span class="d">Superadmin: upload your own logo to replace the GEEK logo. Best as a transparent <strong>PNG</strong>, about <strong>400 × 120 px</strong> (wide) and up to 2 MB.</span></li>
-      <li><span class="m">Notifications</span><span class="d">Set up free Telegram alerts and the daily pending-approvals digest.</span></li>
-      <li><span class="m">Backup &amp; Migration</span><span class="d">Download a full backup, schedule automatic backups, or move to a new host.</span></li>
-      <li><span class="m">License</span><span class="d">Activate the installation with its license key.</span></li>
+      <li><span class="m">Issue</span><span class="d">Assign an item to an employee with its serial number, condition and issue date.</span></li>
+      <li><span class="m">Return / reassign</span><span class="d">Record a return or move an item to another person — with remarks and the condition on return.</span></li>
+      <li><span class="m">On separation</span><span class="d">When someone resigns, record returned assets so there's a clear history for future reference.</span></li>
+    </ul>
+    <p>Employees can see every item issued to them (and what they've returned) from <strong>My Self-Service → Assets</strong>.</p>
+  </section>
+
+  <section id="hr-import">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>Bulk employee import</h2>
+    <p>Onboarding many people at once? Import them from a spreadsheet instead of typing each one.</p>
+    <ol class="steps">
+      <li><span class="st-title">Download the template.</span><p>On the <strong>People</strong> page click <strong>Template</strong> to get the CSV with the correct column headers.</p></li>
+      <li><span class="st-title">Fill it in.</span><p>Add one row per person (name, email, employee number, engagement type, rate, dates, government IDs, …). Keep the header row unchanged.</p></li>
+      <li><span class="st-title">Import.</span><p>Click <strong>Import CSV</strong> and choose your file. New people and their engagements are created; the result reports how many were added and flags any rows that need fixing.</p></li>
+    </ol>
+  </section>
+
+  <section id="hr-payroll">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>Payroll &amp; 13th month</h2>
+    <p>Run payroll under <strong>Payroll</strong>: prepare a run for a period, compute it, review each person, then finalize. Finalized runs produce payslips staff can download themselves, and feed every downstream figure — reports, contributions, and the BIR forms.</p>
+    <ul class="adminlist">
+      <li><span class="m">13th Month &amp; Bonuses</span><span class="d">Process special-pay runs in bulk; amounts can be overridden per person before finalizing.</span></li>
+      <li><span class="m">Loans &amp; Advances</span><span class="d">Issue company loans/advances and approve employee requests; balances deduct through payroll.</span></li>
+      <li><span class="m">Statutory deductions</span><span class="d">SSS, PhilHealth, Pag-IBIG and BIR withholding are computed automatically using the current (2025) tables.</span></li>
     </ul>
   </section>
 
+  <section id="hr-bir">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>BIR forms</h2>
+    <p>The <strong>BIR Forms</strong> page turns your posted payroll into print-ready working copies of the main withholding forms. Pick a form tab, choose the period (or payee), review and adjust the figures, then generate.</p>
+    <div class="tabgrid">
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-blue)"></span>1601-C</div><p>Monthly compensation withholding. Pick a month, untick anyone who shouldn't be included, edit amounts, then generate the return with the monthly total.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-green)"></span>0619-E</div><p>Monthly expanded withholding for consultants — the same editable worksheet, generating the monthly EWT total.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>2307</div><p>Per-payee certificate for professional fees. Choose the consultant, the <strong>5% or 10%</strong> rate, the months to certify, and the nature of payment.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-red)"></span>2316</div><p>Annual compensation certificate per employee — all figures editable before you generate.</p></div>
+    </div>
+    <p>Each form opens in a new tab with a <strong>Print / Save as PDF</strong> button. The <strong>period totals</strong> to remit are also available in <strong>Reports</strong> as the <em>BIR 1601-C</em> and <em>BIR EWT</em> datasets.</p>
+    <div class="note warn">
+      <span class="lbl">Working copies, not the official PDF</span>
+      <p>These mirror the official form's fields for your review — they are <strong>not</strong> the official BIR PDF. File and pay the actual return through <strong>eBIRForms</strong> or <strong>eFPS</strong> using the figures shown.</p>
+    </div>
+  </section>
+
+  <section id="hr-reports">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>Reports &amp; export</h2>
+    <p>Under <strong>Reports</strong> pick a dataset — employees, payroll (by period or project), statutory contributions, leave, attendance, benefits, assets, 13th month, or the BIR period totals — filter and sort it, then <strong>export</strong> to <strong>Excel (.xlsx)</strong>, CSV, or a print-ready PDF.</p>
+  </section>
+
+  <section id="hr-approvals">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>Approvals &amp; the daily digest</h2>
+    <p>When staff file leave, overtime, or loan requests, approvers are alerted right away by email, the in-app <strong>🔔 bell</strong>, and Telegram (if connected). A single approval by <strong>either the Department Head or HR</strong> decides a request, and the employee is notified of the outcome.</p>
+    <div class="note tip">
+      <span class="lbl">Daily digest</span>
+      <p>In <strong>Administration → Notifications</strong>, superadmins can switch on a <strong>daily digest</strong> — once a day each organization's approvers get one email/Telegram summary of everything still pending, only when there's something to act on. Set the time and toggle it on or off there.</p>
+    </div>
+  </section>
+
   <hr class="div">
+
+  <section id="sa-email">
+    <div class="eyebrow">For superadmins</div>
+    <h2>Email delivery (SMTP)</h2>
+    <p>Email powers password resets, approval alerts and the daily digest. Set it up once in <strong>Administration → Notifications → Email delivery</strong>.</p>
+    <ol class="steps">
+      <li><span class="st-title">Choose SMTP.</span><p>Select <strong>SMTP mailbox (recommended)</strong> over the server default for reliable delivery.</p></li>
+      <li><span class="st-title">Enter your mailbox.</span><p>Host, port and encryption (e.g. <span class="url">hris.exssi.com</span> · port 465 · SSL, or <span class="url">localhost</span> · 587 · STARTTLS), the full email as username, the mailbox password, and the From address/name.</p></li>
+      <li><span class="st-title">Send a test.</span><p>Use <strong>Send test</strong> to confirm it arrives, then <strong>Save</strong>.</p></li>
+    </ol>
+    <div class="note security">
+      <span class="lbl">The password stays on your server</span>
+      <p>The SMTP password is stored in a protected file on your own server and is <strong>never shown again</strong> in the app. Leave the password field blank when editing other settings to keep the saved one.</p>
+    </div>
+    <div class="note warn">
+      <span class="lbl">Delivery to Gmail / external providers</span>
+      <p>"Sent" means your server accepted the mail. For Gmail, Outlook and Yahoo to actually accept it, your domain needs <strong>SPF, DKIM and DMARC</strong> records (cPanel → <strong>Email Deliverability</strong>). Mail to your own domain works without them.</p>
+    </div>
+  </section>
+
+  <section id="sa-telegram">
+    <div class="eyebrow">For superadmins</div>
+    <h2>Telegram alerts</h2>
+    <p>Give staff optional phone alerts through a free Telegram bot. In <strong>Administration → Notifications</strong>, create a bot with <span class="url">@BotFather</span>, paste its token and connect — the webhook registers automatically. Staff then link themselves once via <strong>My Self-Service → Security → Connect Telegram</strong>. Everyone still gets email and the in-app bell regardless.</p>
+  </section>
+
+  <section id="sa-branding">
+    <div class="eyebrow">For superadmins</div>
+    <h2>Branding</h2>
+    <p>In <strong>Administration → Branding</strong> you can replace the GEEK logo and app name with your own. Best results with a transparent <strong>PNG</strong>, about <strong>400 × 120 px</strong> (wide), up to 2 MB.</p>
+  </section>
+
+  <section id="sa-backup">
+    <div class="eyebrow">For superadmins</div>
+    <h2>Backup &amp; migration</h2>
+    <p>Under <strong>Administration → Backup &amp; Migration</strong> you can download a full backup ZIP (database + files) at any time, <strong>schedule automatic backups</strong> at a preferred time, and produce a migration package for moving to another host.</p>
+    <div class="note tip">
+      <span class="lbl">Scheduled backups</span>
+      <p>Turn on automatic backups and set the hour (e.g. midnight). This needs the one-time hourly <strong>cron job</strong> shown on the page added in cPanel — the app then decides when to run.</p>
+    </div>
+  </section>
+
+  <section id="sa-license">
+    <div class="eyebrow">For superadmins</div>
+    <h2>License</h2>
+    <p><strong>Administration → License</strong> shows your edition and user cap and lets you paste a license key to activate the installation. If a key is required and missing, an activation banner appears until a valid key is entered.</p>
+  </section>
+
+  <section id="sa-audit">
+    <div class="eyebrow">For superadmins &amp; auditors</div>
+    <h2>Audit trail</h2>
+    <p><strong>Administration → Audit Trail</strong> records every significant action — sign-ins, approvals, edits, uploads — with who did it, when, and from which IP. Anyone with the audit permission (e.g. the Auditor role) can read it.</p>
+    <ul class="adminlist">
+      <li><span class="m">Filter</span><span class="d">Search by email or entity, and narrow by action, organization, and date range.</span></li>
+      <li><span class="m">Details</span><span class="d">Open an entry's <em>details</em> to see the before/after of a change.</span></li>
+      <li><span class="m">Clear logs</span><span class="d">Superadmins can clear the trail — everything, or only entries on/before a chosen date. The clear itself is recorded.</span></li>
+    </ul>
+  </section>
+
+  <section id="sa-statutory">
+    <div class="eyebrow">For superadmins</div>
+    <h2>Statutory tables</h2>
+    <p>Payroll uses the official Philippine 2025 tables: <strong>SSS</strong> 15% total (employee 5%, MSC ₱5,000–₱35,000), <strong>PhilHealth</strong> 5% (₱10,000–₱100,000), <strong>Pag-IBIG</strong> 2% (max ₱200), and the <strong>BIR TRAIN</strong> monthly withholding brackets. These are effective-dated, so past payroll keeps the rates that applied then. Always verify against the latest official circulars when they change.</p>
+  </section>
 
   <section id="help" style="padding-top:34px;">
     <div class="eyebrow">Getting help</div>
@@ -493,7 +696,7 @@
       <div class="mark" aria-hidden="true"><span class="s1"></span><span class="s2"></span><span class="s3"></span><span class="s4"></span></div>
       <div class="wordmark"><span class="g1">G</span><span class="e1">E</span><span class="e2">E</span><span class="k1">K</span><span class="grp">GROUP</span></div>
     </div>
-    GEEK Group · Enterprise HRIS — Employee User Guide. Your records are private to you; treat your sign-in like you would your ATM PIN.
+    GEEK Group · Enterprise HRIS — User Guide (Staff · HR &amp; Admin · Superadmin). Your records are private to you; treat your sign-in like you would your ATM PIN.
   </div>
 </footer>
 
