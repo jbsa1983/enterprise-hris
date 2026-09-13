@@ -1,0 +1,70 @@
+========================================================================
+  GEEK ENTERPRISE HRIS  —  START HERE
+  Multi-company Philippine payroll & HR  ·  self-hosted
+========================================================================
+
+Thank you for choosing GEEK Enterprise HRIS. This package contains
+everything you need to install and run the system on your own web
+hosting (cPanel / PHP 8 / MySQL 8).
+
+
+WHAT'S IN THIS PACKAGE
+------------------------------------------------------------------------
+  GEEK-HRIS-application.zip     The software to install. Upload and
+                                extract THIS into your subdomain folder.
+
+  documentation/
+    Installation-Guide.pdf      Step-by-step setup (start here).
+    User-Guide.pdf              For staff, HR/admin and superadmin.
+    Product-Brochure.pdf        Feature overview and specifications.
+
+  START-HERE.txt                This file.
+
+
+QUICK PATH (about 20-30 minutes)
+------------------------------------------------------------------------
+  1. Open  documentation/Installation-Guide.pdf  and follow it.
+        - Create a subdomain (e.g. hris.yourcompany.com)
+        - Create a MySQL database and user
+        - Upload GEEK-HRIS-application.zip into the subdomain folder,
+          then Extract it there
+        - Import the database (db/schema.sql) and seed it
+        - Copy app/settings.sample.php to app/settings.php and fill in
+          your database details
+        - Turn on free SSL (HTTPS)
+
+  2. Sign in as the administrator and change the password.
+
+  3. ACTIVATE YOUR LICENSE
+        - Go to  Administration -> License
+        - It shows your installation's domain
+        - Click "Request key by email" (or email us yourself) to:
+
+              geekhris@exssi.com
+
+          Include: your domain, company name, edition
+          (Starter / Business / Enterprise) and number of employees.
+        - We reply with your activation key. Paste it and click
+          Activate. The app is then fully unlocked.
+
+     NOTE: License keys are locked to your exact domain, so request the
+     key AFTER your site is live on its final domain.
+
+
+EDITIONS
+------------------------------------------------------------------------
+  Starter      up to 50 employees
+  Business     51 - 100 employees
+  Enterprise   101 - 300 employees
+  (Beyond 300, we recommend a VPS / dedicated server.)
+
+
+SUPPORT
+------------------------------------------------------------------------
+  GEEK Team
+  Phone:  +63 917 891 7232
+  Sales:  geekhris_sales@exssi.com
+  License / activation:  geekhris@exssi.com
+
+  You own the software and your data. No monthly SaaS fees.
+========================================================================

@@ -127,7 +127,7 @@
 
     <div class="note tip">
       <span class="lbl">Before you start — have these ready</span>
-      <p>① Access to your hosting <strong>cPanel</strong>. ② The <strong>application package</strong> ZIP. ③ A subdomain name you want (e.g. <span class="url">hris.yourdomain.com</span>). ④ Your <strong>license key</strong> (if your copy requires activation).</p>
+      <p>① Access to your hosting <strong>cPanel</strong>. ② The <strong>application package</strong> ZIP. ③ A subdomain name you want (e.g. <span class="url">hris.yourdomain.com</span>). You'll request your <strong>license key</strong> after installing, by email to <span class="url">geekhris@exssi.com</span> (Step 8).</p>
     </div>
 
     <nav class="toc no-print" aria-label="Contents">
@@ -245,12 +245,17 @@ php db/seed.php --minimal</div>
   <section id="activate">
     <div class="eyebrow"><span class="num">Step 8</span> License</div>
     <h2>Activate the license</h2>
-    <p>If your copy requires activation, you'll see an amber <strong>“not activated”</strong> banner after signing in.</p>
+    <p>If your copy requires activation, you'll see an amber <strong>“not activated”</strong> banner after signing in. A key is issued for your <strong>exact domain</strong>, so you request it <em>after</em> installing — once your domain is live.</p>
     <ol class="steps">
       <li><span class="st-title">Sign in as the administrator.</span></li>
-      <li><span class="st-title">Open Administration → License.</span></li>
-      <li><span class="st-title">Paste your key and click Activate.</span><p>The key is issued for this exact domain; once accepted the banner disappears and the app is fully unlocked.</p></li>
+      <li><span class="st-title">Open Administration → License.</span><p>The page shows this installation's domain (e.g. <span class="url">hris.yourdomain.com</span>).</p></li>
+      <li><span class="st-title">Request your key.</span><p>Click <strong>Request key by email</strong> — it opens a message to <span class="url">geekhris@exssi.com</span> pre-filled with your domain. Or email <span class="url">geekhris@exssi.com</span> yourself with your <strong>domain, company name, edition and employee count</strong>. The GEEK Team replies with your activation key.</p></li>
+      <li><span class="st-title">Paste your key and click Activate.</span><p>Once accepted the banner disappears and the app is fully unlocked.</p></li>
     </ol>
+    <div class="note">
+      <span class="lbl">Requesting a license key</span>
+      <p>Send your request to <strong>geekhris@exssi.com</strong> with the domain shown on the License page. Keys are domain-locked and may carry an expiry, so use the exact domain you installed on.</p>
+    </div>
     <div class="note">
       <span class="lbl">No banner?</span>
       <p>Then activation isn't required for this installation — you're ready to go.</p>
