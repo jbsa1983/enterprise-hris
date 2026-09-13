@@ -39,7 +39,7 @@ class PayslipService
             'obligations' => $obl,
             'run_reference' => $run['reference'],
             'rule_versions' => json_decode($run['rule_version_snapshot'] ?: '{}', true),
-            'prototype_notice' => 'PROTOTYPE — statutory values are illustrative, not authoritative.',
+            'prototype_notice' => 'Statutory contributions computed using the 2025 SSS, PhilHealth, Pag-IBIG and BIR (TRAIN) withholding tables. Verify against the latest official circulars.',
         ];
     }
 
@@ -135,7 +135,7 @@ class PayslipService
           . ($oblRows ? '<table class="amt"><tr><th>Description</th><th class="n">Original</th><th class="n">This Period</th><th class="n">Total Paid</th><th class="n">Remaining</th><th class="n">Inst. Left</th></tr>' . $oblRows
              . '<tr><td colspan="4"><b>Total Outstanding</b></td><td class="n"><b>' . self::money($snap['obligations']['total_outstanding']) . '</b></td><td></td></tr></table>'
              : '<div class="sub">No outstanding obligations as of this period.</div>')
-          . '<div class="notice">' . htmlspecialchars($snap['prototype_notice']) . '</div>
-          </body></html>';
+          . (!empty($snap['prototype_notice']) ? '<div class="notice">' . htmlspecialchars($snap['prototype_notice']) . '</div>' : '')
+          . '</body></html>';
     }
 }

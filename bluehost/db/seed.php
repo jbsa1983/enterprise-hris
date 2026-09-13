@@ -59,9 +59,12 @@ $adminId = Database::insert('users', [
 Database::insert('user_roles', ['user_id' => $adminId, 'role_id' => $roleId['Super Admin']]);
 echo "[seed] Superadmin: $adminEmail\n";
 
-// --- Statutory rules (illustrative prototype values) -------------------------
+// --- Statutory rules (official PH 2025 values) -------------------------------
+// SSS 2025: 15% total (EE 5%, ER 10%), MSC ₱5,000–₱35,000.
+// PhilHealth: 5% total (EE 2.5%), ₱10,000–₱100,000. Pag-IBIG: 2%, max ₱200.
+// BIR: TRAIN monthly withholding brackets (effective 2023, current for 2025).
 $stat = [
-    ['SSS', ['employee_rate' => 0.045, 'msc_cap' => 30000]],
+    ['SSS', ['employee_rate' => 0.05, 'employer_rate' => 0.10, 'msc_floor' => 5000, 'msc_cap' => 35000]],
     ['PHIC', ['employee_rate' => 0.025, 'salary_cap' => 100000, 'floor' => 10000]],
     ['HDMF', ['employee_rate' => 0.02, 'contribution_cap' => 200]],
     ['BIR', ['brackets' => [[0, 0, 0], [20833, 0, 0.15], [33333, 1875, 0.20], [66667, 8541.80, 0.25],
@@ -69,12 +72,12 @@ $stat = [
 ];
 foreach ($stat as [$name, $params]) {
     Database::insert('statutory_rule_sets', [
-        'rule_name' => $name, 'rule_version' => 'PROTO-2024.1', 'effective_from' => '2024-01-01',
-        'is_prototype_data' => 1, 'parameters_json' => json_encode($params),
-        'notes' => 'Prototype value — validate before real payroll.',
+        'rule_name' => $name, 'rule_version' => '2025.1', 'effective_from' => '2025-01-01',
+        'is_prototype_data' => 0, 'parameters_json' => json_encode($params),
+        'notes' => 'Official PH 2025 values — verify against the latest circulars.',
     ]);
 }
-echo "[seed] statutory rule sets (PROTOTYPE)\n";
+echo "[seed] statutory rule sets (2025)\n";
 
 if ($minimal) {
     $pdo->commit();
@@ -111,7 +114,7 @@ foreach ($orgs as $oi => $oid) {
         'frequency' => 'MONTHLY', 'period_start' => date('Y-m-01'), 'period_end' => date('Y-m-t'), 'pay_date' => date('Y-m-t')]);
     $run = Database::insert('payroll_runs', ['uuid' => uuid(), 'organization_id' => $oid, 'period_id' => $period,
         'reference' => 'RUN-' . date('Ym'), 'status' => 'APPROVED',
-        'rule_version_snapshot' => json_encode(['SSS' => 'PROTO-2024.1', 'PHIC' => 'PROTO-2024.1', 'HDMF' => 'PROTO-2024.1', 'BIR' => 'PROTO-2024.1'])]);
+        'rule_version_snapshot' => json_encode(['SSS' => '2025.1', 'PHIC' => '2025.1', 'HDMF' => '2025.1', 'BIR' => '2025.1'])]);
     // Bank export template (BDO CSV) for this org.
     $tplId = Database::insert('bank_export_templates', ['uuid' => uuid(), 'organization_id' => $oid,
         'template_name' => 'BDO Payroll Corporate', 'bank_name' => 'BDO', 'file_type' => 'CSV', 'delimiter' => ',',
@@ -147,7 +150,7 @@ foreach ($orgs as $oi => $oid) {
         if ($isCon) {
             $ded = ['withholding_tax_ewt' => round($gross * 0.10, 2)];
         } else {
-            $s = round(min($base, $sss['msc_cap']) * $sss['employee_rate'], 2);
+            $s = round(max(min($base, $sss['msc_cap']), $sss['msc_floor'] ?? 0) * $sss['employee_rate'], 2);
             $ph = round(max(min($base, $phic['salary_cap']), $phic['floor']) * $phic['employee_rate'], 2);
             $hd = round(min($base * $hdmf['employee_rate'], $hdmf['contribution_cap']), 2);
             $taxable = max($gross - ($s + $ph + $hd), 0);

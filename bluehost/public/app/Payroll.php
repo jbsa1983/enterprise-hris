@@ -68,7 +68,7 @@ class Payroll
             $phic = self::resolveRule('PHIC', $onDate);
             $hdmf = self::resolveRule('HDMF', $onDate);
             $bir = self::resolveRule('BIR', $onDate);
-            $s = $sss ? self::r2(min($monthly, $sss['msc_cap']) * $sss['employee_rate']) : 0;
+            $s = $sss ? self::r2(max(min($monthly, $sss['msc_cap']), $sss['msc_floor'] ?? 0) * $sss['employee_rate']) : 0;
             $ph = $phic ? self::r2(max(min($monthly, $phic['salary_cap']), $phic['floor']) * $phic['employee_rate']) : 0;
             $hd = $hdmf ? self::r2(min($monthly * $hdmf['employee_rate'], $hdmf['contribution_cap'])) : 0;
             $taxable = max($gross - ($s + $ph + $hd), 0);
