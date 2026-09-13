@@ -12,6 +12,7 @@ class OrgStructureController
         $r->post("$b/positions", [self::class, 'createPosition']);
         $r->put("$b/positions/{id}", [self::class, 'updatePosition']);
         $r->delete("$b/positions/{id}", [self::class, 'deletePosition']);
+        $r->post("$b/setup/copy-to", [self::class, 'copyTo']);
         $r->get("$b/cost-centers", [self::class, 'listCostCenters']);
         $r->post("$b/cost-centers", [self::class, 'createCostCenter']);
     }
@@ -79,5 +80,60 @@ class OrgStructureController
     {
         [, $o] = Auth::org($p, 'organization.manage'); $b = Http::body();
         Http::json(['id' => Database::insert('cost_centers', ['organization_id' => $o, 'code' => $b['code'], 'name' => $b['name']])]);
+    }
+
+    /** Copy this org's structure (departments, positions, cost centers) to another
+     *  organization. Skips items already present (by name/title/code) so it's safe
+     *  to re-run, and remaps department parents and each position's department. */
+    public static function copyTo(array $p): void
+    {
+        [$u, $src] = Auth::org($p, 'organization.manage');
+        $b = Http::body();
+        $tgt = (int) ($b['target_organization_id'] ?? 0);
+        if (!$tgt || $tgt === $src) throw new HttpError('Choose a different destination organization', 422);
+        Auth::requireOrg($u, $tgt);
+        if (!Database::one('SELECT id FROM organizations WHERE id = ?', [$tgt])) throw new HttpError('Destination organization not found', 404);
+        $withPos = ($b['include_positions'] ?? true) ? true : false;
+        $withCc = ($b['include_cost_centers'] ?? true) ? true : false;
+
+        // Departments — map source dept id -> target dept id (existing or newly copied).
+        $existLower = []; foreach (Database::all('SELECT id, LOWER(name) n FROM departments WHERE organization_id = ?', [$tgt]) as $r) $existLower[$r['n']] = (int) $r['id'];
+        $srcDepts = Database::all('SELECT * FROM departments WHERE organization_id = ?', [$src]);
+        $map = []; $deptsAdded = 0;
+        foreach ($srcDepts as $d) {
+            $key = strtolower($d['name']);
+            if (isset($existLower[$key])) { $map[(int) $d['id']] = $existLower[$key]; continue; }
+            $map[(int) $d['id']] = Database::insert('departments', ['organization_id' => $tgt, 'name' => $d['name'], 'code' => $d['code'], 'parent_id' => null]);
+            $deptsAdded++;
+        }
+        foreach ($srcDepts as $d) {
+            if ($d['parent_id'] && isset($map[(int) $d['id']], $map[(int) $d['parent_id']]))
+                Database::update('departments', $map[(int) $d['id']], ['parent_id' => $map[(int) $d['parent_id']]]);
+        }
+
+        $posAdded = 0;
+        if ($withPos) {
+            $existPos = []; foreach (Database::all('SELECT LOWER(title) t FROM positions WHERE organization_id = ?', [$tgt]) as $r) $existPos[$r['t']] = true;
+            foreach (Database::all('SELECT * FROM positions WHERE organization_id = ?', [$src]) as $pos) {
+                if (isset($existPos[strtolower($pos['title'])])) continue;
+                $did = ($pos['department_id'] && isset($map[(int) $pos['department_id']])) ? $map[(int) $pos['department_id']] : null;
+                Database::insert('positions', ['organization_id' => $tgt, 'title' => $pos['title'], 'job_grade' => $pos['job_grade'], 'department_id' => $did]);
+                $posAdded++;
+            }
+        }
+
+        $ccAdded = 0;
+        if ($withCc) {
+            $existCc = []; foreach (Database::all('SELECT LOWER(code) c FROM cost_centers WHERE organization_id = ?', [$tgt]) as $r) $existCc[$r['c']] = true;
+            foreach (Database::all('SELECT * FROM cost_centers WHERE organization_id = ?', [$src]) as $cc) {
+                if (isset($existCc[strtolower($cc['code'])])) continue;
+                Database::insert('cost_centers', ['organization_id' => $tgt, 'code' => $cc['code'], 'name' => $cc['name']]);
+                $ccAdded++;
+            }
+        }
+
+        Audit::record('org.setup_copy', $u, ['organization_id' => $src, 'entity' => 'organization', 'entity_id' => $tgt,
+            'after' => ['to' => $tgt, 'departments' => $deptsAdded, 'positions' => $posAdded, 'cost_centers' => $ccAdded]]);
+        Http::json(['departments' => $deptsAdded, 'positions' => $posAdded, 'cost_centers' => $ccAdded]);
     }
 }

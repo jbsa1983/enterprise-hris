@@ -10,12 +10,33 @@ export default function OrgSetup() {
   const [dForm, setDForm] = useState({ name: "", code: "" });
   const [pForm, setPForm] = useState<any>({ title: "", job_grade: "", department_id: "" });
   const [err, setErr] = useState("");
+  const [orgs, setOrgs] = useState<{ id: number; name: string }[]>([]);
+  const [copyTgt, setCopyTgt] = useState("");
+  const [incPos, setIncPos] = useState(true);
+  const [incCc, setIncCc] = useState(true);
+  const [copyMsg, setCopyMsg] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
     apiFetch(`/organizations/${orgId}/departments`).then(setDepts).catch((e) => setErr(e.message));
     apiFetch(`/organizations/${orgId}/positions`).then(setPositions).catch(() => {});
+    apiFetch<{ id: number; name: string }[]>("/organizations").then(setOrgs).catch(() => {});
   }, [orgId]);
   useEffect(load, [load]);
+
+  async function copySetup() {
+    if (!copyTgt) return;
+    const name = orgs.find((o) => o.id === Number(copyTgt))?.name || "the selected organization";
+    if (!window.confirm(`Copy this organization's departments${incPos ? ", positions" : ""}${incCc ? ", cost centers" : ""} to ${name}? Existing items there are kept (duplicates skipped).`)) return;
+    setBusy(true); setErr(""); setCopyMsg("");
+    try {
+      const r = await apiFetch<{ departments: number; positions: number; cost_centers: number }>(`/organizations/${orgId}/setup/copy-to`, {
+        method: "POST", body: JSON.stringify({ target_organization_id: Number(copyTgt), include_positions: incPos, include_cost_centers: incCc }),
+      });
+      setCopyMsg(`Copied to ${name}: ${r.departments} department(s), ${r.positions} position(s), ${r.cost_centers} cost center(s).`);
+      setCopyTgt("");
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  }
 
   async function addDept() {
     if (!dForm.name) return;
@@ -45,6 +66,23 @@ export default function OrgSetup() {
       <h1 className="mb-1 text-lg font-semibold text-slate-900">Organization Setup</h1>
       <p className="mb-4 text-sm text-slate-500">Define departments and positions before adding people.</p>
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
+      {copyMsg ? <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{copyMsg}</div> : null}
+
+      {orgs.filter((o) => o.id !== orgId).length > 0 ? (
+        <div className="card mb-6 border-l-4 border-geek-blue">
+          <div className="mb-1 text-sm font-medium text-slate-700">Copy this setup to another organization</div>
+          <p className="mb-3 text-sm text-slate-500">Reuse these departments, positions and cost centers in another company instead of re-entering them. Items already there are skipped, so it's safe to run again.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <select className="input max-w-[240px]" value={copyTgt} onChange={(e) => setCopyTgt(e.target.value)}>
+              <option value="">Copy to…</option>
+              {orgs.filter((o) => o.id !== orgId).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+            <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={incPos} onChange={(e) => setIncPos(e.target.checked)} /> Positions</label>
+            <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={incCc} onChange={(e) => setIncCc(e.target.checked)} /> Cost centers</label>
+            <button className="btn-primary" disabled={busy || !copyTgt} onClick={copySetup}>{busy ? "Copying…" : "Copy setup"}</button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Departments */}
