@@ -105,9 +105,10 @@ class Mailer
         if (!$ok($cmd("RCPT TO:<$to>"), [250, 251])) return $fail('Recipient rejected');
         if (!$ok($cmd("DATA"), 354)) return $fail('DATA command rejected');
 
+        $messageId = '<' . bin2hex(random_bytes(16)) . '@' . self::host() . '>';
         $headers = "From: " . self::encodeHeader(self::fromName()) . " <$from>\r\n"
-            . "To: <$to>\r\n" . "Subject: " . self::encodeHeader($subject) . "\r\n"
-            . "Date: " . date('r') . "\r\n" . "MIME-Version: 1.0\r\n"
+            . "To: <$to>\r\n" . "Reply-To: $from\r\n" . "Subject: " . self::encodeHeader($subject) . "\r\n"
+            . "Date: " . date('r') . "\r\n" . "Message-ID: $messageId\r\n" . "MIME-Version: 1.0\r\n"
             . "Content-Type: text/plain; charset=UTF-8\r\n";
         $data = str_replace("\n", "\r\n", str_replace("\r\n", "\n", $body));
         $data = preg_replace('/^\./m', '..', $data);   // dot-stuffing
