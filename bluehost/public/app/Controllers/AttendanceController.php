@@ -232,13 +232,17 @@ class AttendanceController
         $eng = (int) ($b['engagement_id'] ?? 0);
         $type = trim((string) ($b['leave_type'] ?? ''));
         if (!$eng || $type === '') throw new HttpError('engagement_id and leave_type are required', 422);
-        $credits = (float) ($b['credits'] ?? 0);
-        $existing = Database::one('SELECT id, used FROM leave_balances WHERE organization_id = ? AND engagement_id = ? AND leave_type = ?', [$o, $eng, $type]);
+        $existing = Database::one('SELECT id FROM leave_balances WHERE organization_id = ? AND engagement_id = ? AND leave_type = ?', [$o, $eng, $type]);
         if ($existing) {
-            $data = ['credits' => $credits];
-            if (isset($b['used'])) $data['used'] = (float) $b['used'];
-            Database::update('leave_balances', (int) $existing['id'], $data);
+            // Partial update: set only the field(s) sent, so editing "used" (already-taken
+            // days at go-live) doesn't overwrite credits, and vice versa.
+            $data = [];
+            if (array_key_exists('credits', $b)) $data['credits'] = (float) $b['credits'];
+            if (array_key_exists('used', $b)) $data['used'] = (float) $b['used'];
+            if ($data) Database::update('leave_balances', (int) $existing['id'], $data);
         } else {
+            $credits = array_key_exists('credits', $b) ? (float) $b['credits']
+                : (float) (Database::scalar('SELECT default_credits FROM leave_types WHERE organization_id = ? AND name = ? LIMIT 1', [$o, $type]) ?? 0);
             Database::insert('leave_balances', ['organization_id' => $o, 'engagement_id' => $eng, 'leave_type' => $type,
                 'credits' => $credits, 'used' => (float) ($b['used'] ?? 0)]);
         }

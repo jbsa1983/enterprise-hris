@@ -56,15 +56,25 @@ class LoansController
     public static function create(array $p): void
     {
         [$u, $o] = Auth::org($p, 'loan.create'); $b = Http::body();
-        $principal = (float) ($b['principal'] ?? 0); $interest = (float) ($b['interest'] ?? 0); $total = $principal + $interest;
+        $principal = (float) ($b['principal'] ?? 0); $interest = (float) ($b['interest'] ?? 0); $total = round($principal + $interest, 2);
+        // Opening balance: for loans that already existed before go-live, HR can enter
+        // how much was already paid and the original (back-dated) start date.
+        $paid = max((float) ($b['amount_paid'] ?? 0), 0);
+        if ($paid > $total) $paid = $total;
+        $balance = round($total - $paid, 2);
+        $startDate = trim((string) ($b['start_date'] ?? '')) ?: date('Y-m-d');
+        $status = $balance <= 0.005 ? 'PAID' : 'ACTIVE';
         $id = Database::insert('loans', ['uuid' => Util::uuid(), 'organization_id' => $o, 'person_id' => (int) $b['person_id'],
             'engagement_id' => $b['engagement_id'] ?? null, 'obligation_type' => $b['obligation_type'] ?? 'COMPANY_LOAN',
             'reference_number' => $b['reference_number'] ?? null, 'description' => $b['description'] ?? null,
-            'principal' => $principal, 'interest' => $interest, 'total_amount' => $total, 'amount_paid' => 0, 'balance' => $total,
-            'installment_amount' => (float) ($b['installment_amount'] ?? 0), 'status' => 'ACTIVE',
+            'principal' => $principal, 'interest' => $interest, 'total_amount' => $total, 'amount_paid' => $paid, 'balance' => $balance,
+            'installment_amount' => (float) ($b['installment_amount'] ?? 0), 'start_period' => $startDate, 'status' => $status,
             'payroll_deductible' => isset($b['payroll_deductible']) ? (int) (bool) $b['payroll_deductible'] : 1]);
-        Database::insert('loan_transactions', ['loan_id' => $id, 'entry_type' => 'NEW_LOAN', 'amount' => $total, 'balance_after' => $total, 'entry_date' => date('Y-m-d'), 'remarks' => 'Loan/advance granted']);
-        Audit::record('loan.create', $u, ['organization_id' => $o, 'entity' => 'loan', 'entity_id' => $id]);
+        Database::insert('loan_transactions', ['loan_id' => $id, 'entry_type' => 'NEW_LOAN', 'amount' => $total, 'balance_after' => $total, 'entry_date' => $startDate, 'remarks' => 'Loan/advance granted']);
+        if ($paid > 0) {
+            Database::insert('loan_transactions', ['loan_id' => $id, 'entry_type' => 'OPENING_BALANCE', 'amount' => $paid, 'balance_after' => $balance, 'entry_date' => $startDate, 'remarks' => 'Opening balance — already paid before go-live']);
+        }
+        Audit::record('loan.create', $u, ['organization_id' => $o, 'entity' => 'loan', 'entity_id' => $id, 'after' => ['total' => $total, 'amount_paid' => $paid, 'balance' => $balance, 'start' => $startDate]]);
         Http::json(['id' => $id]);
     }
 

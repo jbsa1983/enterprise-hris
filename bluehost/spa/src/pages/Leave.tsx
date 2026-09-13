@@ -45,8 +45,8 @@ export default function LeavePage() {
     if (!confirm(`Delete leave type "${t.name}"?`)) return;
     await apiFetch(`/organizations/${orgId}/leave-types/${t.id}`, { method: "DELETE" }); load();
   }
-  async function saveBalance(leaveType: string, credits: string) {
-    await apiFetch(`/organizations/${orgId}/leave-balances`, { method: "POST", body: JSON.stringify({ engagement_id: Number(selEng), leave_type: leaveType, credits: Number(credits || 0) }) });
+  async function saveBalance(leaveType: string, patch: { credits?: number; used?: number }) {
+    await apiFetch(`/organizations/${orgId}/leave-balances`, { method: "POST", body: JSON.stringify({ engagement_id: Number(selEng), leave_type: leaveType, ...patch }) });
     setCreditMsg("Saved."); loadBalances(selEng);
   }
 
@@ -154,15 +154,16 @@ export default function LeavePage() {
                   {balances.map((b) => (
                     <tr key={b.leave_type}>
                       <td className="py-2">{b.leave_type}</td>
-                      <td className="py-2 text-right"><input key={`${b.leave_type}-${b.credits}`} type="number" className="input max-w-[90px]" defaultValue={b.credits} onBlur={(e) => saveBalance(b.leave_type, e.target.value)} /></td>
-                      <td className="py-2 text-right">{b.used}</td>
+                      <td className="py-2 text-right"><input key={`c-${b.leave_type}-${b.credits}`} type="number" className="input max-w-[90px]" defaultValue={b.credits} onBlur={(e) => saveBalance(b.leave_type, { credits: Number(e.target.value || 0) })} /></td>
+                      <td className="py-2 text-right"><input key={`u-${b.leave_type}-${b.used}`} type="number" className="input max-w-[90px]" defaultValue={b.used} onBlur={(e) => saveBalance(b.leave_type, { used: Number(e.target.value || 0) })} /></td>
                       <td className="py-2 text-right font-medium">{b.remaining}</td>
                     </tr>
                   ))}
                   {balances.length === 0 ? <tr><td colSpan={4} className="py-4 text-center text-slate-400">Define leave types first.</td></tr> : null}
                 </tbody>
               </table>
-            ) : <p className="text-xs text-slate-400">Pick an employee to view and set their credits. Blank uses the type default.</p>}
+            ) : <p className="text-xs text-slate-400">Pick an employee to set their credits and their already-used days at go-live. Blank credits uses the type default.</p>}
+            {selEng ? <p className="mt-2 text-[11px] text-slate-400">At go-live, set <strong>Used</strong> to the days each person has already taken this year so the Remaining balance is correct. After that, approved leave auto-deducts.</p> : null}
           </div>
         </div>
       </div>

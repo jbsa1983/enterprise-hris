@@ -36,6 +36,7 @@ export default function LoansPage() {
         person_id: Number(form.person_id), obligation_type: form.obligation_type || "COMPANY_LOAN",
         description: form.description, principal: Number(form.principal || 0),
         interest: Number(form.interest || 0), installment_amount: Number(form.installment_amount || 0),
+        amount_paid: Number(form.amount_paid || 0), start_date: form.start_date || undefined,
       }) });
       setMsg("Obligation created."); setModal(null); setForm({}); load();
     } catch (e: any) { setErr(e.message); }
@@ -119,8 +120,13 @@ export default function LoansPage() {
           <Field label="Type"><select className="input" value={form.obligation_type} onChange={(e) => setForm({ ...form, obligation_type: e.target.value })}>
             {TYPES.map((t) => <option key={t} value={t}>{label(t)}</option>)}</select></Field>
           <Field label="Description"><input className="input" value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
-          <Field label="Principal"><input className="input" type="number" value={form.principal || ""} onChange={(e) => setForm({ ...form, principal: e.target.value })} /></Field>
+          <Field label="Principal (original amount)"><input className="input" type="number" value={form.principal || ""} onChange={(e) => setForm({ ...form, principal: e.target.value })} /></Field>
           <Field label="Installment / period"><input className="input" type="number" value={form.installment_amount || ""} onChange={(e) => setForm({ ...form, installment_amount: e.target.value })} /></Field>
+          <div className="mt-1 rounded-lg bg-slate-50 px-3 py-2">
+            <p className="mb-2 text-xs text-slate-500">Existing loan at go-live? Enter how much was <strong>already paid</strong> and the <strong>original start date</strong> — the remaining balance carries over and continues deducting automatically.</p>
+            <Field label="Already paid (opening) — optional"><input className="input" type="number" value={form.amount_paid || ""} onChange={(e) => setForm({ ...form, amount_paid: e.target.value })} placeholder="0" /></Field>
+            <Field label="Start date — optional"><input className="input" type="date" value={form.start_date || ""} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></Field>
+          </div>
         </Modal>
       ) : null}
       {modal && typeof modal === "object" ? (
