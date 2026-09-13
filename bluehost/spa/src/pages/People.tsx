@@ -137,6 +137,12 @@ export default function PeoplePage() {
   const [form, setForm] = useState<any>({ ...EMPTY });
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+  const [isSuper, setIsSuper] = useState(false);
+
+  useEffect(() => {
+    if (_permsCache) { setIsSuper(_permsCache.superadmin); return; }
+    apiFetch<any>("/auth/me").then((u) => { _permsCache = { perms: u.permissions || [], superadmin: !!u.is_superadmin }; setIsSuper(!!u.is_superadmin); }).catch(() => {});
+  }, []);
 
   const endpoint = type === "employees" ? "employees" : type === "consultants" ? "consultants" : "people";
   const title = type === "employees" ? "Employees" : type === "consultants" ? "Consultants" : "People";
@@ -208,6 +214,16 @@ export default function PeoplePage() {
     load();
   }
 
+  async function destroy(r: EngagementRow) {
+    if (!window.confirm(`Permanently DELETE ${r.full_name}?\n\nThis removes the person and their records (leave, benefits, assets, documents) and cannot be undone. Anyone with payroll history can't be deleted — archive them instead.`)) return;
+    setErr(""); setMsg("");
+    try {
+      await apiFetch(`/organizations/${orgId}/people/${r.engagement_id}`, { method: "DELETE" });
+      setMsg(`${r.full_name} was permanently deleted.`);
+      load();
+    } catch (e: any) { setErr(e.message); }
+  }
+
   const filtered = rows.filter((r) =>
     r.full_name.toLowerCase().includes(q.toLowerCase()) ||
     (r.employee_number || "").toLowerCase().includes(q.toLowerCase()));
@@ -266,7 +282,8 @@ export default function PeoplePage() {
                 <td className="px-4 py-3 text-right">{peso(r.base_rate)}</td>
                 <td className="px-4 py-3 text-right space-x-2">
                   <button className="text-brand-700 hover:underline" onClick={() => openEdit(r.engagement_id)}>Edit</button>
-                  {r.status === "ACTIVE" ? <button className="text-red-600 hover:underline" onClick={() => archive(r.engagement_id)}>Archive</button> : null}
+                  {r.status === "ACTIVE" ? <button className="text-amber-600 hover:underline" onClick={() => archive(r.engagement_id)}>Archive</button> : null}
+                  {isSuper ? <button className="text-red-600 hover:underline" onClick={() => destroy(r)}>Delete</button> : null}
                 </td>
               </tr>
             ))}

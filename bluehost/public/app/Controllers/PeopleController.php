@@ -28,6 +28,7 @@ class PeopleController
         $r->get("$b/people/{engagement_id}", [self::class, 'detail']);
         $r->put("$b/people/{engagement_id}", [self::class, 'update']);
         $r->post("$b/people/{engagement_id}/archive", [self::class, 'archive']);
+        $r->delete("$b/people/{engagement_id}", [self::class, 'destroy']);
     }
 
     private static function pick(array $src, array $fields): array
@@ -177,6 +178,74 @@ class PeopleController
         Database::update('engagements', (int) $eng['id'], ['status' => $status]);
         Audit::record('employee.archive', $user, ['organization_id' => $orgId, 'entity' => 'engagement', 'entity_id' => $eng['id'], 'after' => ['status' => $status]]);
         Http::json(['engagement_id' => (int) $eng['id'], 'status' => $status]);
+    }
+
+    /** Permanently delete an engagement (and the person if it was their last one).
+     *  Superadmin only. Refuses when there is payroll history — those records must
+     *  be kept for tax/compliance, so archive instead. */
+    public static function destroy(array $p): void
+    {
+        $user = Auth::require();
+        if (!$user['is_superadmin']) throw new HttpError('Only a superadmin can permanently delete records. Use Archive instead.', 403);
+        $orgId = (int) ($p['organization_id'] ?? 0);
+        $eng = Database::one('SELECT * FROM engagements WHERE id = ? AND organization_id = ?', [(int) $p['engagement_id'], $orgId]);
+        if (!$eng) throw new HttpError('Engagement not found', 404);
+        $engId = (int) $eng['id'];
+        $personId = (int) $eng['person_id'];
+
+        // Never delete anything with payroll history — protect financial/tax records.
+        $hasPayroll = (int) Database::scalar('SELECT COUNT(*) FROM payroll_run_people WHERE engagement_id = ?', [$engId])
+            + (int) Database::scalar('SELECT COUNT(*) FROM payslips WHERE engagement_id = ?', [$engId]);
+        if ($hasPayroll > 0) {
+            throw new HttpError('This person has payroll history and cannot be deleted — archive them instead to keep the records intact.', 409);
+        }
+
+        $person = Database::one('SELECT * FROM people WHERE id = ?', [$personId]);
+        $pdo = Database::pdo();
+        $pdo->beginTransaction();
+        try {
+            // Delete this engagement's loans (and their transactions), then the engagement-scoped rows.
+            $loanIds = array_column(Database::all('SELECT id FROM loans WHERE engagement_id = ?', [$engId]), 'id');
+            foreach ($loanIds as $lid) Database::exec('DELETE FROM loan_transactions WHERE loan_id = ?', [(int) $lid]);
+            Database::exec('DELETE FROM loans WHERE engagement_id = ?', [$engId]);
+            foreach (['project_assignments', 'attendance_logs', 'leave_requests', 'overtime_requests', 'leave_balances',
+                      'special_pay_lines', 'performance_reviews', 'training_assignments', 'service_tickets', 'lifecycle_checklists'] as $t) {
+                Database::exec("DELETE FROM `$t` WHERE engagement_id = ?", [$engId]);
+            }
+            Database::exec('DELETE FROM engagements WHERE id = ?', [$engId]);
+
+            // If that was the person's last engagement, remove the person and person-scoped data.
+            $personDeleted = false;
+            if ((int) Database::scalar('SELECT COUNT(*) FROM engagements WHERE person_id = ?', [$personId]) === 0) {
+                $benIds = array_column(Database::all('SELECT id FROM benefits WHERE person_id = ?', [$personId]), 'id');
+                foreach ($benIds as $bid) Database::exec('DELETE FROM benefit_beneficiaries WHERE benefit_id = ?', [(int) $bid]);
+                Database::exec('DELETE FROM benefits WHERE person_id = ?', [$personId]);
+                $pLoanIds = array_column(Database::all('SELECT id FROM loans WHERE person_id = ?', [$personId]), 'id');
+                foreach ($pLoanIds as $lid) Database::exec('DELETE FROM loan_transactions WHERE loan_id = ?', [(int) $lid]);
+                Database::exec('DELETE FROM loans WHERE person_id = ?', [$personId]);
+                // Return any assets to the pool rather than deleting them; drop this person's asset history.
+                Database::exec('UPDATE assets SET assigned_person_id = NULL WHERE assigned_person_id = ?', [$personId]);
+                Database::exec('DELETE FROM asset_events WHERE person_id = ?', [$personId]);
+                // Remove 201-file documents (rows + files on disk).
+                $docs = Database::all('SELECT object_key FROM employee_documents WHERE person_id = ?', [$personId]);
+                $base = dirname(dirname(__DIR__)) . '/storage/documents/';
+                foreach ($docs as $d) { $f = $base . $d['object_key']; if (is_file($f)) @unlink($f); }
+                Database::exec('DELETE FROM employee_documents WHERE person_id = ?', [$personId]);
+                // Unlink any login account from this person (keeps the login, detaches the person).
+                Database::exec('UPDATE users SET person_id = NULL WHERE person_id = ?', [$personId]);
+                Database::exec('DELETE FROM people WHERE id = ?', [$personId]);
+                $personDeleted = true;
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw new HttpError('Could not delete this record: ' . $e->getMessage(), 500);
+        }
+
+        Audit::record('employee.delete', $user, ['organization_id' => $orgId, 'entity' => 'engagement', 'entity_id' => $engId,
+            'before' => ['person_id' => $personId, 'employee_number' => $eng['employee_number'],
+                'name' => $person ? trim(($person['first_name'] ?? '') . ' ' . ($person['last_name'] ?? '')) : null]]);
+        Http::json(['ok' => true, 'engagement_id' => $engId, 'person_deleted' => $personDeleted]);
     }
 
     private static function rows(int $orgId, ?string $mode): array
