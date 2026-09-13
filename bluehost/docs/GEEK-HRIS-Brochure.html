@@ -130,10 +130,10 @@
     <p class="tagline">Multi-company Philippine payroll &amp; HR — a complete, self-hosted system that runs on your own standard web hosting. No monthly SaaS fees.</p>
     <div class="chips">
       <span class="chip"><i style="background:var(--geek-red)"></i>Multi-company</span>
-      <span class="chip"><i style="background:var(--geek-amber)"></i>PH statutory payroll</span>
-      <span class="chip"><i style="background:var(--geek-green)"></i>Employee self-service</span>
-      <span class="chip"><i style="background:var(--geek-blue)"></i>16 roles · 30+ permissions</span>
-      <span class="chip"><i style="background:var(--geek-bluedark)"></i>Runs on shared hosting</span>
+      <span class="chip"><i style="background:var(--geek-amber)"></i>2025 PH statutory payroll</span>
+      <span class="chip"><i style="background:var(--geek-green)"></i>BIR forms &amp; reports</span>
+      <span class="chip"><i style="background:var(--geek-blue)"></i>Employee self-service</span>
+      <span class="chip"><i style="background:var(--geek-bluedark)"></i>Self-hosted · no SaaS fees</span>
     </div>
   </div>
 </header>
@@ -141,7 +141,7 @@
 <main class="wrap">
 
   <section id="overview" style="padding-top:40px;">
-    <p class="lead">GEEK Enterprise HRIS manages people, payroll, time, benefits, assets and HR workflows across multiple companies from a single installation. It ships as a ready-to-deploy package for standard cPanel shared hosting (PHP + MySQL) — you own the software and the data, with role-based access control and employee self-service built in.</p>
+    <p class="lead">GEEK Enterprise HRIS manages people, payroll, time, benefits, assets, documents and HR workflows across multiple companies from a single installation. It computes Philippine statutory contributions on the current 2025 tables, generates the BIR withholding forms, and lets staff serve themselves — all with role-based access, an audit trail, and built-in notifications. It ships as a ready-to-deploy package for standard cPanel shared hosting (PHP + MySQL): you own the software and the data, with no per-seat SaaS fees.</p>
   </section>
 
   <section id="features">
@@ -152,11 +152,22 @@
       <div class="fcard"><h3><span class="dot" style="background:var(--geek-green)"></span>Payroll &amp; Compliance</h3>
         <ul>
           <li>Multi-company payroll runs — <b>prepare, compute, approve, lock</b></li>
-          <li>Philippine statutory: <b>SSS, PhilHealth, Pag-IBIG, withholding tax</b></li>
+          <li><b>2025 PH statutory</b>: SSS, PhilHealth, Pag-IBIG, BIR withholding</li>
+          <li>Effective-dated tables — past runs keep the rates that applied then</li>
           <li><b>13th-month &amp; bonuses</b> — special-pay runs in bulk</li>
           <li>Payslip <b>PDF generation</b>, per employee &amp; period</li>
           <li><b>Bank file export</b> for salary crediting</li>
-          <li>Government contribution reporting</li>
+        </ul>
+      </div>
+
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-bluedark)"></span>BIR Forms &amp; Government Reporting</h3>
+        <ul>
+          <li><b>1601-C</b> — monthly compensation withholding return</li>
+          <li><b>0619-E</b> — monthly expanded withholding (consultants)</li>
+          <li><b>2307</b> — creditable-tax certificate, <b>5% / 10%</b>, per payee</li>
+          <li><b>2316</b> — annual compensation certificate per employee</li>
+          <li>Print-ready working copies for <b>eBIRForms / eFPS</b> filing</li>
+          <li>Period totals to remit surfaced in <b>Reports</b></li>
         </ul>
       </div>
 
@@ -167,7 +178,7 @@
           <li>Leave balances &amp; <b>file leave requests</b></li>
           <li><b>Overtime</b> and <b>loan / cash-advance</b> requests</li>
           <li>View <b>benefits, beneficiaries &amp; assigned assets</b></li>
-          <li>Self-service password change</li>
+          <li>Password change &amp; <b>forgot-password self-reset</b></li>
         </ul>
       </div>
 
@@ -176,18 +187,19 @@
           <li>Attendance import — <b>CSV, biometric, or API</b></li>
           <li>Configurable <b>leave types &amp; credits</b> per company</li>
           <li>Balances that <b>auto-deduct on approval</b></li>
-          <li>Leave &amp; overtime <b>approval workflow</b> (Dept Head / HR)</li>
+          <li>Leave &amp; overtime <b>approval</b> by Dept Head <b>or</b> HR</li>
           <li>Daily logs: hours, late, overtime, status</li>
         </ul>
       </div>
 
-      <div class="fcard"><h3><span class="dot" style="background:var(--geek-red)"></span>Benefits &amp; Assets</h3>
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-red)"></span>Benefits, Assets &amp; Documents</h3>
         <ul>
-          <li>Record <b>benefits</b> (HMO / health, life, and custom types)</li>
+          <li>Record <b>benefits</b> (HMO / health and custom types)</li>
           <li><b>Beneficiaries</b> with relationship &amp; share</li>
-          <li>Company <b>asset issuance</b> (laptops, phones, etc.)</li>
-          <li><b>Return / reassign with remarks</b> &amp; full history</li>
-          <li><b>Bulk asset return</b> on separation</li>
+          <li>Company <b>asset issuance</b>, return / reassign with remarks</li>
+          <li><b>Bulk asset return</b> on separation, full history</li>
+          <li><b>201-file document vault</b> — contracts, IDs, certificates</li>
+          <li>Private uploads, served only to authorised users</li>
         </ul>
       </div>
 
@@ -201,32 +213,45 @@
         </ul>
       </div>
 
-      <div class="fcard"><h3><span class="dot" style="background:var(--geek-green)"></span>Projects &amp; Finance</h3>
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-green)"></span>Notifications &amp; Approvals</h3>
+        <ul>
+          <li>Single approval by <b>Dept Head or HR</b> decides a request</li>
+          <li><b>Email</b> alerts on new requests &amp; decisions</li>
+          <li><b>Telegram</b> phone alerts via a free bot (opt-in)</li>
+          <li>In-app <b>notification bell</b></li>
+          <li><b>Daily digest</b> of everything still pending, on a schedule</li>
+        </ul>
+      </div>
+
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-blue)"></span>Projects, Finance &amp; Reports</h3>
         <ul>
           <li>Projects with <b>budgets</b> by period</li>
           <li>Loan &amp; cash-advance ledgers with balances</li>
           <li>Payroll-deductible obligations</li>
           <li><b>Reports</b> by staff, period, project, or organization</li>
+          <li>Export to <b>Excel (.xlsx)</b>, CSV, or print-ready PDF</li>
         </ul>
       </div>
 
-      <div class="fcard"><h3><span class="dot" style="background:var(--geek-blue)"></span>Administration &amp; Security</h3>
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-blue)"></span>Security &amp; Access Control</h3>
         <ul>
           <li><b>Role-based access</b> — 16 roles, 30+ granular permissions</li>
           <li>Multi-organization scoping enforced on the backend</li>
-          <li>Create users, <b>link logins to employee records</b></li>
-          <li><b>Bulk-provision</b> employee logins (with CSV of credentials)</li>
-          <li>JWT sign-in, <b>15-minute idle logout</b>, hashed passwords, audit trail</li>
+          <li>JWT sign-in, bcrypt passwords, <b>3-minute idle logout</b></li>
+          <li><b>Brute-force lockout</b> after repeated failed sign-ins</li>
+          <li><b>Audit trail</b> of every action — searchable, with before/after</li>
+          <li>Bulk-provision logins; link logins to employee records</li>
         </ul>
       </div>
 
-      <div class="fcard"><h3><span class="dot" style="background:var(--geek-amber)"></span>Branding &amp; Dashboards</h3>
+      <div class="fcard"><h3><span class="dot" style="background:var(--geek-amber)"></span>Deployment, Backup &amp; Branding</h3>
         <ul>
-          <li><b>White-label</b> — upload your own logo</li>
+          <li><b>White-label</b> — upload your own logo &amp; app name</li>
           <li>Enterprise &amp; per-organization dashboards</li>
-          <li>Org setup: departments &amp; positions</li>
-          <li>Real-time storage monitoring</li>
-          <li>Works on desktop &amp; mobile browsers</li>
+          <li><b>Bulk employee import</b> from an Excel / CSV template</li>
+          <li><b>One-click backup</b> ZIP &amp; scheduled automatic backups</li>
+          <li><b>Migration package</b> to move to a new host</li>
+          <li>Real-time storage monitoring · desktop &amp; mobile</li>
         </ul>
       </div>
 
@@ -241,8 +266,8 @@
       <div class="pkg-item"><div class="n">1</div><div><div class="t">Full application package</div><div class="s">Deployable ZIP — extract into your subdomain's folder. PHP backend + built web app.</div></div></div>
       <div class="pkg-item"><div class="n">2</div><div><div class="t">Database schema &amp; seeders</div><div class="s">MySQL schema plus one-command seeding for roles, permissions, and defaults.</div></div></div>
       <div class="pkg-item"><div class="n">3</div><div><div class="t">Installation manual</div><div class="s">Step-by-step cPanel setup: database, import, file upload, SSL, and go-live.</div></div></div>
-      <div class="pkg-item"><div class="n">4</div><div><div class="t">Employee user guide</div><div class="s">Branded PDF plus an in-app Help page hosted at your own domain.</div></div></div>
-      <div class="pkg-item"><div class="n">5</div><div><div class="t">Admin quick-start</div><div class="s">Creating organizations, users, roles, leave types, and branding.</div></div></div>
+      <div class="pkg-item"><div class="n">4</div><div><div class="t">Complete user guide</div><div class="s">Branded guide for staff, HR/admin &amp; superadmin — as a PDF and an in-app Help page at your own domain.</div></div></div>
+      <div class="pkg-item"><div class="n">5</div><div><div class="t">Backup &amp; migration tools</div><div class="s">Built-in one-click backup, scheduled backups, and a package to move hosts.</div></div></div>
       <div class="pkg-item"><div class="n">6</div><div><div class="t">License / activation key</div><div class="s">A single-use key that activates your installation (see below).</div></div></div>
     </div>
   </section>
@@ -257,7 +282,8 @@
         <tr><td>Front-end</td><td>Pre-built single-page web app (static) — nothing to compile on the server</td></tr>
         <tr><td>Hosting</td><td>Standard <b>cPanel shared hosting</b> (e.g. Bluehost, Zoom Hosting) — Apache/LiteSpeed</td></tr>
         <tr><td>Needs</td><td>MySQL database, File Manager or FTP, SSL (free AutoSSL), optional SSH &amp; cron</td></tr>
-        <tr><td>Security</td><td>JWT authentication, bcrypt passwords, role/permission checks, idle auto-logout, audit log</td></tr>
+        <tr><td>Email</td><td>Any <b>SMTP mailbox</b> (or the server mailer) for reset links, approval alerts &amp; the digest; optional free <b>Telegram</b> alerts</td></tr>
+        <tr><td>Security</td><td>JWT authentication, bcrypt passwords, role/permission checks, <b>3-minute idle logout</b>, <b>brute-force lockout</b>, searchable <b>audit trail</b></td></tr>
         <tr><td>Footprint</td><td>Lightweight — the whole app is a few MB; data grows with your records</td></tr>
         <tr><td>Ownership</td><td>Self-hosted — your server, <b>your data</b>, no per-seat SaaS fees</td></tr>
       </tbody></table>
