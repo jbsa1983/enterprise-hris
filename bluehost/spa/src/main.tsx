@@ -5,6 +5,7 @@ import "./index.css";
 
 import { getAccessToken } from "@/lib/api";
 import LoginPage from "@/pages/LoginPage";
+import ResetPage from "@/pages/ResetPage";
 import EnterpriseDashboard from "@/pages/EnterpriseDashboard";
 import OrgDashboard from "@/pages/OrgDashboard";
 import People from "@/pages/People";
@@ -38,6 +39,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset" element={<ResetPage />} />
         <Route path="/dashboard" element={<EnterpriseDashboard />} />
         <Route path="/o/:orgId/dashboard" element={<OrgDashboard />} />
         <Route path="/o/:orgId/people" element={<People />} />

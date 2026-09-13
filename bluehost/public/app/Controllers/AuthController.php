@@ -6,6 +6,46 @@ class AuthController
         $r->post('/auth/login', [self::class, 'login']);
         $r->post('/auth/refresh', [self::class, 'refresh']);
         $r->get('/auth/me', [self::class, 'me']);
+        $r->post('/auth/forgot', [self::class, 'forgot']);
+        $r->post('/auth/reset', [self::class, 'reset']);
+    }
+
+    /** Send a password-reset link. Always responds OK (never reveals if the email exists). */
+    public static function forgot(): void
+    {
+        $email = strtolower(trim((string) (Http::body()['email'] ?? '')));
+        if ($email !== '') {
+            $u = Database::one('SELECT id, email, full_name, hashed_password FROM users WHERE email = ? AND is_active = 1', [$email]);
+            if ($u) {
+                $token = Jwt::encode([
+                    'sub' => (string) $u['id'], 'type' => 'reset',
+                    'pwv' => substr(sha1($u['hashed_password']), 0, 12), // invalidates the link once the password changes
+                    'iat' => time(), 'exp' => time() + 3600,
+                ], Config::get('jwt_secret'));
+                $host = $_SERVER['HTTP_HOST'] ?? '';
+                $link = "https://$host/reset?token=" . urlencode($token);
+                Mailer::send($u['email'], 'Reset your GEEK HRIS password',
+                    "Hi {$u['full_name']},\n\nWe received a request to reset your password. Open the link below to set a new one (valid for 1 hour):\n\n$link\n\nIf you didn't request this, just ignore this email — your password stays the same.");
+            }
+        }
+        Http::json(['ok' => true]);
+    }
+
+    public static function reset(): void
+    {
+        $b = Http::body();
+        $token = (string) ($b['token'] ?? '');
+        $new = (string) ($b['new_password'] ?? '');
+        if (strlen($new) < 8) throw new HttpError('New password must be at least 8 characters', 422);
+        $payload = Jwt::decode($token, Config::get('jwt_secret'));
+        if (!$payload || ($payload['type'] ?? '') !== 'reset') throw new HttpError('This reset link is invalid or has expired', 400);
+        $u = Database::one('SELECT id, hashed_password FROM users WHERE id = ? AND is_active = 1', [(int) $payload['sub']]);
+        if (!$u) throw new HttpError('Account not found', 404);
+        if (($payload['pwv'] ?? '') !== substr(sha1($u['hashed_password']), 0, 12)) {
+            throw new HttpError('This reset link has already been used or has expired. Request a new one.', 400);
+        }
+        Database::update('users', (int) $u['id'], ['hashed_password' => password_hash($new, PASSWORD_BCRYPT)]);
+        Http::json(['ok' => true]);
     }
 
     public static function login(): void

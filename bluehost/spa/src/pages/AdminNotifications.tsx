@@ -4,20 +4,46 @@ import { apiFetch } from "@/lib/api";
 
 interface TgStatus { configured: boolean; bot_username: string | null; webhook_set: boolean; webhook_error?: string | null; webhook_url?: string | null; }
 interface DigestCfg { enabled: boolean; time: string; last_run: string | null; cron_command: string; }
+interface MailCfg { transport: "mail" | "smtp"; host: string; port: number; secure: "tls" | "ssl" | "none"; username: string; from_email: string; from_name: string; has_password: boolean; }
 
 export default function AdminNotificationsPage() {
   const [st, setSt] = useState<TgStatus | null>(null);
   const [token, setToken] = useState("");
   const [dg, setDg] = useState<DigestCfg | null>(null);
   const [dgForm, setDgForm] = useState({ enabled: false, time: "08:00" });
+  const [mail, setMail] = useState<MailCfg | null>(null);
+  const [mf, setMf] = useState<MailCfg>({ transport: "mail", host: "", port: 587, secure: "tls", username: "", from_email: "", from_name: "GEEK HRIS", has_password: false });
+  const [mailPw, setMailPw] = useState("");
+  const [testTo, setTestTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
 
   const load = useCallback(() => {
     apiFetch<TgStatus>("/admin/telegram").then(setSt).catch((e) => setErr(e.message));
     apiFetch<DigestCfg>("/admin/digest").then((d) => { setDg(d); setDgForm({ enabled: d.enabled, time: d.time }); }).catch(() => {});
+    apiFetch<MailCfg>("/admin/mail").then((m) => { setMail(m); setMf(m); }).catch(() => {});
   }, []);
   useEffect(load, [load]);
+
+  async function saveMail() {
+    setErr(""); setMsg(""); setBusy(true);
+    try {
+      const payload: any = { transport: mf.transport, host: mf.host, port: mf.port, secure: mf.secure, username: mf.username, from_email: mf.from_email, from_name: mf.from_name };
+      if (mailPw !== "") payload.password = mailPw;
+      const m = await apiFetch<MailCfg>("/admin/mail", { method: "POST", body: JSON.stringify(payload) });
+      setMail(m); setMf(m); setMailPw(""); setMsg("Email settings saved.");
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  }
+  async function testMail() {
+    setErr(""); setMsg("Sending test email…"); setBusy(true);
+    try {
+      const payload: any = { transport: mf.transport, host: mf.host, port: mf.port, secure: mf.secure, username: mf.username, from_email: mf.from_email, from_name: mf.from_name, to: testTo.trim() };
+      if (mailPw !== "") payload.password = mailPw;
+      const r = await apiFetch<any>("/admin/mail/test", { method: "POST", body: JSON.stringify(payload) });
+      setMail((m) => (m ? { ...m, ...mf, has_password: m.has_password || mailPw !== "" } : m)); setMailPw("");
+      setMsg(`Test email sent to ${r.to}. Check the inbox (and spam folder).`);
+    } catch (e: any) { setErr(e.message); setMsg(""); } finally { setBusy(false); }
+  }
 
   async function saveDigest() {
     setErr(""); setMsg(""); setBusy(true);
@@ -46,19 +72,90 @@ export default function AdminNotificationsPage() {
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   }
 
+  const smtp = mf.transport === "smtp";
+
   return (
     <AppShell>
       <div className="mb-4">
-        <h1 className="text-lg font-semibold text-slate-900">Notifications — Telegram</h1>
-        <p className="text-sm text-slate-500">Send approval alerts to staff phones via a free Telegram bot.</p>
+        <h1 className="text-lg font-semibold text-slate-900">Notifications</h1>
+        <p className="text-sm text-slate-500">Email delivery, phone alerts via Telegram, and the daily digest of pending approvals.</p>
       </div>
       {msg ? <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{msg}</div> : null}
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
 
+      {/* Email delivery (SMTP) */}
+      <div className="card mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-sm font-medium text-slate-700">Email delivery</div>
+          {mail ? <span className={`badge ${smtp && mail.host ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>{smtp && mail.host ? "SMTP configured" : "Server default"}</span> : null}
+        </div>
+        <p className="mb-4 text-sm text-slate-500">
+          Used for password-reset links, approval alerts and the daily digest. For reliable delivery, use your own SMTP mailbox
+          (for example <span className="font-mono">notification@hris.exssi.com</span>). The password is stored on your server only — it's never shown here again once saved.
+        </p>
+
+        <div className="mb-4 flex flex-wrap gap-4 text-sm">
+          <label className="flex items-center gap-2"><input type="radio" name="transport" checked={!smtp} onChange={() => setMf({ ...mf, transport: "mail" })} /> Server default (PHP mail)</label>
+          <label className="flex items-center gap-2"><input type="radio" name="transport" checked={smtp} onChange={() => setMf({ ...mf, transport: "smtp" })} /> SMTP mailbox (recommended)</label>
+        </div>
+
+        {smtp ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">SMTP host</label>
+              <input className="input" value={mf.host} onChange={(e) => setMf({ ...mf, host: e.target.value })} placeholder="mail.hris.exssi.com" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-slate-500">Port</label>
+                <input className="input" type="number" value={mf.port} onChange={(e) => setMf({ ...mf, port: parseInt(e.target.value || "0", 10) })} placeholder="587" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-500">Encryption</label>
+                <select className="input" value={mf.secure} onChange={(e) => setMf({ ...mf, secure: e.target.value as MailCfg["secure"] })}>
+                  <option value="tls">STARTTLS (587)</option>
+                  <option value="ssl">SSL / TLS (465)</option>
+                  <option value="none">None (25)</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">Username (full email)</label>
+              <input className="input" value={mf.username} onChange={(e) => setMf({ ...mf, username: e.target.value })} placeholder="notification@hris.exssi.com" autoComplete="off" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">Password {mail?.has_password ? <span className="text-slate-400">(leave blank to keep current)</span> : null}</label>
+              <input className="input" type="password" value={mailPw} onChange={(e) => setMailPw(e.target.value)} placeholder={mail?.has_password ? "••••••••" : "Mailbox password"} autoComplete="new-password" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">From address</label>
+              <input className="input" value={mf.from_email} onChange={(e) => setMf({ ...mf, from_email: e.target.value })} placeholder="notification@hris.exssi.com" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">From name</label>
+              <input className="input" value={mf.from_name} onChange={(e) => setMf({ ...mf, from_name: e.target.value })} placeholder="GEEK HRIS" />
+            </div>
+          </div>
+        ) : (
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            Emails will be sent through the hosting server's built-in mailer. This often works, but messages may be marked as spam or blocked. Switch to SMTP for reliable delivery.
+          </p>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <button className="btn-primary" onClick={saveMail} disabled={busy}>{busy ? "Saving…" : "Save email settings"}</button>
+          <div>
+            <label className="mb-1 block text-xs text-slate-500">Send a test to</label>
+            <input className="input max-w-[220px]" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="you@example.com" />
+          </div>
+          <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50" onClick={testMail} disabled={busy}>Send test</button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card">
           <div className="mb-3 flex items-center justify-between">
-            <div className="text-sm font-medium text-slate-700">Bot connection</div>
+            <div className="text-sm font-medium text-slate-700">Telegram bot connection</div>
             {st ? <span className={`badge ${st.configured && st.webhook_set ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
               {st.configured ? (st.webhook_set ? "Connected" : "Token set · webhook off") : "Not set up"}
             </span> : null}
@@ -87,7 +184,7 @@ export default function AdminNotificationsPage() {
         </div>
 
         <div className="card">
-          <div className="mb-2 text-sm font-medium text-slate-700">How to set it up (2 minutes)</div>
+          <div className="mb-2 text-sm font-medium text-slate-700">How to set up Telegram (2 minutes)</div>
           <ol className="ml-4 list-decimal space-y-2 text-sm text-slate-600">
             <li>In Telegram, open <span className="font-mono">@BotFather</span> and send <span className="font-mono">/newbot</span>.</li>
             <li>Give it a name and a username (must end in <span className="font-mono">bot</span>, e.g. <span className="font-mono">geekhris_bot</span>).</li>

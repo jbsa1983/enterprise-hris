@@ -41,3 +41,4 @@ bluehost/public/app/installed-license.php
 # Per-install secrets/config written at runtime
 bluehost/public/app/telegram-config.php
 bluehost/public/app/digest-config.php
+bluehost/public/app/mail-config.php
