@@ -11,6 +11,38 @@ class BenefitsController
         $r->post($b, [self::class, 'create']);
         $r->put("$b/{id}", [self::class, 'update']);
         $r->delete("$b/{id}", [self::class, 'delete']);
+        $bt = '/organizations/{organization_id}/benefit-types';
+        $r->get($bt, [self::class, 'listTypes']);
+        $r->post($bt, [self::class, 'createType']);
+        $r->delete("$bt/{id}", [self::class, 'deleteType']);
+    }
+
+    public static function listTypes(array $p): void
+    {
+        [, $o] = Auth::org($p, 'employee.view');
+        Http::json(Database::all('SELECT id, name FROM benefit_types WHERE organization_id = ? ORDER BY name', [$o]));
+    }
+    /** Add a benefit type to the org catalog (no-op if it already exists). */
+    public static function ensureType(int $o, string $name): void
+    {
+        $name = trim($name);
+        if ($name === '') return;
+        if (Database::one('SELECT id FROM benefit_types WHERE organization_id = ? AND LOWER(name) = ? LIMIT 1', [$o, strtolower($name)])) return;
+        Database::insert('benefit_types', ['organization_id' => $o, 'name' => substr($name, 0, 100)]);
+    }
+    public static function createType(array $p): void
+    {
+        [, $o] = Auth::org($p, 'employee.edit');
+        $name = trim((string) (Http::body()['name'] ?? ''));
+        if ($name === '') throw new HttpError('Benefit type name is required', 422);
+        self::ensureType($o, $name);
+        Http::json(Database::all('SELECT id, name FROM benefit_types WHERE organization_id = ? ORDER BY name', [$o]));
+    }
+    public static function deleteType(array $p): void
+    {
+        [, $o] = Auth::org($p, 'employee.edit');
+        Database::exec('DELETE FROM benefit_types WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
+        Http::json(['ok' => true]);
     }
 
     public static function shape(array $x): array
@@ -73,6 +105,7 @@ class BenefitsController
         if (empty($data['status'])) $data['status'] = 'ACTIVE';
         $id = Database::insert('benefits', $data);
         self::saveBeneficiaries($id, $b['beneficiaries'] ?? []);
+        self::ensureType($o, (string) $b['benefit_type']); // grow the org's benefit-type catalog
         Audit::record('benefit.create', $u, ['organization_id' => $o, 'entity' => 'benefit', 'entity_id' => $id]);
         Http::json(['id' => $id]);
     }

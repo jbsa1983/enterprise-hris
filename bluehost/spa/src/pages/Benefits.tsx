@@ -18,6 +18,8 @@ export default function BenefitsPage() {
   const [editing, setEditing] = useState<null | "new" | any>(null);
   const [form, setForm] = useState<any>({ ...EMPTY });
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
+  const [types, setTypes] = useState<{ id: number; name: string }[]>([]);
+  const [newType, setNewType] = useState("");
 
   const load = useCallback(() => {
     const url = filterPid ? `/organizations/${orgId}/benefits?person_id=${filterPid}` : `/organizations/${orgId}/benefits`;
@@ -25,6 +27,19 @@ export default function BenefitsPage() {
     apiFetch(`/organizations/${orgId}/people`).then(setPeople).catch(() => {});
   }, [orgId, filterPid]);
   useEffect(load, [load]);
+
+  const loadTypes = useCallback(() => { apiFetch<{ id: number; name: string }[]>(`/organizations/${orgId}/benefit-types`).then(setTypes).catch(() => {}); }, [orgId]);
+  useEffect(loadTypes, [loadTypes]);
+
+  async function addType() {
+    if (!newType.trim()) return;
+    try { const t = await apiFetch<{ id: number; name: string }[]>(`/organizations/${orgId}/benefit-types`, { method: "POST", body: JSON.stringify({ name: newType.trim() }) }); setTypes(t); setNewType(""); }
+    catch (e: any) { setErr(e.message); }
+  }
+  async function delType(id: number) {
+    await apiFetch(`/organizations/${orgId}/benefit-types/${id}`, { method: "DELETE" }); loadTypes();
+  }
+  const typeOptions = Array.from(new Set([...types.map((t) => t.name), ...BENEFIT_TYPES]));
 
   function openCreate() { setForm({ ...EMPTY, beneficiaries: [] }); setEditing("new"); setErr(""); }
   function openEdit(b: any) {
@@ -85,6 +100,22 @@ export default function BenefitsPage() {
       {msg ? <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{msg}</div> : null}
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
 
+      <div className="card mb-4">
+        <div className="mb-2 text-sm font-medium text-slate-700">Benefit types this organization offers</div>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {types.map((t) => (
+            <span key={t.id} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
+              {t.name}<button className="text-slate-400 hover:text-red-600" onClick={() => delType(t.id)} aria-label={`Remove ${t.name}`}>×</button>
+            </span>
+          ))}
+          {types.length === 0 ? <span className="text-xs text-slate-400">None defined yet — add the benefit types your company offers (they're also copyable to other orgs in Org Setup).</span> : null}
+        </div>
+        <div className="flex gap-2">
+          <input className="input max-w-xs" placeholder="e.g. HMO / Health" value={newType} onChange={(e) => setNewType(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addType(); }} />
+          <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50" onClick={addType}>+ Add type</button>
+        </div>
+      </div>
+
       <div className="card p-0 overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50"><tr className="text-left text-xs uppercase text-slate-500">
@@ -129,7 +160,7 @@ export default function BenefitsPage() {
               </div>
               <div><label className="mb-1 block text-xs text-slate-500">Benefit type *</label>
                 <input className="input" list="benefit-types" placeholder="e.g. HMO / Health — or type your own" value={form.benefit_type} onChange={(e) => setForm({ ...form, benefit_type: e.target.value })} />
-                <datalist id="benefit-types">{BENEFIT_TYPES.map((t) => <option key={t} value={t} />)}</datalist></div>
+                <datalist id="benefit-types">{typeOptions.map((t) => <option key={t} value={t} />)}</datalist></div>
               {F("provider", "Provider")}
               {F("policy_number", "Policy number")}
               {F("coverage_amount", "Coverage amount", { type: "number" })}

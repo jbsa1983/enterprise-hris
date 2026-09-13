@@ -132,8 +132,30 @@ class OrgStructureController
             }
         }
 
+        $ltAdded = 0;
+        if (($b['include_leave_types'] ?? true)) {
+            $existLt = []; foreach (Database::all('SELECT LOWER(name) n FROM leave_types WHERE organization_id = ?', [$tgt]) as $r) $existLt[$r['n']] = true;
+            foreach (Database::all('SELECT * FROM leave_types WHERE organization_id = ?', [$src]) as $lt) {
+                if (isset($existLt[strtolower($lt['name'])])) continue;
+                Database::insert('leave_types', ['organization_id' => $tgt, 'name' => $lt['name'], 'default_credits' => $lt['default_credits'], 'paid' => $lt['paid']]);
+                $ltAdded++;
+            }
+        }
+
+        $btAdded = 0;
+        if (($b['include_benefit_types'] ?? true)) {
+            try {
+                $existBt = []; foreach (Database::all('SELECT LOWER(name) n FROM benefit_types WHERE organization_id = ?', [$tgt]) as $r) $existBt[$r['n']] = true;
+                foreach (Database::all('SELECT * FROM benefit_types WHERE organization_id = ?', [$src]) as $bt) {
+                    if (isset($existBt[strtolower($bt['name'])])) continue;
+                    Database::insert('benefit_types', ['organization_id' => $tgt, 'name' => $bt['name']]);
+                    $btAdded++;
+                }
+            } catch (\Throwable $e) { /* benefit_types table not migrated yet */ }
+        }
+
         Audit::record('org.setup_copy', $u, ['organization_id' => $src, 'entity' => 'organization', 'entity_id' => $tgt,
-            'after' => ['to' => $tgt, 'departments' => $deptsAdded, 'positions' => $posAdded, 'cost_centers' => $ccAdded]]);
-        Http::json(['departments' => $deptsAdded, 'positions' => $posAdded, 'cost_centers' => $ccAdded]);
+            'after' => ['to' => $tgt, 'departments' => $deptsAdded, 'positions' => $posAdded, 'cost_centers' => $ccAdded, 'leave_types' => $ltAdded, 'benefit_types' => $btAdded]]);
+        Http::json(['departments' => $deptsAdded, 'positions' => $posAdded, 'cost_centers' => $ccAdded, 'leave_types' => $ltAdded, 'benefit_types' => $btAdded]);
     }
 }

@@ -706,6 +706,13 @@ CREATE TABLE IF NOT EXISTS benefits (
   INDEX (organization_id), INDEX (person_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS benefit_types (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  INDEX (organization_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS benefit_beneficiaries (
   id INT AUTO_INCREMENT PRIMARY KEY,
   benefit_id INT NOT NULL,

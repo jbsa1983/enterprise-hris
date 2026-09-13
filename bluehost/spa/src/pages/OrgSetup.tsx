@@ -14,6 +14,8 @@ export default function OrgSetup() {
   const [copyTgt, setCopyTgt] = useState("");
   const [incPos, setIncPos] = useState(true);
   const [incCc, setIncCc] = useState(true);
+  const [incLt, setIncLt] = useState(true);
+  const [incBt, setIncBt] = useState(true);
   const [copyMsg, setCopyMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -27,13 +29,13 @@ export default function OrgSetup() {
   async function copySetup() {
     if (!copyTgt) return;
     const name = orgs.find((o) => o.id === Number(copyTgt))?.name || "the selected organization";
-    if (!window.confirm(`Copy this organization's departments${incPos ? ", positions" : ""}${incCc ? ", cost centers" : ""} to ${name}? Existing items there are kept (duplicates skipped).`)) return;
+    if (!window.confirm(`Copy this organization's setup to ${name}? Existing items there are kept (duplicates skipped).`)) return;
     setBusy(true); setErr(""); setCopyMsg("");
     try {
-      const r = await apiFetch<{ departments: number; positions: number; cost_centers: number }>(`/organizations/${orgId}/setup/copy-to`, {
-        method: "POST", body: JSON.stringify({ target_organization_id: Number(copyTgt), include_positions: incPos, include_cost_centers: incCc }),
+      const r = await apiFetch<{ departments: number; positions: number; cost_centers: number; leave_types: number; benefit_types: number }>(`/organizations/${orgId}/setup/copy-to`, {
+        method: "POST", body: JSON.stringify({ target_organization_id: Number(copyTgt), include_positions: incPos, include_cost_centers: incCc, include_leave_types: incLt, include_benefit_types: incBt }),
       });
-      setCopyMsg(`Copied to ${name}: ${r.departments} department(s), ${r.positions} position(s), ${r.cost_centers} cost center(s).`);
+      setCopyMsg(`Copied to ${name}: ${r.departments} department(s), ${r.positions} position(s), ${r.cost_centers} cost center(s), ${r.leave_types} leave type(s), ${r.benefit_types} benefit type(s).`);
       setCopyTgt("");
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   }
@@ -71,14 +73,17 @@ export default function OrgSetup() {
       {orgs.filter((o) => o.id !== orgId).length > 0 ? (
         <div className="card mb-6 border-l-4 border-geek-blue">
           <div className="mb-1 text-sm font-medium text-slate-700">Copy this setup to another organization</div>
-          <p className="mb-3 text-sm text-slate-500">Reuse these departments, positions and cost centers in another company instead of re-entering them. Items already there are skipped, so it's safe to run again.</p>
-          <div className="flex flex-wrap items-center gap-3">
+          <p className="mb-3 text-sm text-slate-500">Reuse this company's setup elsewhere instead of re-entering it. Items already there are skipped, so it's safe to run again.</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <select className="input max-w-[240px]" value={copyTgt} onChange={(e) => setCopyTgt(e.target.value)}>
               <option value="">Copy to…</option>
               {orgs.filter((o) => o.id !== orgId).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
             </select>
+            <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked disabled /> Departments</label>
             <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={incPos} onChange={(e) => setIncPos(e.target.checked)} /> Positions</label>
             <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={incCc} onChange={(e) => setIncCc(e.target.checked)} /> Cost centers</label>
+            <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={incLt} onChange={(e) => setIncLt(e.target.checked)} /> Leave types</label>
+            <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={incBt} onChange={(e) => setIncBt(e.target.checked)} /> Benefit types</label>
             <button className="btn-primary" disabled={busy || !copyTgt} onClick={copySetup}>{busy ? "Copying…" : "Copy setup"}</button>
           </div>
         </div>
