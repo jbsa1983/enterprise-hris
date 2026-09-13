@@ -130,7 +130,14 @@ export default function AppShell({
 
   function onOrgChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const id = e.target.value;
-    if (id) router.push(`/o/${id}/dashboard`);
+    if (!id) return;
+    // Stay on the same section when switching organizations — swap only the org id
+    // in the current path (e.g. /o/5/loans → /o/8/loans), preserving any query
+    // (like ?type=consultants). Non-org pages fall back to the org dashboard.
+    const m = pathname.match(/^\/o\/[^/]+(\/[^?]*)?$/);
+    const rest = m ? (m[1] || "/dashboard") : "/dashboard";
+    const search = m && typeof window !== "undefined" ? window.location.search : "";
+    router.push(`/o/${id}${rest}${search}`);
   }
 
   if (loading) {
