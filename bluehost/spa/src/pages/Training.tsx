@@ -47,6 +47,7 @@ export default function TrainingPage() {
     await apiFetch(`/organizations/${orgId}/training/assignments/${t.id}/complete`, { method: "POST", body: JSON.stringify({}) }); load();
   }
   async function reopen(t: any) { await apiFetch(`/organizations/${orgId}/training/assignments/${t.id}/reopen`, { method: "POST" }); load(); }
+  async function verify(t: any) { await apiFetch(`/organizations/${orgId}/training/assignments/${t.id}/verify`, { method: "POST" }); setMsg(`Approved ${t.points} points for ${t.employee}.`); load(); }
   async function removeAssignment(t: any) {
     if (!window.confirm(`Delete this training record for ${t.employee}? This can't be undone.`)) return;
     await apiFetch(`/organizations/${orgId}/training/assignments/${t.id}`, { method: "DELETE" }); load();
@@ -138,11 +139,12 @@ export default function TrainingPage() {
               <tr key={t.id}>
                 <td className="px-4 py-2">{t.employee}</td>
                 <td className="px-4 py-2">{t.course_title}{t.provider ? <span className="text-xs text-slate-400"> · {t.provider}</span> : null}{t.source === "SELF" ? <span className="ml-1 badge bg-slate-100 text-slate-500">Self-added</span> : null}</td>
-                <td className="px-4 py-2 text-right">{Number(t.points) > 0 ? t.points : "—"}</td>
+                <td className="px-4 py-2 text-right">{Number(t.points) > 0 ? <>{t.points}{t.source === "SELF" && !t.verified ? <span className="text-xs text-amber-600"> ⏳</span> : null}</> : "—"}</td>
                 <td className="px-4 py-2 text-slate-600">{t.due_date || "—"}</td>
-                <td className="px-4 py-2">{statusBadge(t)}{t.completed_date ? <span className="ml-1 text-xs text-slate-400">{t.completed_date}</span> : null}</td>
+                <td className="px-4 py-2">{statusBadge(t)}{t.source === "SELF" && !t.verified ? <span className="ml-1 badge bg-amber-100 text-amber-700">Points pending</span> : null}{t.completed_date ? <span className="ml-1 text-xs text-slate-400">{t.completed_date}</span> : null}</td>
                 <td className="px-4 py-2">{t.has_certificate ? <button className="text-brand-700 hover:underline" onClick={() => apiOpen(`/organizations/${orgId}/training/assignments/${t.id}/certificate`)}>View</button> : <span className="text-slate-300">—</span>}</td>
                 <td className="px-4 py-2 text-right space-x-2">
+                  {t.source === "SELF" && !t.verified ? <button className="text-emerald-700 hover:underline" onClick={() => verify(t)}>Approve pts</button> : null}
                   {t.status !== "COMPLETED" ? <button className="text-emerald-700 hover:underline" onClick={() => markComplete(t)}>Complete</button>
                     : <button className="text-slate-500 hover:underline" onClick={() => reopen(t)}>Reopen</button>}
                   <button className="text-red-600 hover:underline" onClick={() => removeAssignment(t)}>Delete</button>

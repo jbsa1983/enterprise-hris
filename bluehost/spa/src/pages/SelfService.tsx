@@ -370,7 +370,7 @@ export default function SelfServicePage() {
       {tab === "Training" ? (
         <Section title="My Training & Credentials">
           <div className="mb-3 inline-flex items-center gap-2 rounded-lg bg-geek-blue/10 px-3 py-1.5 text-sm text-geek-bluedark">
-            <span className="font-semibold">{trainings.filter((t) => t.status === "COMPLETED").reduce((s, t) => s + Number(t.points || 0), 0)}</span> training points earned
+            <span className="font-semibold">{trainings.filter((t) => t.status === "COMPLETED" && t.verified).reduce((s, t) => s + Number(t.points || 0), 0)}</span> training points earned
           </div>
           <div className="space-y-2">
             {trainings.map((t) => {
@@ -381,6 +381,7 @@ export default function SelfServicePage() {
                     <div>
                       <div className="font-medium text-slate-800">{t.course_title}
                         {t.source === "SELF" ? <span className="ml-2 badge bg-slate-100 text-slate-500">Self-added</span> : null}
+                        {t.source === "SELF" && !t.verified ? <span className="ml-2 badge bg-amber-100 text-amber-700">Pending approval</span> : null}
                         {Number(t.points) > 0 ? <span className="ml-2 text-xs text-slate-400">{t.points} pts</span> : null}
                       </div>
                       <div className="text-xs text-slate-400">

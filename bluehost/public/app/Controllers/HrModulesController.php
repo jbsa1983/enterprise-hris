@@ -22,6 +22,7 @@ class HrModulesController
         $r->post("$b/training/assign-bulk", [self::class, 'assignBulk']);
         $r->post("$b/training/assignments/{id}/complete", [self::class, 'completeTraining']);
         $r->post("$b/training/assignments/{id}/reopen", [self::class, 'reopenTraining']);
+        $r->post("$b/training/assignments/{id}/verify", [self::class, 'verifyTraining']);
         $r->delete("$b/training/assignments/{id}", [self::class, 'deleteAssignment']);
         $r->get("$b/training/assignments/{id}/certificate", [self::class, 'assignmentCertificate']);
         // Service desk
@@ -99,7 +100,7 @@ class HrModulesController
             'id' => (int) $t['id'], 'course_id' => $t['course_id'] !== null ? (int) $t['course_id'] : null,
             'engagement_id' => (int) $t['engagement_id'], 'source' => $t['source'] ?? 'ASSIGNED',
             'course_title' => $t['course_title'], 'provider' => $t['provider'], 'category' => $t['category'],
-            'points' => (float) ($t['points'] ?? 0),
+            'points' => (float) ($t['points'] ?? 0), 'verified' => (int) ($t['verified'] ?? 1) === 1,
             'employee' => $t['employee'], 'employee_number' => $t['employee_number'],
             'status' => $t['status'], 'due_date' => $t['due_date'], 'completed_date' => $t['completed_date'],
             'completion_note' => $t['completion_note'],
@@ -159,6 +160,18 @@ class HrModulesController
         Audit::record('training.assign_bulk', $u, ['organization_id' => $o, 'entity' => 'training_assignment',
             'after' => ['created' => $created, 'employees' => count($perEng), 'courses' => count($courseIds)]]);
         Http::json(['created' => $created]);
+    }
+    /** Approve a self-added training so its points count toward the employee's total. */
+    public static function verifyTraining(array $p): void
+    {
+        [$u, $o] = Auth::org($p, 'employee.edit');
+        $t = Database::one('SELECT id, engagement_id FROM training_assignments WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
+        if (!$t) throw new HttpError('Assignment not found', 404);
+        Database::update('training_assignments', (int) $t['id'], ['verified' => 1]);
+        $person = Database::scalar('SELECT person_id FROM engagements WHERE id = ?', [(int) $t['engagement_id']]);
+        if ($person) Notify::toPerson((int) $person, 'training.verified', 'Training approved', 'Your self-added training was approved — the points now count.', '/me');
+        Audit::record('training.verify', $u, ['organization_id' => $o, 'entity' => 'training_assignment', 'entity_id' => (int) $t['id']]);
+        Http::json(['id' => (int) $t['id'], 'verified' => true]);
     }
     public static function deleteAssignment(array $p): void
     {

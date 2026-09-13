@@ -310,6 +310,7 @@
     <nav class="toc no-print" aria-label="HR and admin contents">
       <h4>For HR &amp; administrators</h4>
       <ol>
+        <li><a href="#golive">Go-live checklist</a></li>
         <li><a href="#hr-people">People &amp; the 201 file</a></li>
         <li><a href="#hr-leave">Leave credits &amp; benefits</a></li>
         <li><a href="#hr-assets">Assets</a></li>
@@ -510,6 +511,26 @@
 
   <hr class="div">
 
+  <section id="golive">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>Go-live checklist</h2>
+    <p>Setting up the system for the first time? Work through this once, in order, and you'll be ready to run your first payroll with correct balances.</p>
+    <ol class="steps">
+      <li><span class="st-title">Set up the organization.</span><p><strong>Org Setup</strong> → add departments and positions. Superadmins first create the organization under <strong>Administration → Organizations</strong>.</p></li>
+      <li><span class="st-title">Add your people.</span><p><strong>People</strong> → add employees and consultants one by one, or use <strong>Template → Import CSV</strong> for a batch. Set each consultant's <strong>EWT rate</strong> (5% or 10%) in their record.</p></li>
+      <li><span class="st-title">Enter opening balances.</span><p><strong>Opening Balances</strong> → walk through each person and set their starting <strong>leave credits &amp; days already used</strong>, existing <strong>loans / cash advances</strong> (with amount already paid and original date), and current <strong>benefits</strong>. This is what makes day-one balances correct.</p></li>
+      <li><span class="st-title">Check statutory tables.</span><p>Payroll ships with the official 2025 SSS, PhilHealth, Pag-IBIG and BIR values. Superadmins can confirm them (Administration → License page notes the version).</p></li>
+      <li><span class="st-title">Turn on notifications.</span><p>Superadmin: set up <strong>email (SMTP)</strong>, optionally the <strong>Telegram</strong> bot and the <strong>daily digest</strong>, and upload your <strong>logo</strong> under Branding.</p></li>
+      <li><span class="st-title">Assign any training.</span><p><strong>Training</strong> → create courses and assign them with due dates.</p></li>
+      <li><span class="st-title">Run your first payroll.</span><p><strong>Payroll</strong> → prepare, compute, review, and finalize. Payslips become available to staff, and all downstream figures (reports, contributions, BIR &amp; agency forms) flow from here.</p></li>
+      <li><span class="st-title">Generate government forms as needed.</span><p><strong>BIR Forms</strong> (1601-C, 0619-E, 2307, 2316) and <strong>SSS / PhilHealth / HDMF</strong> remittance forms (R-3, RF-1, MCRF) are built from your posted payroll.</p></li>
+    </ol>
+    <div class="note tip">
+      <span class="lbl">Do it per person</span>
+      <p>The <strong>Opening Balances</strong> screen has Prev / Next buttons so you can move through your whole roster without jumping between tabs — the fastest way to get set up.</p>
+    </div>
+  </section>
+
   <section id="hr-people">
     <div class="eyebrow">For HR &amp; administrators</div>
     <h2>People &amp; the 201 file</h2>
@@ -588,9 +609,10 @@
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-red)"></span>2316</div><p>Annual compensation certificate per employee — all figures editable before you generate.</p></div>
     </div>
     <p>Each form opens in a new tab with a <strong>Print / Save as PDF</strong> button. The <strong>period totals</strong> to remit are also available in <strong>Reports</strong> as the <em>BIR 1601-C</em> and <em>BIR EWT</em> datasets.</p>
+    <p>The <strong>SSS / PhilHealth / HDMF</strong> page does the same for the agency remittance forms — <strong>SSS R-3</strong>, <strong>PhilHealth RF-1</strong> and <strong>Pag-IBIG MCRF</strong> — for a chosen month, with employee and employer shares. Each consultant's EWT rate (5% or 10%) is set on their record and used automatically in payroll and on Form 2307.</p>
     <div class="note warn">
       <span class="lbl">Working copies, not the official PDF</span>
-      <p>These mirror the official form's fields for your review — they are <strong>not</strong> the official BIR PDF. File and pay the actual return through <strong>eBIRForms</strong> or <strong>eFPS</strong> using the figures shown.</p>
+      <p>These mirror the official form's fields for your review — they are <strong>not</strong> the official BIR or agency PDF. File and pay through the proper facility (eBIRForms / eFPS, or the SSS/PhilHealth/Pag-IBIG online portals), and verify against the latest official tables (incl. SSS EC &amp; WISP).</p>
     </div>
   </section>
 

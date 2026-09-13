@@ -131,8 +131,9 @@ const EMPTY: any = {
   tin: "", sss_number: "", philhealth_number: "", pagibig_number: "",
   bank_name: "", bank_account_number: "", bank_account_name: "",
   engagement_type: "REGULAR", employee_number: "", salary_basis: "MONTHLY", base_rate: "",
-  department_id: "", position_id: "", start_date: "",
+  department_id: "", position_id: "", start_date: "", ewt_rate: "",
 };
+const isConsultantType = (t: string) => t === "CONSULTANT_INDIVIDUAL" || t === "CONSULTANT_COMPANY";
 
 export default function PeoplePage() {
   const orgId = Number(useParams().orgId);
@@ -185,6 +186,7 @@ export default function PeoplePage() {
       department_id: d.engagement.department_id ?? "",
       position_id: d.engagement.position_id ?? "",
       start_date: d.engagement.start_date || "",
+      ewt_rate: d.engagement.ewt_rate ?? "",
     });
     setEditing(engagementId);
   }
@@ -205,6 +207,7 @@ export default function PeoplePage() {
     if (form.department_id) e.department_id = Number(form.department_id);
     if (form.position_id) e.position_id = Number(form.position_id);
     if (form.start_date) e.start_date = form.start_date;
+    if (isConsultantType(form.engagement_type)) e.ewt_rate = form.ewt_rate !== "" ? Number(form.ewt_rate) : null;
     return e;
   }
 
@@ -413,6 +416,16 @@ export default function PeoplePage() {
                   <option value="">—</option>{positions.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
                 </select></div>
               {F("start_date", "Start date", { type: "date" })}
+              {isConsultantType(form.engagement_type) ? (
+                <div><label className="mb-1 block text-xs text-slate-500">EWT rate (%)</label>
+                  <select className="input" value={form.ewt_rate === "" ? "" : String(form.ewt_rate)} onChange={(e) => setForm({ ...form, ewt_rate: e.target.value })}>
+                    <option value="">Default (10%)</option>
+                    <option value="5">5%</option>
+                    <option value="10">10%</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">Expanded withholding tax on this consultant's fees — used automatically in payroll and on Form 2307.</p>
+                </div>
+              ) : null}
             </div>
             {typeof editing === "number" ? <DocumentsSection orgId={orgId} engagementId={editing} /> : null}
             {err ? <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}

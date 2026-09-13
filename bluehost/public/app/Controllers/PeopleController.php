@@ -10,7 +10,7 @@ class PeopleController
         'philhealth_number', 'pagibig_number', 'bank_name', 'bank_account_number', 'bank_account_name'];
     const ENG_FIELDS = ['engagement_type', 'employee_number', 'start_date', 'end_date', 'regularization_date',
         'department_id', 'position_id', 'job_grade', 'salary_basis', 'base_rate', 'payroll_group', 'cost_center',
-        'project_id', 'work_site', 'status'];
+        'project_id', 'work_site', 'status', 'ewt_rate'];
 
     // Columns for the bulk-import CSV template (order matters).
     const IMPORT_HEADERS = ['first_name', 'middle_name', 'last_name', 'suffix', 'birth_date', 'gender', 'civil_status',

@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS engagements (
   project_id INT NULL,
   work_site VARCHAR(100) NULL,
   tax_profile VARCHAR(50) NULL,
+  ewt_rate DECIMAL(5,2) NULL,
   statutory_profile VARCHAR(50) NULL,
   benefits_profile VARCHAR(50) NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
@@ -558,6 +559,7 @@ CREATE TABLE IF NOT EXISTS training_assignments (
   course_id INT NULL,
   engagement_id INT NOT NULL,
   source VARCHAR(10) DEFAULT 'ASSIGNED',   -- ASSIGNED (by HR) | SELF (employee credential)
+  verified TINYINT(1) DEFAULT 1,           -- 0 = self-added, awaiting HR approval for points
   self_title VARCHAR(150) NULL,
   self_provider VARCHAR(120) NULL,
   points DECIMAL(6,2) DEFAULT 0,

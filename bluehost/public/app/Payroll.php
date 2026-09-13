@@ -62,7 +62,9 @@ class Payroll
 
         $deductions = [];
         if ($isConsultant) {
-            $deductions['withholding_tax_ewt'] = self::r2($gross * 0.10);
+            // Per-consultant EWT rate (5% or 10%); defaults to 10% when unset.
+            $rate = ($eng['ewt_rate'] ?? null) !== null ? (float) $eng['ewt_rate'] : 10.0;
+            $deductions['withholding_tax_ewt'] = self::r2($gross * $rate / 100);
         } else {
             $sss = self::resolveRule('SSS', $onDate);
             $phic = self::resolveRule('PHIC', $onDate);

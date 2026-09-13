@@ -39,13 +39,13 @@ class EssController
         if (!$engs) { Http::json([]); return; }
         $in = implode(',', array_fill(0, count($engs), '?'));
         $rows = Database::all(
-            "SELECT ta.id, ta.status, ta.source, ta.points, ta.due_date, ta.completed_date, ta.completion_note,
+            "SELECT ta.id, ta.status, ta.source, ta.points, ta.verified, ta.due_date, ta.completed_date, ta.completion_note,
                     ta.certificate_filename, COALESCE(tc.title, ta.self_title) course_title, COALESCE(tc.provider, ta.self_provider) provider, tc.category
                FROM training_assignments ta LEFT JOIN training_courses tc ON tc.id = ta.course_id
               WHERE ta.engagement_id IN ($in) ORDER BY (ta.status = 'COMPLETED'), ta.due_date IS NULL, ta.due_date, ta.id DESC", $engs);
         Http::json(array_map(fn($t) => [
             'id' => (int) $t['id'], 'course_title' => $t['course_title'], 'provider' => $t['provider'], 'category' => $t['category'],
-            'source' => $t['source'] ?? 'ASSIGNED', 'points' => (float) ($t['points'] ?? 0),
+            'source' => $t['source'] ?? 'ASSIGNED', 'points' => (float) ($t['points'] ?? 0), 'verified' => (int) ($t['verified'] ?? 1) === 1,
             'status' => $t['status'], 'due_date' => $t['due_date'], 'completed_date' => $t['completed_date'],
             'completion_note' => $t['completion_note'], 'certificate_filename' => $t['certificate_filename'],
             'has_certificate' => !empty($t['certificate_filename']),
@@ -66,6 +66,7 @@ class EssController
             'course_id' => null, 'source' => 'SELF', 'self_title' => substr($title, 0, 150),
             'self_provider' => substr(trim((string) ($_POST['provider'] ?? '')), 0, 120) ?: null,
             'points' => (float) ($_POST['points'] ?? 0), 'status' => 'COMPLETED', 'completed_date' => $date,
+            'verified' => 0, // awaits HR approval before the points count
         ];
         // Reserve the id first so the certificate path can use it.
         $id = Database::insert('training_assignments', $data);

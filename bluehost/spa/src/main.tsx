@@ -21,6 +21,7 @@ import HrModules from "@/pages/HrModules";
 import Training from "@/pages/Training";
 import Reports from "@/pages/Reports";
 import BirForms from "@/pages/BirForms";
+import AgencyForms from "@/pages/AgencyForms";
 import SelfService from "@/pages/SelfService";
 import OrgSetup from "@/pages/OrgSetup";
 import OpeningBalances from "@/pages/OpeningBalances";
@@ -59,6 +60,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/o/:orgId/training" element={<Training />} />
         <Route path="/o/:orgId/reports" element={<Reports />} />
         <Route path="/o/:orgId/bir" element={<BirForms />} />
+        <Route path="/o/:orgId/remittances" element={<AgencyForms />} />
         <Route path="/o/:orgId/setup" element={<OrgSetup />} />
         <Route path="/o/:orgId/opening-balances" element={<OpeningBalances />} />
         <Route path="/me" element={<SelfService />} />
