@@ -27,6 +27,10 @@ class BirFormsController
         $r->get("$b/0619e", [self::class, 'data0619e']);
         $r->get("$b/2307", [self::class, 'data2307']);
         $r->get("$b/2316", [self::class, 'data2316']);
+        $r->get("$b/1604c", [self::class, 'data1604c']);
+        $r->get("$b/1604e", [self::class, 'data1604e']);
+        $r->post("$b/1604c/generate", [self::class, 'gen1604c']);
+        $r->post("$b/1604e/generate", [self::class, 'gen1604e']);
         $r->post("$b/1601c/generate", [self::class, 'gen1601c']);
         $r->post("$b/0619e/generate", [self::class, 'gen0619e']);
         $r->post("$b/2307/generate", [self::class, 'gen2307']);
@@ -384,6 +388,113 @@ class BirFormsController
             . "<div class='tot'><div class='totbox'><div class='lbl'>Tax withheld for the year (2316)</div><div class='amt'>₱ " . self::n($wt) . "</div></div></div>"
             . self::signatures('Employer / Authorized representative', 'Employee');
         self::page('2316', 'Certificate of Compensation Payment / Tax Withheld for Compensation', $inner);
+    }
+
+    // ---- 1604-C: annual alphalist of compensation withholding (all employees) ----
+    public static function data1604c(array $p): void
+    {
+        [, $o] = Auth::org($p, 'payroll.view');
+        $year = (int) Http::query('year', 0);
+        if (!$year) throw new HttpError('Choose a year', 422);
+        $c = self::inTypes();
+        $rows = Database::all(
+            "SELECT e.id engagement_id, e.employee_number, CONCAT_WS(' ', pe.first_name, pe.last_name) name, pe.tin, prp.gross_pay, prp.deductions
+               FROM payroll_run_people prp
+               JOIN payroll_runs pr ON pr.id = prp.run_id
+               JOIN payroll_periods pp ON pp.id = pr.period_id
+               JOIN engagements e ON e.id = prp.engagement_id
+               JOIN people pe ON pe.id = e.person_id
+              WHERE pr.organization_id = ? AND e.engagement_type NOT IN ($c)
+                AND YEAR(COALESCE(pp.pay_date, pp.period_end)) = ?",
+            array_merge([$o], self::CONSULTANT_TYPES, [$year]));
+        $by = [];
+        foreach ($rows as $r) {
+            $d = self::contrib(json_decode($r['deductions'] ?: '{}', true) ?: []);
+            $taxable = max((float) $r['gross_pay'] - $d['sss'] - $d['philhealth'] - $d['pagibig'], 0);
+            $id = (int) $r['engagement_id'];
+            if (!isset($by[$id])) $by[$id] = ['employee_number' => $r['employee_number'], 'name' => $r['name'], 'tin' => $r['tin'] ?: '', 'gross' => 0, 'taxable' => 0, 'withholding_tax' => 0];
+            $by[$id]['gross'] += round((float) $r['gross_pay'], 2);
+            $by[$id]['taxable'] += round($taxable, 2);
+            $by[$id]['withholding_tax'] += round($d['wtax'], 2);
+        }
+        $lines = array_values($by);
+        Http::json(['company' => self::company($o), 'year' => $year, 'lines' => $lines,
+            'totals' => ['count' => count($lines), 'gross' => round(array_sum(array_column($lines, 'gross')), 2),
+                'taxable' => round(array_sum(array_column($lines, 'taxable')), 2), 'withholding_tax' => round(array_sum(array_column($lines, 'withholding_tax')), 2)]]);
+    }
+
+    // ---- 1604-E: annual alphalist of expanded withholding (all payees) -----------
+    public static function data1604e(array $p): void
+    {
+        [, $o] = Auth::org($p, 'payroll.view');
+        $year = (int) Http::query('year', 0);
+        if (!$year) throw new HttpError('Choose a year', 422);
+        $c = self::inTypes();
+        $rows = Database::all(
+            "SELECT e.id engagement_id, e.employee_number, CONCAT_WS(' ', pe.first_name, pe.last_name) name, pe.tin, prp.gross_pay, prp.deductions
+               FROM payroll_run_people prp
+               JOIN payroll_runs pr ON pr.id = prp.run_id
+               JOIN payroll_periods pp ON pp.id = pr.period_id
+               JOIN engagements e ON e.id = prp.engagement_id
+               JOIN people pe ON pe.id = e.person_id
+              WHERE pr.organization_id = ? AND e.engagement_type IN ($c)
+                AND YEAR(COALESCE(pp.pay_date, pp.period_end)) = ?",
+            array_merge([$o], self::CONSULTANT_TYPES, [$year]));
+        $by = [];
+        foreach ($rows as $r) {
+            $d = self::contrib(json_decode($r['deductions'] ?: '{}', true) ?: []);
+            $id = (int) $r['engagement_id'];
+            if (!isset($by[$id])) $by[$id] = ['employee_number' => $r['employee_number'], 'name' => $r['name'], 'tin' => $r['tin'] ?: '', 'income_payment' => 0, 'ewt' => 0];
+            $by[$id]['income_payment'] += round((float) $r['gross_pay'], 2);
+            $by[$id]['ewt'] += round($d['ewt'], 2);
+        }
+        $lines = array_values($by);
+        Http::json(['company' => self::company($o), 'year' => $year, 'lines' => $lines,
+            'totals' => ['count' => count($lines), 'income_payment' => round(array_sum(array_column($lines, 'income_payment')), 2), 'ewt' => round(array_sum(array_column($lines, 'ewt')), 2)]]);
+    }
+
+    public static function gen1604c(array $p): void
+    {
+        [, $o] = Auth::org($p, 'payroll.view');
+        $b = Http::body();
+        $company = self::company($o); $year = (int) ($b['year'] ?? 0);
+        $lines = is_array($b['lines'] ?? null) ? $b['lines'] : [];
+        $rows = ''; $tTax = 0.0; $tWt = 0.0;
+        foreach ($lines as $ln) {
+            $tax = (float) ($ln['taxable'] ?? 0); $wt = (float) ($ln['withholding_tax'] ?? 0);
+            $tTax += $tax; $tWt += $wt;
+            $rows .= '<tr><td>' . self::e($ln['employee_number'] ?? '') . '</td><td>' . self::e($ln['name'] ?? '')
+                . '</td><td>' . self::e($ln['tin'] ?? '') . "</td><td class='num'>" . self::n($tax) . "</td><td class='num'>" . self::n($wt) . '</td></tr>';
+        }
+        $inner = self::agentBox($company)
+            . "<div class='row'><div><div class='lbl'>For the year</div><div class='val'>$year</div></div><div><div class='lbl'>No. of employees</div><div class='val'>" . count($lines) . "</div></div></div>"
+            . "<table><thead><tr><th>Emp. No.</th><th>Employee (alphalist)</th><th>TIN</th><th class='num'>Taxable compensation (year)</th><th class='num'>Tax withheld (year)</th></tr></thead>"
+            . "<tbody>$rows</tbody><tfoot><tr><td colspan='3'>Totals</td><td class='num'>" . self::n($tTax) . "</td><td class='num'>" . self::n($tWt) . "</td></tr></tfoot></table>"
+            . "<div class='tot'><div class='totbox'><div class='lbl'>Total tax withheld on compensation for $year (1604-C)</div><div class='amt'>₱ " . self::n($tWt) . "</div></div></div>"
+            . self::signatures();
+        self::page('1604-C', 'Annual Information Return of Income Taxes Withheld on Compensation', $inner);
+    }
+
+    public static function gen1604e(array $p): void
+    {
+        [, $o] = Auth::org($p, 'payroll.view');
+        $b = Http::body();
+        $company = self::company($o); $year = (int) ($b['year'] ?? 0);
+        $lines = is_array($b['lines'] ?? null) ? $b['lines'] : [];
+        $rows = ''; $tInc = 0.0; $tEwt = 0.0;
+        foreach ($lines as $ln) {
+            $inc = (float) ($ln['income_payment'] ?? 0); $ewt = (float) ($ln['ewt'] ?? 0);
+            $tInc += $inc; $tEwt += $ewt;
+            $rows .= '<tr><td>' . self::e($ln['name'] ?? '') . '</td><td>' . self::e($ln['tin'] ?? '')
+                . "</td><td class='num'>" . self::n($inc) . "</td><td class='num'>" . self::n($ewt) . '</td></tr>';
+        }
+        $inner = self::agentBox($company)
+            . "<div class='row'><div><div class='lbl'>For the year</div><div class='val'>$year</div></div><div><div class='lbl'>No. of payees</div><div class='val'>" . count($lines) . "</div></div></div>"
+            . "<table><thead><tr><th>Payee (alphalist)</th><th>TIN</th><th class='num'>Income payments (year)</th><th class='num'>EWT withheld (year)</th></tr></thead>"
+            . "<tbody>$rows</tbody><tfoot><tr><td colspan='2'>Totals</td><td class='num'>" . self::n($tInc) . "</td><td class='num'>" . self::n($tEwt) . "</td></tr></tfoot></table>"
+            . "<div class='tot'><div class='totbox'><div class='lbl'>Total expanded tax withheld for $year (1604-E)</div><div class='amt'>₱ " . self::n($tEwt) . "</div></div></div>"
+            . self::signatures();
+        self::page('1604-E', 'Annual Information Return of Creditable Income Taxes Withheld (Expanded)', $inner);
     }
 
     private static function signatures(string $left = 'Authorized representative', string $right = 'Date'): string

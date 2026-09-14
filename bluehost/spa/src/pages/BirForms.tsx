@@ -3,7 +3,7 @@ import { useParams } from "@/lib/nav";
 import AppShell from "@/components/AppShell";
 import { apiFetch, apiOpen } from "@/lib/api";
 
-type Tab = "1601c" | "0619e" | "2307" | "2316";
+type Tab = "1601c" | "0619e" | "2307" | "2316" | "1604c" | "1604e";
 interface Month { year: number; month: number; label: string; }
 interface Person { engagement_id: number; employee_number: string | null; name: string; type: string; }
 
@@ -31,6 +31,8 @@ export default function BirFormsPage() {
     { id: "0619e", label: "0619-E", sub: "Expanded WT (monthly)" },
     { id: "2307", label: "2307", sub: "Creditable tax certificate" },
     { id: "2316", label: "2316", sub: "Annual comp. certificate" },
+    { id: "1604c", label: "1604-C", sub: "Annual comp. WT (alphalist)" },
+    { id: "1604e", label: "1604-E", sub: "Annual expanded WT (alphalist)" },
   ];
 
   return (
@@ -59,7 +61,83 @@ export default function BirFormsPage() {
       {tab === "0619e" ? <MonthlyForm orgId={orgId} months={months} kind="0619e" /> : null}
       {tab === "2307" ? <Form2307 orgId={orgId} years={years} /> : null}
       {tab === "2316" ? <Form2316 orgId={orgId} years={years} /> : null}
+      {tab === "1604c" ? <AnnualForm orgId={orgId} years={years} kind="1604c" /> : null}
+      {tab === "1604e" ? <AnnualForm orgId={orgId} years={years} kind="1604e" /> : null}
     </AppShell>
+  );
+}
+
+// ---------- 1604-C / 1604-E : annual alphalist consolidation ----------
+function AnnualForm({ orgId, years, kind }: { orgId: number; years: number[]; kind: "1604c" | "1604e" }) {
+  const [year, setYear] = useState("");
+  const [data, setData] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const isComp = kind === "1604c";
+
+  function loadYear(y: string) {
+    setYear(y); setErr(""); setData(null);
+    if (!y) return;
+    setBusy(true);
+    apiFetch<any>(`/organizations/${orgId}/bir/${kind}?year=${y}`).then(setData).catch((e) => setErr(e.message)).finally(() => setBusy(false));
+  }
+  function onGenerate() {
+    if (!data) return;
+    generate(`/organizations/${orgId}/bir/${kind}/generate`, { year: data.year, lines: data.lines }).catch((e) => setErr(e.message));
+  }
+
+  const lines: any[] = data ? data.lines || [] : [];
+  const totals = data ? data.totals : null;
+
+  return (
+    <div className="card">
+      <div className="mb-3 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">Year</label>
+          <select className="input min-w-[160px]" value={year} onChange={(e) => loadYear(e.target.value)}>
+            <option value="">Choose a year…</option>
+            {years.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <button className="btn-primary" disabled={!data || lines.length === 0} onClick={onGenerate}>Generate {isComp ? "1604-C" : "1604-E"}</button>
+      </div>
+      {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
+      {busy ? <p className="text-sm text-slate-400">Loading…</p> : null}
+      {data ? (
+        <div className="overflow-x-auto">
+          <p className="mb-2 text-xs text-slate-500">Annual consolidation for {data.year} — the alphalist of {isComp ? "employees and their compensation tax" : "payees and their expanded tax"} withheld across the whole year.</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400">
+                <th className="py-2 pr-2">{isComp ? "Employee" : "Payee"}</th><th className="py-2 pr-2">TIN</th>
+                <th className="py-2 pr-2 text-right">{isComp ? "Taxable comp. (year)" : "Income (year)"}</th>
+                <th className="py-2 pr-2 text-right">{isComp ? "Tax withheld (year)" : "EWT (year)"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l, i) => (
+                <tr key={i} className="border-b border-slate-100">
+                  <td className="py-1.5 pr-2"><span className="font-mono text-xs text-slate-400">{l.employee_number || "—"}</span> {l.name}</td>
+                  <td className="py-1.5 pr-2 font-mono text-xs text-slate-500">{l.tin || "—"}</td>
+                  <td className="py-1.5 pr-2 text-right">{fmt(isComp ? l.taxable : l.income_payment)}</td>
+                  <td className="py-1.5 pr-2 text-right">{fmt(isComp ? l.withholding_tax : l.ewt)}</td>
+                </tr>
+              ))}
+              {lines.length === 0 ? <tr><td colSpan={4} className="py-6 text-center text-slate-400">No {isComp ? "compensation" : "expanded"} withholding for {year}.</td></tr> : null}
+            </tbody>
+            {totals ? (
+              <tfoot>
+                <tr className="font-semibold">
+                  <td className="py-2 pr-2" colSpan={2}>{totals.count} {isComp ? "employees" : "payees"}</td>
+                  <td className="py-2 pr-2 text-right">₱ {fmt(isComp ? totals.taxable : totals.income_payment)}</td>
+                  <td className="py-2 pr-2 text-right">₱ {fmt(isComp ? totals.withholding_tax : totals.ewt)}</td>
+                </tr>
+              </tfoot>
+            ) : null}
+          </table>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
