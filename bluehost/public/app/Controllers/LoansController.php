@@ -13,6 +13,24 @@ class LoansController
         $r->post($b, [self::class, 'create']);
         $r->post("$b/{id}/adjust", [self::class, 'adjust']);
         $r->post("$b/{id}/decision", [self::class, 'decide']);
+        $r->delete("$b/{id}", [self::class, 'destroy']);
+    }
+
+    /** Permanently delete a loan/advance and its ledger. Superadmin only — for clearing
+     *  sample/test records. Payslips already computed keep their own deduction snapshot,
+     *  so removing the loan does not change past payroll; it only stops future deductions. */
+    public static function destroy(array $p): void
+    {
+        $u = Auth::require();
+        if (!$u['is_superadmin']) throw new HttpError('Only a superadmin can delete a loan/advance.', 403);
+        $o = (int) ($p['organization_id'] ?? 0);
+        $l = Database::one('SELECT * FROM loans WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
+        if (!$l) throw new HttpError('Loan not found', 404);
+        Database::exec('DELETE FROM loan_transactions WHERE loan_id = ?', [(int) $l['id']]);
+        Database::exec('DELETE FROM loans WHERE id = ?', [(int) $l['id']]);
+        Audit::record('loan.delete', $u, ['organization_id' => $o, 'entity' => 'loan', 'entity_id' => (int) $l['id'],
+            'before' => ['obligation_type' => $l['obligation_type'], 'balance' => (float) $l['balance'], 'status' => $l['status']]]);
+        Http::json(['ok' => true, 'id' => (int) $l['id']]);
     }
 
     private static function shape(array $l): array

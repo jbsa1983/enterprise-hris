@@ -18,6 +18,7 @@ export default function LoansPage() {
   const [modal, setModal] = useState<null | "new" | { adjust: any }>(null);
   const [form, setForm] = useState<any>({});
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
+  const [isSuper, setIsSuper] = useState(false);
 
   const load = useCallback(() => {
     apiFetch(`/organizations/${orgId}/loans/summary`).then(setSummary).catch(() => {});
@@ -26,6 +27,7 @@ export default function LoansPage() {
     apiFetch(`/organizations/${orgId}/people`).then(setPeople).catch(() => {});
   }, [orgId, tab]);
   useEffect(load, [load]);
+  useEffect(() => { apiFetch<any>("/auth/me").then((u) => setIsSuper(!!u.is_superadmin)).catch(() => {}); }, []);
 
   const totalOut = rows.reduce((s, r) => s + (r.balance || 0), 0);
 
@@ -56,6 +58,14 @@ export default function LoansPage() {
     try {
       await apiFetch(`/organizations/${orgId}/loans/${loan.id}/decision`, { method: "POST", body: JSON.stringify({ decision }) });
       setMsg(decision === "APPROVED" ? "Request approved." : "Request rejected."); load();
+    } catch (e: any) { setErr(e.message); }
+  }
+  async function deleteLoan(loan: any) {
+    if (!confirm(`Permanently delete this ${label(loan.obligation_type)} for ${loan.person} and its ledger? This cannot be undone.`)) return;
+    setErr("");
+    try {
+      await apiFetch(`/organizations/${orgId}/loans/${loan.id}`, { method: "DELETE" });
+      setMsg("Loan/advance deleted."); load();
     } catch (e: any) { setErr(e.message); }
   }
 
@@ -97,14 +107,17 @@ export default function LoansPage() {
                 <td className="px-4 py-2 text-right">{peso(r.installment_amount)}</td>
                 <td className="px-4 py-2"><span className={`badge ${r.status === "PENDING" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{r.status}</span></td>
                 <td className="px-4 py-2 text-right whitespace-nowrap">
-                  {r.status === "PENDING" ? (
-                    <span className="space-x-3">
-                      <button className="text-emerald-700 hover:underline" onClick={() => decide(r, "APPROVED")}>Approve</button>
-                      <button className="text-red-600 hover:underline" onClick={() => decide(r, "REJECTED")}>Reject</button>
-                    </span>
-                  ) : r.balance > 0 ? (
-                    <button className="text-brand-700 hover:underline" onClick={() => { setForm({ entry_type: "DIRECT_PAYMENT" }); setModal({ adjust: r }); }}>Adjust</button>
-                  ) : null}
+                  <span className="space-x-3">
+                    {r.status === "PENDING" ? (
+                      <>
+                        <button className="text-emerald-700 hover:underline" onClick={() => decide(r, "APPROVED")}>Approve</button>
+                        <button className="text-red-600 hover:underline" onClick={() => decide(r, "REJECTED")}>Reject</button>
+                      </>
+                    ) : r.balance > 0 ? (
+                      <button className="text-brand-700 hover:underline" onClick={() => { setForm({ entry_type: "DIRECT_PAYMENT" }); setModal({ adjust: r }); }}>Adjust</button>
+                    ) : null}
+                    {isSuper ? <button className="text-red-600 hover:underline" onClick={() => deleteLoan(r)}>Delete</button> : null}
+                  </span>
                 </td>
               </tr>
             ))}

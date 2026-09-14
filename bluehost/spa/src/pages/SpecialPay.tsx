@@ -13,12 +13,14 @@ export default function SpecialPayPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<any>({ pay_type: "13TH_MONTH", year: new Date().getFullYear(), name: "", all: true, engagement_ids: [] as number[] });
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
+  const [isSuper, setIsSuper] = useState(false);
 
   const loadRuns = useCallback(() => {
     apiFetch(`/organizations/${orgId}/special-pay`).then(setRuns).catch((e) => setErr(e.message));
     apiFetch(`/organizations/${orgId}/people?status=ACTIVE`).then(setPeople).catch(() => {});
   }, [orgId]);
   useEffect(loadRuns, [loadRuns]);
+  useEffect(() => { apiFetch<any>("/auth/me").then((u) => setIsSuper(!!u.is_superadmin)).catch(() => {}); }, []);
 
   function openRun(id: number) { apiFetch(`/organizations/${orgId}/special-pay/${id}`).then(setSel); }
 
@@ -39,6 +41,14 @@ export default function SpecialPayPage() {
   async function finalize() {
     await apiFetch(`/organizations/${orgId}/special-pay/${sel.id}/finalize`, { method: "POST" });
     setMsg("Run finalized."); loadRuns(); openRun(sel.id);
+  }
+  async function deleteRun() {
+    if (!confirm(`Permanently delete "${sel.name}" and its lines? This cannot be undone.`)) return;
+    setErr("");
+    try {
+      await apiFetch(`/organizations/${orgId}/special-pay/${sel.id}`, { method: "DELETE" });
+      setMsg("Run deleted."); setSel(null); loadRuns();
+    } catch (e: any) { setErr(e.message); }
   }
 
   return (
@@ -72,6 +82,7 @@ export default function SpecialPayPage() {
                 <div className="flex gap-2">
                   <button className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50" onClick={() => apiDownload(`/organizations/${orgId}/special-pay/${sel.id}/export`, `${sel.pay_type}_${sel.year}.csv`)}>Export CSV</button>
                   {sel.status !== "GENERATED" ? <button className="btn-primary !py-1.5" onClick={finalize}>Finalize</button> : <span className="badge bg-emerald-100 text-emerald-700">Generated</span>}
+                  {isSuper ? <button className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50" onClick={deleteRun}>Delete run</button> : null}
                 </div>
               </div>
               <div className="max-h-96 overflow-y-auto">

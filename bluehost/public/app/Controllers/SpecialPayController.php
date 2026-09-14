@@ -12,6 +12,23 @@ class SpecialPayController
         $r->put("$b/{id}/lines/{line_id}", [self::class, 'overrideLine']);
         $r->post("$b/{id}/finalize", [self::class, 'finalize']);
         $r->get("$b/{id}/export", [self::class, 'export']);
+        $r->delete("$b/{id}", [self::class, 'destroy']);
+    }
+
+    /** Permanently delete a 13th-month / bonus run and its lines. Superadmin only —
+     *  for clearing sample/test runs. These runs don't post to payroll, so nothing to reverse. */
+    public static function destroy(array $p): void
+    {
+        $u = Auth::require();
+        if (!$u['is_superadmin']) throw new HttpError('Only a superadmin can delete a run.', 403);
+        $o = (int) ($p['organization_id'] ?? 0);
+        $run = Database::one('SELECT * FROM special_pay_runs WHERE id = ? AND organization_id = ?', [(int) $p['id'], $o]);
+        if (!$run) throw new HttpError('Run not found', 404);
+        Database::exec('DELETE FROM special_pay_lines WHERE run_id = ?', [(int) $run['id']]);
+        Database::exec('DELETE FROM special_pay_runs WHERE id = ?', [(int) $run['id']]);
+        Audit::record('special_pay.delete', $u, ['organization_id' => $o, 'entity' => 'special_pay_run', 'entity_id' => (int) $run['id'],
+            'before' => ['name' => $run['name'], 'pay_type' => $run['pay_type'], 'status' => $run['status']]]);
+        Http::json(['ok' => true, 'id' => (int) $run['id']]);
     }
 
     private static function basicEarned(int $engId, int $year): float
