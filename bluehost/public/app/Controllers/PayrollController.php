@@ -15,6 +15,36 @@ class PayrollController
         $r->post("$b/runs/{run_id}/lock", [self::class, 'lock']);
         $r->post("$b/runs/{run_id}/generate-payslips", [self::class, 'generatePayslips']);
         $r->get("$b/runs/{run_id}/payslips", [self::class, 'listPayslips']);
+        $r->delete("$b/runs/{run_id}", [self::class, 'destroy']);
+    }
+
+    /** Permanently delete a payroll run (superadmin only) — for cleaning up test runs.
+     *  Reverses this run's loan deductions and removes its payslips and lines. */
+    public static function destroy(array $p): void
+    {
+        $u = Auth::require();
+        if (!$u['is_superadmin']) throw new HttpError('Only a superadmin can delete a payroll run', 403);
+        $orgId = (int) $p['organization_id'];
+        $run = self::getRun($orgId, (int) $p['run_id']);
+        // Reverse any loan installments this run deducted, then drop the ledger entries.
+        foreach (Database::all('SELECT * FROM loan_transactions WHERE payroll_run_id = ?', [$run['id']]) as $t) {
+            if ($t['entry_type'] === 'PAYROLL_DEDUCTION') {
+                $loan = Database::one('SELECT * FROM loans WHERE id = ?', [$t['loan_id']]);
+                if ($loan) Database::update('loans', (int) $loan['id'], [
+                    'balance' => (float) $loan['balance'] + (float) $t['amount'],
+                    'amount_paid' => max((float) $loan['amount_paid'] - (float) $t['amount'], 0),
+                    'status' => 'ACTIVE',
+                ]);
+            }
+            Database::exec('DELETE FROM loan_transactions WHERE id = ?', [$t['id']]);
+        }
+        Database::exec('DELETE FROM payroll_run_people WHERE run_id = ?', [$run['id']]);
+        Database::exec('DELETE FROM payslips WHERE payroll_run_id = ?', [$run['id']]);
+        try { Database::exec('DELETE FROM bank_export_runs WHERE payroll_run_id = ?', [$run['id']]); } catch (\Throwable $e) { /* optional */ }
+        Database::exec('DELETE FROM payroll_runs WHERE id = ?', [$run['id']]);
+        Audit::record('payroll.delete', $u, ['organization_id' => $orgId, 'entity' => 'payroll_run', 'entity_id' => $run['id'],
+            'before' => ['reference' => $run['reference'], 'status' => $run['status']]]);
+        Http::json(['ok' => true]);
     }
 
     private static function guard(array $p, string $perm): array
@@ -108,6 +138,7 @@ class PayrollController
         }
         Database::exec('DELETE FROM payroll_run_people WHERE run_id = ?', [$run['id']]);
 
+        $factor = Payroll::periodFactor($period['frequency'] ?? 'MONTHLY');
         $engs = Database::all("SELECT * FROM engagements WHERE organization_id = ? AND status = 'ACTIVE'", [$orgId]);
         $gt = $dt = $nt = 0.0;
         foreach ($engs as $eng) {
@@ -121,7 +152,7 @@ class PayrollController
                     $plan[] = [$loan, $amt];
                 }
             }
-            $line = Payroll::computeLine($eng, $onDate, $allowance, $inst);
+            $line = Payroll::computeLine($eng, $onDate, $allowance, $inst, $factor);
             Database::insert('payroll_run_people', [
                 'run_id' => $run['id'], 'engagement_id' => $eng['id'], 'gross_pay' => $line['gross_pay'],
                 'total_deductions' => $line['total_deductions'], 'net_pay' => $line['net_pay'],

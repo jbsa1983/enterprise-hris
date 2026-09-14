@@ -36,6 +36,7 @@ export default function PayrollPage() {
   const [busy, setBusy] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [nf, setNf] = useState<any>({ period_id: "", frequency: "MONTHLY", ...thisMonth() });
+  const [isSuper, setIsSuper] = useState(false);
 
   const reloadRuns = useCallback((keepId?: number) => {
     return apiFetch<Run[]>(`/organizations/${orgId}/payroll/runs`).then((r) => {
@@ -47,6 +48,7 @@ export default function PayrollPage() {
     reloadRuns();
     apiFetch<Template[]>(`/organizations/${orgId}/bank-templates`).then((t) => { setTemplates(t); setTplId(t[0]?.id ?? null); }).catch(() => {});
     apiFetch<any[]>(`/organizations/${orgId}/payroll/periods`).then(setPeriods).catch(() => {});
+    apiFetch<any>("/auth/me").then((u) => setIsSuper(!!u.is_superadmin)).catch(() => {});
   }, [orgId, reloadRuns]);
 
   const loadSlips = useCallback((runId: number) => {
@@ -75,6 +77,13 @@ export default function PayrollPage() {
     if (!sel) return;
     setBusy(true); setMsg("");
     try { await apiFetch(`/organizations/${orgId}/payroll/runs/${sel.id}/${path}`, { method: "POST", body: JSON.stringify({}) }); await reloadRuns(sel.id); setMsg(okMsg); }
+    catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  }
+  async function deleteRun() {
+    if (!sel) return;
+    if (!window.confirm(`Permanently delete payroll run "${sel.reference}"? Its payslips and lines are removed and any loan deductions it made are reversed. This can't be undone.`)) return;
+    setBusy(true); setMsg("");
+    try { await apiFetch(`/organizations/${orgId}/payroll/runs/${sel.id}`, { method: "DELETE" }); setSel(null); await reloadRuns(); setMsg("Payroll run deleted."); }
     catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
   }
 
@@ -156,6 +165,7 @@ export default function PayrollPage() {
                   {sel.status === "CALCULATED" ? <button className="rounded-lg border border-emerald-300 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50" onClick={() => doAction("approve", "Payroll approved.")} disabled={busy}>Approve</button> : null}
                   {sel.status === "APPROVED" ? <button className="rounded-lg border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100" onClick={() => doAction("lock", "Payroll locked.")} disabled={busy}>Lock</button> : null}
                   <button className="btn-primary" onClick={generate} disabled={busy}>Generate Payslips</button>
+                  {isSuper ? <button className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50" onClick={deleteRun} disabled={busy}>Delete run</button> : null}
                   <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
                     onClick={() => apiOpen(`/organizations/${orgId}/payroll/runs/${sel.id}/payslips.pdf`)} disabled={!slips.length}>
                     View All (PDF)

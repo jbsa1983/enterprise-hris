@@ -50,15 +50,37 @@ class Payroll
         return self::r2(max($tax, 0));
     }
 
-    /** Compute one payroll line. Returns [gross_pay, total_deductions, net_pay, earnings, deductions]. */
-    public static function computeLine(array $eng, string $onDate, float $allowance = 0.0, array $installments = []): array
+    /** Fraction of a month a pay period covers (semi-monthly = 0.5, weekly ≈ 0.23). */
+    public static function periodFactor(string $frequency): float
+    {
+        switch (strtoupper($frequency)) {
+            case 'SEMI_MONTHLY': case 'SEMIMONTHLY': return 0.5;
+            case 'BI_WEEKLY': case 'BIWEEKLY': return 24.0 / 52.0;
+            case 'WEEKLY': return 12.0 / 52.0;
+            case 'DAILY': return 1.0 / 22.0;
+            default: return 1.0; // MONTHLY
+        }
+    }
+
+    /** Scale monthly BIR withholding brackets to a shorter pay period. */
+    private static function scaleBrackets(array $params, float $factor): array
+    {
+        if ($factor > 0.999 && $factor < 1.001) return $params;
+        $params['brackets'] = array_map(fn($b) => [(float) $b[0] * $factor, (float) $b[1] * $factor, (float) $b[2]], $params['brackets'] ?? []);
+        return $params;
+    }
+
+    /** Compute one payroll line. $factor prorates a monthly rate to the pay period
+     *  (e.g. 0.5 for a semi-monthly run). Returns [gross_pay, total_deductions, net_pay, earnings, deductions]. */
+    public static function computeLine(array $eng, string $onDate, float $allowance = 0.0, array $installments = [], float $factor = 1.0): array
     {
         $monthly = self::monthlyEquivalent($eng);
         $isConsultant = in_array($eng['engagement_type'], self::CONSULTANT_TYPES, true);
 
-        $earnings = ['basic' => self::r2($monthly)];
+        // Basic pay is prorated to the pay period; the base rate itself is monthly.
+        $earnings = ['basic' => self::r2($monthly * $factor)];
         if ($allowance) $earnings['allowance'] = self::r2($allowance);
-        $gross = array_sum($earnings);
+        $gross = self::r2(array_sum($earnings));
 
         $deductions = [];
         if ($isConsultant) {
@@ -70,11 +92,16 @@ class Payroll
             $phic = self::resolveRule('PHIC', $onDate);
             $hdmf = self::resolveRule('HDMF', $onDate);
             $bir = self::resolveRule('BIR', $onDate);
-            $s = $sss ? self::r2(max(min($monthly, $sss['msc_cap']), $sss['msc_floor'] ?? 0) * $sss['employee_rate']) : 0;
-            $ph = $phic ? self::r2(max(min($monthly, $phic['salary_cap']), $phic['floor']) * $phic['employee_rate']) : 0;
-            $hd = $hdmf ? self::r2(min($monthly * $hdmf['employee_rate'], $hdmf['contribution_cap'])) : 0;
+            // Monthly statutory contributions, prorated to the period (they reconcile
+            // to the full monthly amount across a month's cutoffs).
+            $sMonthly = $sss ? max(min($monthly, $sss['msc_cap']), $sss['msc_floor'] ?? 0) * $sss['employee_rate'] : 0;
+            $phMonthly = $phic ? max(min($monthly, $phic['salary_cap']), $phic['floor']) * $phic['employee_rate'] : 0;
+            $hdMonthly = $hdmf ? min($monthly * $hdmf['employee_rate'], $hdmf['contribution_cap']) : 0;
+            $s = self::r2($sMonthly * $factor);
+            $ph = self::r2($phMonthly * $factor);
+            $hd = self::r2($hdMonthly * $factor);
             $taxable = max($gross - ($s + $ph + $hd), 0);
-            $wt = $bir ? self::withholding($taxable, $bir) : 0;
+            $wt = $bir ? self::withholding($taxable, self::scaleBrackets($bir, $factor)) : 0;
             $deductions = ['sss' => $s, 'philhealth' => $ph, 'pagibig' => $hd, 'withholding_tax' => $wt];
         }
         foreach ($installments as $label => $amt) {
