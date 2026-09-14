@@ -8,6 +8,7 @@ interface Month { year: number; month: number; label: string; }
 interface Person { engagement_id: number; employee_number: string | null; name: string; type: string; }
 
 const fmt = (n: any) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function generate(path: string, payload: any) {
   return apiOpen(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -246,6 +247,8 @@ function Form2307({ orgId, years }: { orgId: number; years: number[] }) {
   const [rate, setRate] = useState("10");
   const [nature, setNature] = useState("Professional fees");
   const [atc, setAtc] = useState("WI010");
+  const [period, setPeriod] = useState<"month" | "quarter" | "year">("year");
+  const [sub, setSub] = useState(1); // 1-12 for month, 1-4 for quarter
   const [data, setData] = useState<any>(null);
   const [items, setItems] = useState<{ month: number; label: string; income: number; _inc: boolean }[]>([]);
   const [busy, setBusy] = useState(false);
@@ -253,12 +256,15 @@ function Form2307({ orgId, years }: { orgId: number; years: number[] }) {
 
   useEffect(() => { apiFetch<Person[]>(`/organizations/${orgId}/bir/people?type=consultants`).then(setConsultants).catch((e) => setErr(e.message)); }, [orgId]);
 
+  const inc = (m: number, p = period, s = sub) => p === "year" ? true : p === "month" ? m === s : Math.ceil(m / 3) === s;
+  function applyPeriod(p: typeof period, s: number) { setItems((xs) => xs.map((x) => ({ ...x, _inc: inc(x.month, p, s) }))); }
+
   function loadData(e = eng, y = year) {
     setErr(""); setData(null); setItems([]);
     if (!e || !y) return;
     setBusy(true);
     apiFetch<any>(`/organizations/${orgId}/bir/2307?engagement_id=${e}&year=${y}`)
-      .then((d) => { setData(d); setItems((d.months || []).filter((m: any) => m.income > 0).map((m: any) => ({ month: m.month, label: `${m.month_name} ${d.year}`, income: m.income, _inc: true }))); })
+      .then((d) => { setData(d); setItems((d.months || []).filter((m: any) => m.income > 0).map((m: any) => ({ month: m.month, label: `${m.month_name} ${d.year}`, income: m.income, _inc: inc(m.month) }))); })
       .catch((er) => setErr(er.message)).finally(() => setBusy(false));
   }
 
@@ -266,11 +272,12 @@ function Form2307({ orgId, years }: { orgId: number; years: number[] }) {
   const included = items.filter((i) => i._inc);
   const totInc = included.reduce((s, i) => s + Number(i.income || 0), 0);
   const totTax = totInc * r / 100;
+  const periodLabel = period === "year" ? `${year}` : period === "month" ? `${MONTH_NAMES[sub]} ${year}` : `Q${sub} ${year}`;
 
   function onGenerate() {
     if (!data) return;
     generate(`/organizations/${orgId}/bir/2307/generate`, {
-      payee: data.payee, rate: r, nature, atc,
+      payee: data.payee, rate: r, nature, atc, period_label: periodLabel,
       items: included.map((i) => ({ label: i.label, income: i.income })),
     }).catch((e) => setErr(e.message));
   }
@@ -304,16 +311,37 @@ function Form2307({ orgId, years }: { orgId: number; years: number[] }) {
           <input className="input" value={atc} onChange={(e) => setAtc(e.target.value)} />
         </div>
       </div>
-      <div className="mb-3">
-        <label className="mb-1 block text-xs text-slate-500">Nature of income payment</label>
-        <input className="input max-w-md" value={nature} onChange={(e) => setNature(e.target.value)} />
+      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">Period covered</label>
+          <select className="input" value={period} onChange={(e) => { const p = e.target.value as typeof period; setPeriod(p); const s = 1; setSub(s); applyPeriod(p, s); }}>
+            <option value="month">Monthly</option>
+            <option value="quarter">Quarterly</option>
+            <option value="year">Annual (whole year)</option>
+          </select>
+        </div>
+        {period === "month" ? (
+          <div><label className="mb-1 block text-xs text-slate-500">Month</label>
+            <select className="input" value={sub} onChange={(e) => { const s = Number(e.target.value); setSub(s); applyPeriod("month", s); }}>
+              {MONTH_NAMES.slice(1).map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </select></div>
+        ) : period === "quarter" ? (
+          <div><label className="mb-1 block text-xs text-slate-500">Quarter</label>
+            <select className="input" value={sub} onChange={(e) => { const s = Number(e.target.value); setSub(s); applyPeriod("quarter", s); }}>
+              {[1, 2, 3, 4].map((qn) => <option key={qn} value={qn}>Q{qn} (months {(qn - 1) * 3 + 1}–{qn * 3})</option>)}
+            </select></div>
+        ) : <div />}
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">Nature of income payment</label>
+          <input className="input" value={nature} onChange={(e) => setNature(e.target.value)} />
+        </div>
       </div>
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
       {busy ? <p className="text-sm text-slate-400">Loading…</p> : null}
 
       {data ? (
         <div className="overflow-x-auto">
-          <p className="mb-2 text-xs text-slate-500">Payee: <b>{data.payee.name}</b> · TIN {data.payee.tin || "—"}. Choose the months to certify (e.g. a quarter). Tax is computed at {r}%.</p>
+          <p className="mb-2 text-xs text-slate-500">Payee: <b>{data.payee.name}</b> · TIN {data.payee.tin || "—"}. The <b>Period covered</b> above sets which months are included (monthly / quarterly / annual); you can still fine-tune with the checkboxes. Tax is computed at {r}%.</p>
           <table className="w-full text-sm">
             <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400">
               <th className="py-2 pr-2"></th><th className="py-2 pr-2">Month</th><th className="py-2 pr-2 text-right">Income payment</th><th className="py-2 pr-2 text-right">Tax @ {r}%</th>
@@ -337,7 +365,7 @@ function Form2307({ orgId, years }: { orgId: number; years: number[] }) {
               <td className="py-2 pr-2 text-right">₱ {fmt(totInc)}</td><td className="py-2 pr-2 text-right">₱ {fmt(totTax)}</td>
             </tr></tfoot>
           </table>
-          <div className="mt-3"><button className="btn-primary" disabled={included.length === 0} onClick={onGenerate}>Generate 2307</button></div>
+          <div className="mt-3 flex items-center gap-3"><button className="btn-primary" disabled={included.length === 0} onClick={onGenerate}>Generate 2307</button><span className="text-xs text-slate-500">Period covered: <b>{periodLabel}</b></span></div>
         </div>
       ) : null}
     </div>

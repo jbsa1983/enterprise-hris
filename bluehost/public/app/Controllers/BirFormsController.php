@@ -337,6 +337,7 @@ class BirFormsController
         $payee = is_array($b['payee'] ?? null) ? $b['payee'] : [];
         $atc = self::e($b['atc'] ?? 'WI010 / WI011'); $rate = (float) ($b['rate'] ?? 10);
         $nature = self::e($b['nature'] ?? 'Professional fees');
+        $periodLabel = self::e($b['period_label'] ?? '');
         $items = is_array($b['items'] ?? null) ? $b['items'] : []; // [{quarter_month, income}]
         $rows = ''; $totInc = 0.0; $totTax = 0.0;
         foreach ($items as $it) {
@@ -352,6 +353,7 @@ class BirFormsController
             . "<div class='box' style='flex:1'><h4>Payor (Withholding Agent)</h4><div class='lbl'>Name</div><div class='val'>" . self::e($company['name']) . "</div>"
             . "<div class='lbl' style='margin-top:4px'>TIN</div><div class='val'>" . (self::e($company['tin']) ?: '—') . "</div>"
             . "<div class='lbl' style='margin-top:4px'>Address</div><div class='val' style='font-weight:400'>" . (self::e($company['address']) ?: '—') . "</div></div></div>"
+            . ($periodLabel ? "<div class='row'><div><div class='lbl'>Period covered</div><div class='val'>$periodLabel</div></div></div>" : '')
             . "<table><thead><tr><th>Period</th><th>Nature of payment</th><th class='num'>ATC</th><th class='num'>Amount of income payment</th><th class='num'>Rate</th><th class='num'>Tax withheld</th></tr></thead>"
             . "<tbody>$rows</tbody><tfoot><tr><td colspan='3'>Totals</td><td class='num'>" . self::n($totInc) . "</td><td></td><td class='num'>" . self::n($totTax) . "</td></tr></tfoot></table>"
             . "<div class='tot'><div class='totbox'><div class='lbl'>Total creditable tax withheld (2307)</div><div class='amt'>₱ " . self::n($totTax) . "</div></div></div>"
