@@ -47,8 +47,23 @@ class ProjectPayrollController
         return $r['name'] ?? '';
     }
 
-    /** Recompute one line from its days/OT/allowance and the run's pay date. */
-    private static function computeAndSaveLine(array $run, array $line): array
+    /** A worker's active, payroll-deductible loans/cash advances with the installment due
+     *  this run (capped at balance). Returns [total, plan] where plan = [[loan, amount], …]. */
+    private static function loanPlan(int $personId): array
+    {
+        $loans = Database::all("SELECT * FROM loans WHERE person_id = ? AND payroll_deductible = 1 AND balance > 0 AND status = 'ACTIVE' ORDER BY id", [$personId]);
+        $total = 0.0; $plan = [];
+        foreach ($loans as $loan) {
+            $amt = min((float) $loan['installment_amount'], (float) $loan['balance']);
+            if ($amt > 0) { $total += $amt; $plan[] = [$loan, round($amt, 2)]; }
+        }
+        return [round($total, 2), $plan];
+    }
+
+    /** Recompute one line from its days/OT/allowance and the run's pay date. Also folds in
+     *  the worker's loan/cash-advance installment (estimate — balances are only touched on
+     *  approve). $loanApplied lets approve store the amount actually deducted. */
+    private static function computeAndSaveLine(array $run, array $line, ?float $loanApplied = null): array
     {
         $eng = Database::one('SELECT * FROM engagements WHERE id = ?', [(int) $line['engagement_id']]);
         $rate = (float) ($line['daily_rate'] ?? 0);
@@ -56,12 +71,41 @@ class ProjectPayrollController
         $onDate = $run['pay_date'] ?: $run['period_end'];
         $c = Payroll::computeProjectLine($rate, (float) $line['days_worked'], $onDate,
             (float) $line['ot_amount'], (float) $line['allowance'], (float) $line['other_deduction']);
+        // Loan installment fits in whatever gross remains after statutory/tax/other.
+        $room = max($c['gross_pay'] - $c['total_deductions'], 0);
+        if ($loanApplied === null) {
+            [$loanTotal] = $eng ? self::loanPlan((int) $eng['person_id']) : [0.0];
+            $loan = min($loanTotal, $room);
+        } else {
+            $loan = min($loanApplied, $room);
+        }
+        $loan = round($loan, 2);
+        $totalDed = round($c['total_deductions'] + $loan, 2);
+        $net = round($c['gross_pay'] - $totalDed, 2);
         Database::update('project_pay_lines', (int) $line['id'], [
             'daily_rate' => $rate, 'basic_pay' => $c['basic_pay'], 'gross_pay' => $c['gross_pay'],
             'sss' => $c['sss'], 'philhealth' => $c['philhealth'], 'pagibig' => $c['pagibig'],
-            'withholding_tax' => $c['withholding_tax'], 'total_deductions' => $c['total_deductions'], 'net_pay' => $c['net_pay'],
+            'withholding_tax' => $c['withholding_tax'], 'loan_deduction' => $loan,
+            'total_deductions' => $totalDed, 'net_pay' => $net,
         ]);
-        return $c;
+        return array_merge($c, ['loan_deduction' => $loan, 'total_deductions' => $totalDed, 'net_pay' => $net]);
+    }
+
+    /** Reverse (add back) all loan installments this run had posted, and delete the ledger
+     *  entries. Used before re-applying on approve, and on reopen / delete. */
+    private static function reverseLoans(int $runId): void
+    {
+        foreach (Database::all("SELECT * FROM loan_transactions WHERE project_pay_run_id = ?", [$runId]) as $t) {
+            if ($t['entry_type'] === 'PAYROLL_DEDUCTION') {
+                $loan = Database::one('SELECT * FROM loans WHERE id = ?', [$t['loan_id']]);
+                if ($loan) Database::update('loans', (int) $loan['id'], [
+                    'balance' => (float) $loan['balance'] + (float) $t['amount'],
+                    'amount_paid' => max((float) $loan['amount_paid'] - (float) $t['amount'], 0),
+                    'status' => 'ACTIVE',
+                ]);
+            }
+            Database::exec('DELETE FROM loan_transactions WHERE id = ?', [(int) $t['id']]);
+        }
     }
 
     private static function retotal(int $runId): array
@@ -137,7 +181,8 @@ class ProjectPayrollController
                 'ot_amount' => (float) $l['ot_amount'], 'allowance' => (float) $l['allowance'], 'other_deduction' => (float) $l['other_deduction'],
                 'basic_pay' => (float) $l['basic_pay'], 'gross_pay' => (float) $l['gross_pay'],
                 'sss' => (float) $l['sss'], 'philhealth' => (float) $l['philhealth'], 'pagibig' => (float) $l['pagibig'],
-                'withholding_tax' => (float) $l['withholding_tax'], 'total_deductions' => (float) $l['total_deductions'],
+                'withholding_tax' => (float) $l['withholding_tax'], 'loan_deduction' => (float) ($l['loan_deduction'] ?? 0),
+                'total_deductions' => (float) $l['total_deductions'],
                 'net_pay' => (float) $l['net_pay'], 'remarks' => $l['remarks']];
         }, Database::all('SELECT * FROM project_pay_lines WHERE run_id = ? ORDER BY id', [$run['id']]));
         Http::json(['id' => (int) $run['id'], 'project_id' => (int) $proj['id'], 'project_name' => $proj['project_name'],
@@ -166,7 +211,8 @@ class ProjectPayrollController
         $fresh = Database::one('SELECT * FROM project_pay_lines WHERE id = ?', [(int) $line['id']]);
         Http::json(['line_id' => (int) $line['id'], 'gross_pay' => (float) $fresh['gross_pay'], 'net_pay' => (float) $fresh['net_pay'],
             'sss' => (float) $fresh['sss'], 'philhealth' => (float) $fresh['philhealth'], 'pagibig' => (float) $fresh['pagibig'],
-            'withholding_tax' => (float) $fresh['withholding_tax'], 'basic_pay' => (float) $fresh['basic_pay'], 'totals' => $totals]);
+            'withholding_tax' => (float) $fresh['withholding_tax'], 'loan_deduction' => (float) ($fresh['loan_deduction'] ?? 0),
+            'total_deductions' => (float) $fresh['total_deductions'], 'basic_pay' => (float) $fresh['basic_pay'], 'totals' => $totals]);
     }
 
     public static function recompute(array $p): void
@@ -187,6 +233,36 @@ class ProjectPayrollController
     {
         [$u, $o] = Auth::org($p, 'payroll.approve');
         $run = self::findRun($o, (int) $p['run_id']);
+        if ($run['status'] === 'APPROVED') throw new HttpError('This run is already approved.', 409);
+        // Apply loan/cash-advance installments against live balances, then lock.
+        self::reverseLoans((int) $run['id']); // safety — clear any stale entries
+        $onDate = $run['pay_date'] ?: $run['period_end'];
+        foreach (Database::all('SELECT * FROM project_pay_lines WHERE run_id = ?', [$run['id']]) as $l) {
+            $eng = Database::one('SELECT person_id FROM engagements WHERE id = ?', [(int) $l['engagement_id']]);
+            $personId = $eng ? (int) $eng['person_id'] : 0;
+            // Recompute statutory/tax, find room for loans in the remaining gross.
+            $c = Payroll::computeProjectLine((float) $l['daily_rate'], (float) $l['days_worked'], $onDate,
+                (float) $l['ot_amount'], (float) $l['allowance'], (float) $l['other_deduction']);
+            $room = max($c['gross_pay'] - $c['total_deductions'], 0);
+            [$loanTotal, $plan] = $personId ? self::loanPlan($personId) : [0.0, []];
+            $applied = 0.0; $remaining = min($loanTotal, $room);
+            foreach ($plan as [$loan, $amt]) {
+                $take = round(min($amt, $remaining), 2);
+                if ($take <= 0) break;
+                $newBal = round((float) $loan['balance'] - $take, 2);
+                Database::update('loans', (int) $loan['id'], [
+                    'balance' => $newBal, 'amount_paid' => round((float) $loan['amount_paid'] + $take, 2),
+                    'status' => $newBal <= 0.005 ? 'PAID' : 'ACTIVE',
+                ]);
+                Database::insert('loan_transactions', [
+                    'loan_id' => (int) $loan['id'], 'entry_type' => 'PAYROLL_DEDUCTION', 'amount' => $take,
+                    'balance_after' => $newBal, 'project_pay_run_id' => (int) $run['id'],
+                    'period_label' => $run['reference'], 'entry_date' => $onDate, 'remarks' => 'Project pay run',
+                ]);
+                $applied += $take; $remaining -= $take;
+            }
+            self::computeAndSaveLine($run, $l, round($applied, 2));
+        }
         self::retotal((int) $run['id']);
         Database::update('project_pay_runs', (int) $run['id'], ['status' => 'APPROVED']);
         Audit::record('project_payroll.approve', $u, ['organization_id' => $o, 'entity' => 'project_pay_run', 'entity_id' => (int) $run['id']]);
@@ -197,6 +273,10 @@ class ProjectPayrollController
     {
         [$u, $o] = Auth::org($p, 'payroll.compute');
         $run = self::findRun($o, (int) $p['run_id']);
+        // Give back the loan installments this run deducted, then recompute estimates.
+        self::reverseLoans((int) $run['id']);
+        foreach (Database::all('SELECT * FROM project_pay_lines WHERE run_id = ?', [$run['id']]) as $l) self::computeAndSaveLine($run, $l);
+        self::retotal((int) $run['id']);
         Database::update('project_pay_runs', (int) $run['id'], ['status' => 'DRAFT']);
         Audit::record('project_payroll.reopen', $u, ['organization_id' => $o, 'entity' => 'project_pay_run', 'entity_id' => (int) $run['id']]);
         Http::json(['id' => (int) $run['id'], 'status' => 'DRAFT']);
@@ -208,6 +288,7 @@ class ProjectPayrollController
         if (!$u['is_superadmin']) throw new HttpError('Only a superadmin can delete a pay run.', 403);
         $o = (int) ($p['organization_id'] ?? 0);
         $run = self::findRun($o, (int) $p['run_id']);
+        self::reverseLoans((int) $run['id']); // return any loan installments this run took
         Database::exec('DELETE FROM project_pay_lines WHERE run_id = ?', [(int) $run['id']]);
         Database::exec('DELETE FROM project_pay_runs WHERE id = ?', [(int) $run['id']]);
         Audit::record('project_payroll.delete', $u, ['organization_id' => $o, 'entity' => 'project_pay_run', 'entity_id' => (int) $run['id'],
@@ -405,13 +486,18 @@ class ProjectPayrollController
         $run = self::findRun($o, (int) $p['run_id']);
         $proj = self::project($o, (int) $run['project_id']);
         $c = self::company($o);
-        $lines = Database::all('SELECT * FROM project_pay_lines WHERE run_id = ? ORDER BY id', [$run['id']]);
+        // One worker's payslip (to send individually) when ?line= is given, else the whole run.
+        $only = (int) Http::query('line', 0);
+        $sql = 'SELECT * FROM project_pay_lines WHERE run_id = ?'; $prm = [$run['id']];
+        if ($only) { $sql .= ' AND id = ?'; $prm[] = $only; }
+        $lines = Database::all($sql . ' ORDER BY id', $prm);
         $slips = '';
         foreach ($lines as $l) {
             $name = self::engName((int) $l['engagement_id']);
             $eng = Database::one('SELECT employee_number FROM engagements WHERE id = ?', [$l['engagement_id']]);
             $dedRows = '';
-            foreach (['SSS' => $l['sss'], 'PhilHealth' => $l['philhealth'], 'Pag-IBIG' => $l['pagibig'], 'Withholding tax' => $l['withholding_tax'], 'Other' => $l['other_deduction']] as $lbl => $amt) {
+            foreach (['SSS' => $l['sss'], 'PhilHealth' => $l['philhealth'], 'Pag-IBIG' => $l['pagibig'], 'Withholding tax' => $l['withholding_tax'],
+                      'Loan / cash advance' => ($l['loan_deduction'] ?? 0), 'Other' => $l['other_deduction']] as $lbl => $amt) {
                 if ((float) $amt != 0) $dedRows .= "<tr><td>$lbl</td><td class='num'>" . self::n($amt) . '</td></tr>';
             }
             $slips .= "<div class='slip'><div class='shd'><div><b>" . self::e($c['name']) . "</b><div class='sub'>Payslip — project pay</div></div>"

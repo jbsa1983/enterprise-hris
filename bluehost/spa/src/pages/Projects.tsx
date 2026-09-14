@@ -205,7 +205,7 @@ function ProjectPayroll({ orgId, project, onChanged }: { orgId: number; project:
   async function saveLine(lineId: number, patch: any) {
     const r = await apiFetch<any>(`/organizations/${orgId}/project-pay-runs/${run.id}/lines/${lineId}`, { method: "PUT", body: JSON.stringify(patch) });
     setRun((cur: any) => ({ ...cur, gross_total: r.totals.gross_total, statutory_total: r.totals.statutory_total, net_total: r.totals.net_total,
-      lines: cur.lines.map((l: any) => (l.line_id === lineId ? { ...l, ...patch, basic_pay: r.basic_pay, gross_pay: r.gross_pay, net_pay: r.net_pay, sss: r.sss, philhealth: r.philhealth, pagibig: r.pagibig, withholding_tax: r.withholding_tax } : l)) }));
+      lines: cur.lines.map((l: any) => (l.line_id === lineId ? { ...l, ...patch, basic_pay: r.basic_pay, gross_pay: r.gross_pay, net_pay: r.net_pay, sss: r.sss, philhealth: r.philhealth, pagibig: r.pagibig, withholding_tax: r.withholding_tax, loan_deduction: r.loan_deduction, total_deductions: r.total_deductions } : l)) }));
     onChanged();
   }
   async function act(path: string, method = "POST") {
@@ -295,15 +295,16 @@ function ProjectPayroll({ orgId, project, onChanged }: { orgId: number; project:
                   <thead className="bg-slate-50"><tr className="text-left uppercase text-slate-500">
                     <th className="px-2 py-1.5">Worker</th><th className="px-2 py-1.5 text-right">Rate/day</th><th className="px-2 py-1.5 text-right">Days</th>
                     <th className="px-2 py-1.5 text-right">OT</th><th className="px-2 py-1.5 text-right">Allow.</th><th className="px-2 py-1.5 text-right">Other ded.</th>
-                    <th className="px-2 py-1.5 text-right">Gross</th><th className="px-2 py-1.5 text-right">Statutory</th><th className="px-2 py-1.5 text-right">Tax</th><th className="px-2 py-1.5 text-right">Net</th>
+                    <th className="px-2 py-1.5 text-right">Gross</th><th className="px-2 py-1.5 text-right">Statutory</th><th className="px-2 py-1.5 text-right">Tax</th>
+                    <th className="px-2 py-1.5 text-right">Loan</th><th className="px-2 py-1.5 text-right">Net</th><th className="px-2 py-1.5"></th>
                   </tr></thead>
                   <tbody className="divide-y divide-slate-100">
-                    {run.lines.map((l: any) => <PayLine key={l.line_id} line={l} editable={editable} onSave={saveLine} />)}
-                    {run.lines.length === 0 ? <tr><td colSpan={10} className="px-2 py-4 text-center text-slate-400">No workers — assign site workers to this project first.</td></tr> : null}
+                    {run.lines.map((l: any) => <PayLine key={l.line_id} line={l} editable={editable} onSave={saveLine} onSlip={() => apiOpen(`/organizations/${orgId}/project-pay-runs/${run.id}/payslips?line=${l.line_id}`)} />)}
+                    {run.lines.length === 0 ? <tr><td colSpan={12} className="px-2 py-4 text-center text-slate-400">No workers — assign site workers to this project first.</td></tr> : null}
                   </tbody>
                 </table>
               </div>
-              <p className="mt-2 text-[11px] text-slate-400">Pay = daily rate × days worked (+ OT + allowance). SSS/PhilHealth/Pag-IBIG are prorated by time worked and tagged to this project. {editable ? "Type days per worker; totals update on blur." : "Approved — reopen to edit."}</p>
+              <p className="mt-2 text-[11px] text-slate-400">Pay = daily rate × days worked (+ OT + allowance). SSS/PhilHealth/Pag-IBIG are prorated by time worked and tagged to this project. The <strong>Loan</strong> column is each worker's cash-advance / loan installment (auto — shown as an estimate, actually deducted from their balance on <strong>Approve</strong>; reopening returns it). {editable ? "Type days per worker; totals update on blur. Use the per-row Payslip to print/send one worker." : "Approved — reopen to edit."}</p>
             </>
           ) : <div className="flex h-40 items-center justify-center text-xs text-slate-400">Select or create a pay run.</div>}
         </div>
@@ -312,7 +313,7 @@ function ProjectPayroll({ orgId, project, onChanged }: { orgId: number; project:
   );
 }
 
-function PayLine({ line, editable, onSave }: any) {
+function PayLine({ line, editable, onSave, onSlip }: any) {
   const [d, setD] = useState(String(line.days_worked ?? ""));
   const [ot, setOt] = useState(String(line.ot_amount ?? ""));
   const [al, setAl] = useState(String(line.allowance ?? ""));
@@ -331,7 +332,9 @@ function PayLine({ line, editable, onSave }: any) {
       <td className="px-2 py-1 text-right font-medium">{peso(line.gross_pay)}</td>
       <td className="px-2 py-1 text-right">{peso((line.sss || 0) + (line.philhealth || 0) + (line.pagibig || 0))}</td>
       <td className="px-2 py-1 text-right">{peso(line.withholding_tax)}</td>
+      <td className="px-2 py-1 text-right">{peso(line.loan_deduction)}</td>
       <td className="px-2 py-1 text-right font-semibold">{peso(line.net_pay)}</td>
+      <td className="px-2 py-1 text-right"><button className="text-brand-700 hover:underline" onClick={onSlip}>Payslip</button></td>
     </tr>
   );
 }
