@@ -329,36 +329,134 @@ class BirFormsController
         self::page('0619-E', 'Monthly Remittance Form for Creditable Income Taxes Withheld (Expanded)', $inner);
     }
 
+    /** Render an "MM/DD/YYYY" string into the form's 8 separate date boxes. */
+    private static function dateBoxes(string $mdY): string
+    {
+        $digits = preg_replace('/\D/', '', $mdY); // MMDDYYYY
+        $digits = str_pad(substr($digits, 0, 8), 8, ' ');
+        $cells = '';
+        for ($i = 0; $i < 8; $i++) $cells .= "<span class='db'>" . self::e($digits[$i] === ' ' ? '' : $digits[$i]) . '</span>';
+        return "<span class='dbwrap'>$cells</span>";
+    }
+    /** Render a TIN string into boxed groups (000-000-000-000). */
+    private static function tinBoxes(string $tin): string
+    {
+        $d = preg_replace('/\D/', '', $tin);
+        $groups = [substr($d, 0, 3), substr($d, 3, 3), substr($d, 6, 3), substr($d, 9, 5)];
+        $out = '';
+        foreach ($groups as $gi => $g) {
+            $out .= "<span class='tinb'>" . self::e($g) . '</span>';
+            if ($gi < 3) $out .= "<span class='tindash'>-</span>";
+        }
+        return "<span class='tinwrap'>$out</span>";
+    }
+
     public static function gen2307(array $p): void
     {
         [, $o] = Auth::org($p, 'payroll.view');
         $b = Http::body();
         $company = self::company($o);
         $payee = is_array($b['payee'] ?? null) ? $b['payee'] : [];
-        $atc = self::e($b['atc'] ?? 'WI010 / WI011'); $rate = (float) ($b['rate'] ?? 10);
+        $atc = self::e($b['atc'] ?? '');
+        $rate = (float) ($b['rate'] ?? 10);
         $nature = self::e($b['nature'] ?? 'Professional fees');
-        $periodLabel = self::e($b['period_label'] ?? '');
-        $items = is_array($b['items'] ?? null) ? $b['items'] : []; // [{quarter_month, income}]
-        $rows = ''; $totInc = 0.0; $totTax = 0.0;
-        foreach ($items as $it) {
-            $inc = (float) ($it['income'] ?? 0); if ($inc <= 0) continue;
-            $tax = round($inc * $rate / 100, 2); $totInc += $inc; $totTax += $tax;
-            $rows .= "<tr><td>" . self::e($it['label'] ?? '') . "</td><td>$nature</td><td class='num'>" . self::e($atc)
-                . "</td><td class='num'>" . self::n($inc) . "</td><td class='num'>" . rtrim(rtrim(number_format($rate, 2), '0'), '.') . "%</td><td class='num'>" . self::n($tax) . "</td></tr>";
-        }
-        $inner = "<div class='row'>"
-            . "<div class='box' style='flex:1'><h4>Payee</h4><div class='lbl'>Name</div><div class='val'>" . self::e($payee['name'] ?? '') . "</div>"
-            . "<div class='lbl' style='margin-top:4px'>TIN</div><div class='val'>" . (self::e($payee['tin'] ?? '') ?: '—') . "</div>"
-            . "<div class='lbl' style='margin-top:4px'>Address</div><div class='val' style='font-weight:400'>" . (self::e($payee['address'] ?? '') ?: '—') . "</div></div>"
-            . "<div class='box' style='flex:1'><h4>Payor (Withholding Agent)</h4><div class='lbl'>Name</div><div class='val'>" . self::e($company['name']) . "</div>"
-            . "<div class='lbl' style='margin-top:4px'>TIN</div><div class='val'>" . (self::e($company['tin']) ?: '—') . "</div>"
-            . "<div class='lbl' style='margin-top:4px'>Address</div><div class='val' style='font-weight:400'>" . (self::e($company['address']) ?: '—') . "</div></div></div>"
-            . ($periodLabel ? "<div class='row'><div><div class='lbl'>Period covered</div><div class='val'>$periodLabel</div></div></div>" : '')
-            . "<table><thead><tr><th>Period</th><th>Nature of payment</th><th class='num'>ATC</th><th class='num'>Amount of income payment</th><th class='num'>Rate</th><th class='num'>Tax withheld</th></tr></thead>"
-            . "<tbody>$rows</tbody><tfoot><tr><td colspan='3'>Totals</td><td class='num'>" . self::n($totInc) . "</td><td></td><td class='num'>" . self::n($totTax) . "</td></tr></tfoot></table>"
-            . "<div class='tot'><div class='totbox'><div class='lbl'>Total creditable tax withheld (2307)</div><div class='amt'>₱ " . self::n($totTax) . "</div></div></div>"
-            . self::signatures('Payor / Authorized representative', 'Payee');
-        self::page('2307', 'Certificate of Creditable Tax Withheld at Source', $inner);
+        $from = self::dateBoxes((string) ($b['period_from'] ?? ''));
+        $to = self::dateBoxes((string) ($b['period_to'] ?? ''));
+        $cols = is_array($b['cols'] ?? null) ? array_map('floatval', $b['cols']) : [0, 0, 0];
+        $c1 = $cols[0] ?? 0; $c2 = $cols[1] ?? 0; $c3 = $cols[2] ?? 0;
+        $total = (float) ($b['total'] ?? ($c1 + $c2 + $c3));
+        $tax = (float) ($b['tax'] ?? 0);
+        $m = fn($v) => $v > 0 ? self::n($v) : '';
+
+        // Part III income rows: our data row first, then blank rows to fill the form.
+        $incRows = "<tr><td class='l'>" . $nature . "</td><td class='c'>$atc</td><td class='num'>" . $m($c1) . "</td><td class='num'>" . $m($c2) . "</td><td class='num'>" . $m($c3) . "</td><td class='num'>" . $m($total) . "</td><td class='num'>" . $m($tax) . '</td></tr>';
+        for ($i = 0; $i < 9; $i++) $incRows .= "<tr><td class='l'>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>";
+        $bizRows = '';
+        for ($i = 0; $i < 8; $i++) $bizRows .= "<tr><td class='l'>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>";
+
+        $payeeName = self::e($payee['name'] ?? '');
+        $payeeAddr = self::e($payee['address'] ?? '');
+        $payeeTin = self::tinBoxes((string) ($payee['tin'] ?? ''));
+        $coName = self::e($company['name']);
+        $coAddr = self::e($company['address']);
+        $coTin = self::tinBoxes((string) ($company['tin'] ?? ''));
+
+        self::render2307($from, $to, $payeeTin, $payeeName, $payeeAddr, $coTin, $coName, $coAddr, $incRows, $bizRows, self::n($total), self::n($tax));
+    }
+
+    private static function render2307($from, $to, $payeeTin, $payeeName, $payeeAddr, $coTin, $coName, $coAddr, $incRows, $bizRows, $totInc, $totTax): void
+    {
+        $css = <<<CSS
+*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:9.5px;color:#000;margin:0;padding:14px;background:#eceff3}
+.sheet{width:816px;margin:0 auto;background:#fff;border:1.5px solid #000}
+.noprint{max-width:816px;margin:0 auto 10px}.btn{background:#1A73E8;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer}
+table.g{border-collapse:collapse;width:100%}
+.g td,.g th{border:1px solid #000;padding:2px 4px;vertical-align:top}
+.bar{background:#d9d9d9;font-weight:bold;text-align:center;padding:2px}
+.no{width:16px;text-align:center;font-weight:bold}
+.lbl{font-size:9px}.it{font-style:italic}
+.field{font-weight:bold;font-size:11px;min-height:15px;padding-top:2px}
+.hdr td{border:1px solid #000}.formno{font-size:26px;font-weight:800;line-height:1}
+.dbwrap,.tinwrap{display:inline-flex;gap:2px;vertical-align:middle}
+.db{display:inline-block;width:14px;height:16px;border:1px solid #000;text-align:center;font-weight:bold;line-height:16px}
+.tinb{display:inline-block;min-width:34px;height:16px;border:1px solid #000;text-align:center;font-weight:bold;line-height:16px;padding:0 3px}
+.tinb:last-child{min-width:52px}.tindash{line-height:16px;font-weight:bold}
+table.p3{border-collapse:collapse;width:100%}
+.p3 td,.p3 th{border:1px solid #000;font-size:9px;padding:2px 4px}
+.p3 th{background:#fff;text-align:center;font-weight:bold}
+.p3 td.l{width:210px}.p3 td.c{text-align:center}.p3 td.num,.p3 th.num{text-align:right}
+.p3 tr{height:15px}
+.sig{height:34px}.declaration{padding:6px 8px;font-size:9px;line-height:1.35}
+@media print{body{background:#fff;padding:0}.sheet{border:none}.noprint{display:none}@page{size:Letter;margin:8mm}}
+CSS;
+
+        $barcode = "<div style='font-family:monospace;font-size:22px;letter-spacing:-2px;overflow:hidden;height:34px'>▐█▌│█▐▌│▐█│█▌▐│█▐▌│▐█▌│█▐│▌█▐│█▌▐▌</div><div style='text-align:right;font-size:8px'>2307 01/18ENCS</div>";
+
+        header('Content-Type: text/html; charset=utf-8');
+        echo "<!doctype html><html><head><meta charset='utf-8'><title>BIR 2307</title><style>$css</style></head><body>"
+            . "<div class='noprint'><button class='btn' onclick='window.print()'>🖨 Print / Save as PDF</button></div>"
+            . "<div class='sheet'>"
+            // Masthead
+            . "<table class='g'><tr>"
+            . "<td style='width:118px'><div class='lbl'>For BIR&nbsp;&nbsp;BCS/</div><div class='lbl'>Use Only&nbsp;Item:</div><div class='lbl' style='margin-top:6px'>BIR Form No.</div><div class='formno'>2307</div><div class='lbl'>January 2018 (ENCS)</div></td>"
+            . "<td style='text-align:center'><div style='font-size:8px'>Republic of the Philippines<br>Department of Finance<br><b>Bureau of Internal Revenue</b></div><div style='font-size:17px;font-weight:800;margin-top:4px'>Certificate of Creditable Tax<br>Withheld at Source</div></td>"
+            . "<td style='width:210px'>$barcode</td></tr></table>"
+            . "<div style='border:1px solid #000;border-top:none;padding:1px 4px;font-size:9px'>Fill in all applicable spaces. Mark all appropriate boxes with an \"X\".</div>"
+            // Item 1 period
+            . "<table class='g'><tr><td class='no'>1</td><td>For the Period&nbsp;&nbsp;&nbsp; From $from &nbsp;<span class='it'>(MM/DD/YYYY)</span> &nbsp;&nbsp;&nbsp; To $to &nbsp;<span class='it'>(MM/DD/YYYY)</span></td></tr></table>"
+            . "<table class='g'><tr><td class='bar'>Part I &ndash; Payee Information</td></tr></table>"
+            . "<table class='g'><tr><td class='no'>2</td><td>Taxpayer Identification Number <span class='it'>(TIN)</span> &nbsp;&nbsp; $payeeTin</td></tr>"
+            . "<tr><td class='no'>3</td><td><div class='lbl'>Payee's Name <span class='it'>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</span></div><div class='field'>$payeeName</div></td></tr>"
+            . "<tr><td class='no'>4</td><td><div class='lbl'>Registered Address</div><div class='field'>$payeeAddr</div></td></tr>"
+            . "<tr><td class='no'>5</td><td><div class='lbl'>Foreign Address, <span class='it'>if applicable</span></div><div class='field'>&nbsp;</div></td></tr></table>"
+            . "<table class='g'><tr><td class='bar'>Part II &ndash; Payor Information</td></tr></table>"
+            . "<table class='g'><tr><td class='no'>6</td><td>Taxpayer Identification Number <span class='it'>(TIN)</span> &nbsp;&nbsp; $coTin</td></tr>"
+            . "<tr><td class='no'>7</td><td><div class='lbl'>Payor's Name <span class='it'>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</span></div><div class='field'>$coName</div></td></tr>"
+            . "<tr><td class='no'>8</td><td><div class='lbl'>Registered Address</div><div class='field'>$coAddr</div></td></tr></table>"
+            . "<table class='g'><tr><td class='bar'>Part III &ndash; Details of Monthly Income Payments and Taxes Withheld</td></tr></table>"
+            // Part III income table
+            . "<table class='p3'><thead><tr>"
+            . "<th rowspan='2' style='width:210px'>Income Payments Subject to Expanded Withholding Tax</th><th rowspan='2' style='width:44px'>ATC</th>"
+            . "<th colspan='4'>AMOUNT OF INCOME PAYMENTS</th><th rowspan='2' style='width:96px'>Tax Withheld for the Quarter</th></tr>"
+            . "<tr><th>1st Month of the Quarter</th><th>2nd Month of the Quarter</th><th>3rd Month of the Quarter</th><th>Total</th></tr></thead>"
+            . "<tbody>$incRows"
+            . "<tr><td class='l'><b>Total</b></td><td></td><td></td><td></td><td></td><td class='num'><b>$totInc</b></td><td class='num'><b>$totTax</b></td></tr>"
+            . "<tr><td class='l bar' style='text-align:left'>Money Payments Subject to Withholding of Business Tax (Government &amp; Private)</td><td class='bar'></td><td class='bar'></td><td class='bar'></td><td class='bar'></td><td class='bar'></td><td class='bar'></td></tr>"
+            . "$bizRows"
+            . "<tr><td class='l'><b>Total</b></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>"
+            . "</tbody></table>"
+            // Declaration + signatures
+            . "<table class='g'><tr><td class='declaration'>We declare under the penalties of perjury that this certificate has been made in good faith, verified by us, and to the best of our knowledge and belief, is true and correct, pursuant to the provisions of the National Internal Revenue Code, as amended, and the regulations issued under authority thereof. Further, we give our consent to the processing of our information as contemplated under the *Data Privacy Act of 2012 (R.A. No. 10173) for legitimate and lawful purposes.</td></tr>"
+            . "<tr><td class='sig'>&nbsp;</td></tr>"
+            . "<tr><td style='text-align:center;font-size:9px'>Signature over Printed Name of Payor/Payor's Authorized Representative/Tax Agent<br><span class='it'>(Indicate Title/Designation and TIN)</span></td></tr></table>"
+            . "<table class='g'><tr><td style='width:50%'><div class='lbl'>Tax Agent Accreditation No./ Attorney's Roll No. (if applicable)</div><div class='field'>&nbsp;</div></td><td><div class='lbl'>Date of Issue <span class='it'>(MM/DD/YYYY)</span></div><div class='field'>&nbsp;</div></td><td><div class='lbl'>Date of Expiry <span class='it'>(MM/DD/YYYY)</span></div><div class='field'>&nbsp;</div></td></tr></table>"
+            . "<table class='g'><tr><td class='bar'>CONFORME:</td></tr>"
+            . "<tr><td class='sig'>&nbsp;</td></tr>"
+            . "<tr><td style='text-align:center;font-size:9px'>Signature over Printed Name of Payee/Payee's Authorized Representative/Tax Agent<br><span class='it'>(Indicate Title/Designation and TIN)</span></td></tr></table>"
+            . "<table class='g'><tr><td style='width:50%'><div class='lbl'>Tax Agent Accreditation No./ Attorney's Roll No. (if applicable)</div><div class='field'>&nbsp;</div></td><td><div class='lbl'>Date of Issue <span class='it'>(MM/DD/YYYY)</span></div><div class='field'>&nbsp;</div></td><td><div class='lbl'>Date of Expiry <span class='it'>(MM/DD/YYYY)</span></div><div class='field'>&nbsp;</div></td></tr></table>"
+            . "<div style='padding:2px 4px;font-size:8px'>*NOTE: The BIR Data Privacy is in the BIR website (www.bir.gov.ph)</div>"
+            . "</div></body></html>";
+        exit;
     }
 
     public static function gen2316(array $p): void

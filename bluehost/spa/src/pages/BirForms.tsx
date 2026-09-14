@@ -276,9 +276,19 @@ function Form2307({ orgId, years }: { orgId: number; years: number[] }) {
 
   function onGenerate() {
     if (!data) return;
+    const y = Number(year);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const months = included.map((i) => i.month);
+    const minM = months.length ? Math.min(...months) : 1;
+    const maxM = months.length ? Math.max(...months) : 12;
+    const lastDay = (m: number) => new Date(y, m, 0).getDate();
+    // Map each included month to its position within its quarter (1st/2nd/3rd).
+    const cols = [0, 0, 0];
+    included.forEach((i) => { cols[(i.month - 1) % 3] += Number(i.income || 0); });
     generate(`/organizations/${orgId}/bir/2307/generate`, {
       payee: data.payee, rate: r, nature, atc, period_label: periodLabel,
-      items: included.map((i) => ({ label: i.label, income: i.income })),
+      period_from: `${pad(minM)}/01/${y}`, period_to: `${pad(maxM)}/${pad(lastDay(maxM))}/${y}`,
+      cols, total: totInc, tax: totTax,
     }).catch((e) => setErr(e.message));
   }
 
