@@ -316,6 +316,7 @@
         <li><a href="#hr-assets">Assets</a></li>
         <li><a href="#hr-import">Bulk employee import</a></li>
         <li><a href="#hr-payroll">Payroll &amp; 13th month</a></li>
+        <li><a href="#hr-project">Project (construction) payroll</a></li>
         <li><a href="#hr-bir">BIR forms</a></li>
         <li><a href="#hr-reports">Reports &amp; export</a></li>
         <li><a href="#hr-approvals">Approvals &amp; the digest</a></li>
@@ -592,10 +593,59 @@
     <h2>Payroll &amp; 13th month</h2>
     <p>Run payroll under <strong>Payroll</strong>: prepare a run for a period, compute it, review each person, then finalize. Finalized runs produce payslips staff can download themselves, and feed every downstream figure — reports, contributions, and the BIR forms.</p>
     <ul class="adminlist">
+      <li><span class="m">Semi-monthly &amp; other cycles</span><span class="d">The base rate is <strong>monthly</strong>; a semi-monthly run pays half, and statutory is prorated to match the cycle.</span></li>
       <li><span class="m">13th Month &amp; Bonuses</span><span class="d">Process special-pay runs in bulk; amounts can be overridden per person before finalizing.</span></li>
       <li><span class="m">Loans &amp; Advances</span><span class="d">Issue company loans/advances and approve employee requests; balances deduct through payroll.</span></li>
       <li><span class="m">Statutory deductions</span><span class="d">SSS, PhilHealth, Pag-IBIG and BIR withholding are computed automatically using the current (2025) tables.</span></li>
+      <li><span class="m">Pag-IBIG MP2 accounts</span><span class="d">On a person's record (People or Consultants) add one or more <strong>MP2 accounts</strong>, each with its own account number and an <strong>employee + employer</strong> monthly share. The employee share is deducted in payroll; both appear on the <strong>Pag-IBIG MP2</strong> remittance form.</span></li>
     </ul>
+    <div class="note tip">
+      <span class="lbl">Cleaning up test data (superadmin)</span>
+      <p>A superadmin can permanently <strong>delete</strong> a payroll run, a 13th-month/bonus run, or a loan/advance — for clearing sample data during go-live. Deleting a payroll run reverses its loan deductions; deleting a loan returns nothing to past payslips (they keep their own snapshot). Everyone else should <strong>archive</strong> instead.</p>
+    </div>
+  </section>
+
+  <section id="hr-project">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>Project (construction) payroll</h2>
+    <p>For construction and other project work paid by the day, the system keeps <strong>project (site) workers</strong> separate from regular employees and consultants, and pays them in <strong>short cycles</strong> — weekly, every few days, or any date range — with their own payslips and per-project reports for DOLE.</p>
+
+    <h3>1. Add the site workers</h3>
+    <ol class="steps">
+      <li><span class="st-title">Open Project Workers.</span><p>In the left menu choose <strong>Project Workers</strong>, then <strong>+ Add Person</strong>.</p></li>
+      <li><span class="st-title">Set them up as daily-wage.</span><p>Set <strong>Type</strong> to <em>DAILY_PAID</em> or <em>PROJECT_BASED</em>, <strong>Salary basis</strong> to <em>DAILY</em>, put the <strong>daily rate</strong> in <strong>Base rate</strong>, and pick the <strong>Project</strong> they belong to. Save.</p></li>
+    </ol>
+    <p>Project-assigned site workers are <strong>kept out of the regular monthly payroll and the company-wide 13th month</strong>, so they're never paid twice.</p>
+
+    <h3>2. Run the payroll</h3>
+    <p>Go to <strong>Projects</strong> and <strong>click the project card</strong> to open it (clicking <em>Edit</em> only changes the project's details). In the <strong>Project payroll</strong> card below the budget:</p>
+    <ol class="steps">
+      <li><span class="st-title">New pay run.</span><p><strong>+ New pay run</strong>, then choose the period — click <strong>Week</strong> or <strong>3 days</strong>, or set any start/end dates — and <strong>Create run</strong>. It picks up this project's active site workers.</p></li>
+      <li><span class="st-title">Enter days worked.</span><p>Type each worker's <strong>Days</strong> (and OT / allowance if any). Pay = <strong>daily rate × days</strong>; gross, statutory, loan and net update as you type.</p></li>
+      <li><span class="st-title">Approve.</span><p><strong>Approve</strong> finalizes the run and applies any loan deductions. <strong>Reopen</strong> if you need to edit again; a superadmin can <strong>Delete</strong> a run.</p></li>
+    </ol>
+    <div class="note tip">
+      <span class="lbl">Statutory &amp; 13th month, per project</span>
+      <p>SSS, PhilHealth and Pag-IBIG are <strong>prorated by time worked</strong> (days ÷ 22 of a month) and tagged to the project, so they can be remitted per project. 13th month is tracked per project (basic earned ÷ 12). Both are kept separate from the company-wide payroll.</p>
+    </div>
+
+    <h3>3. Payslips &amp; cash advances</h3>
+    <ul class="adminlist">
+      <li><span class="m">Payslip per worker</span><span class="d">Each worker row has a <strong>Payslip</strong> link that prints just that person for the run period — ready to hand out or send. The <strong>Payslips</strong> button prints the whole crew at once.</span></li>
+      <li><span class="m">Loans &amp; cash advances</span><span class="d">A worker's active loan/advance from <strong>Loans &amp; Advances</strong> is deducted in the run (installment capped at the balance), applied to their balance on <strong>Approve</strong>, and returned if you reopen or delete the run.</span></li>
+    </ul>
+    <div class="note warn">
+      <span class="lbl">One deduction per run</span>
+      <p>A loan installment comes off <strong>each run</strong>. If you pay weekly, set each loan's <em>installment per period</em> to the weekly amount so it isn't over-deducted.</p>
+    </div>
+
+    <h3>4. Reports for DOLE</h3>
+    <div class="tabgrid">
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-blue)"></span>DOLE labour report</div><p>Every worker with days, gross, SSS/PhilHealth/Pag-IBIG, tax and net, plus the labour budget, total used and remaining. Print or export CSV.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-green)"></span>Statutory summary</div><p>Per-project SSS / PhilHealth / Pag-IBIG employee <em>and</em> employer shares to remit.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>13th month</div><p>Per-project 13th month for each worker (basic earned ÷ 12), as CSV.</p></div>
+    </div>
+    <p>When the job is finished, <strong>End project</strong> marks it completed with an end date for a clean final report. The project's <strong>Actual spend / Remaining</strong> budget on the Projects page reflects these pay runs.</p>
   </section>
 
   <section id="hr-bir">
@@ -609,7 +659,7 @@
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-red)"></span>2316</div><p>Annual compensation certificate per employee — all figures editable before you generate.</p></div>
     </div>
     <p>Each form opens in a new tab with a <strong>Print / Save as PDF</strong> button. The <strong>period totals</strong> to remit are also available in <strong>Reports</strong> as the <em>BIR 1601-C</em> and <em>BIR EWT</em> datasets.</p>
-    <p>The <strong>SSS / PhilHealth / HDMF</strong> page does the same for the agency remittance forms — <strong>SSS R-3</strong>, <strong>PhilHealth RF-1</strong> and <strong>Pag-IBIG MCRF</strong> — for a chosen month, with employee and employer shares. Each consultant's EWT rate (5% or 10%) is set on their record and used automatically in payroll and on Form 2307.</p>
+    <p>The <strong>SSS / PhilHealth / HDMF</strong> page does the same for the agency remittance forms — <strong>SSS R-3</strong>, <strong>PhilHealth RF-1</strong>, <strong>Pag-IBIG MCRF</strong> and <strong>Pag-IBIG MP2</strong> — for a chosen month, with employee and employer shares. The MP2 tab lists one row per MP2 account (employee + employer share). Each consultant's EWT rate (5% or 10%) is set on their record and used automatically in payroll and on Form 2307.</p>
     <div class="note warn">
       <span class="lbl">Working copies, not the official PDF</span>
       <p>These mirror the official form's fields for your review — they are <strong>not</strong> the official BIR or agency PDF. File and pay through the proper facility (eBIRForms / eFPS, or the SSS/PhilHealth/Pag-IBIG online portals), and verify against the latest official tables (incl. SSS EC &amp; WISP).</p>
