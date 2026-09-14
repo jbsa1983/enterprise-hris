@@ -36,7 +36,64 @@ class PeopleController
         $r->post("$b/people/bulk-transfer", [self::class, 'bulkTransfer']);
         $r->post("$b/people/bulk-reclassify", [self::class, 'bulkReclassify']);
         $r->post("$b/people/{engagement_id}/archive", [self::class, 'archive']);
+        $r->post("$b/people/{engagement_id}/photo", [self::class, 'uploadPhoto']);
+        $r->get("$b/people/{engagement_id}/photo", [self::class, 'getPhoto']);
+        $r->delete("$b/people/{engagement_id}/photo", [self::class, 'deletePhoto']);
         $r->delete("$b/people/{engagement_id}", [self::class, 'destroy']);
+    }
+
+    /** Resolve an engagement within the org, then authorize a photo action on its person. */
+    private static function photoEngagement(array $p, string $employeePerm): array
+    {
+        $user = Auth::require();
+        $orgId = (int) ($p['organization_id'] ?? 0);
+        Auth::requireOrg($user, $orgId);
+        $eng = Database::one('SELECT * FROM engagements WHERE id = ? AND organization_id = ?', [(int) $p['engagement_id'], $orgId]);
+        if (!$eng) throw new HttpError('Person not found', 404);
+        self::authorizePerson($user, $orgId, $eng['engagement_type'], $eng['project_id'] ?? null, $employeePerm);
+        return [$user, $orgId, $eng];
+    }
+
+    public static function uploadPhoto(array $p): void
+    {
+        [$user, $orgId, $eng] = self::photoEngagement($p, 'employee.edit');
+        $pid = (int) $eng['person_id'];
+        $img = ImageUpload::validate('file');
+        $dir = ImageUpload::baseDir() . '/people/' . $orgId . '/' . $pid;
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            throw new HttpError('Could not create the photo folder — check permissions', 500);
+        }
+        $old = Database::scalar('SELECT profile_image_key FROM people WHERE id = ?', [$pid]);
+        $key = 'people/' . $orgId . '/' . $pid . '/' . Util::uuid() . '.' . $img['ext'];
+        if (!move_uploaded_file($img['tmp'], ImageUpload::baseDir() . '/' . $key)) {
+            throw new HttpError('Could not save the photo', 500);
+        }
+        if ($old) { $f = ImageUpload::baseDir() . '/' . $old; if (is_file($f)) @unlink($f); }
+        Database::update('people', $pid, ['profile_image_key' => $key]);
+        Audit::record('employee.photo', $user, ['organization_id' => $orgId, 'entity' => 'person', 'entity_id' => $pid]);
+        Http::json(['ok' => true, 'width' => $img['width'], 'height' => $img['height']]);
+    }
+
+    public static function getPhoto(array $p): void
+    {
+        [, , $eng] = self::photoEngagement($p, 'employee.view');
+        $key = Database::scalar('SELECT profile_image_key FROM people WHERE id = ?', [(int) $eng['person_id']]);
+        if (!$key) throw new HttpError('No photo', 404);
+        $path = ImageUpload::baseDir() . '/' . $key;
+        if (!is_file($path)) throw new HttpError('Photo missing from storage', 404);
+        $ext = strtolower(pathinfo($key, PATHINFO_EXTENSION));
+        Http::file(file_get_contents($path), ImageUpload::mimeFor($ext), 'photo.' . $ext, true);
+    }
+
+    public static function deletePhoto(array $p): void
+    {
+        [$user, $orgId, $eng] = self::photoEngagement($p, 'employee.edit');
+        $pid = (int) $eng['person_id'];
+        $key = Database::scalar('SELECT profile_image_key FROM people WHERE id = ?', [$pid]);
+        if ($key) { $f = ImageUpload::baseDir() . '/' . $key; if (is_file($f)) @unlink($f); }
+        Database::exec('UPDATE people SET profile_image_key = NULL WHERE id = ?', [$pid]);
+        Audit::record('employee.photo_delete', $user, ['organization_id' => $orgId, 'entity' => 'person', 'entity_id' => $pid]);
+        Http::json(['ok' => true]);
     }
 
     private static function pick(array $src, array $fields): array
@@ -217,7 +274,7 @@ class PeopleController
         $pp = [];
         foreach (self::PERSON_FIELDS as $f) $pp[$f] = $person[$f] ?? null;
         return ['engagement_id' => (int) $eng['id'], 'person_id' => (int) $person['id'], 'person' => $pp, 'engagement' => $e,
-            'mp2_accounts' => self::loadMp2((int) $eng['id'])];
+            'has_photo' => !empty($person['profile_image_key']), 'mp2_accounts' => self::loadMp2((int) $eng['id'])];
     }
 
     public static function detail(array $p): void
@@ -429,7 +486,7 @@ class PeopleController
         $sql = "SELECT e.id eng_id, e.person_id, e.engagement_type, e.employee_number, e.status,
                        e.base_rate, e.salary_basis, e.start_date, e.end_date, e.project_id,
                        pr.project_name, pr.project_code,
-                       p.first_name, p.middle_name, p.last_name, p.suffix
+                       p.first_name, p.middle_name, p.last_name, p.suffix, p.profile_image_key
                   FROM engagements e JOIN people p ON p.id = e.person_id
                   LEFT JOIN projects pr ON pr.id = e.project_id
                  WHERE e.organization_id = ?";
@@ -469,6 +526,7 @@ class PeopleController
                 'salary_basis' => $r['salary_basis'], 'start_date' => $r['start_date'], 'end_date' => $r['end_date'],
                 'project_id' => $r['project_id'] !== null ? (int) $r['project_id'] : null,
                 'project_name' => $r['project_name'], 'project_code' => $r['project_code'],
+                'has_photo' => !empty($r['profile_image_key']),
             ];
         }, Database::all($sql, $params));
     }

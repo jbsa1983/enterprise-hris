@@ -13,6 +13,7 @@ export interface CurrentUser {
   is_superadmin: boolean;
   roles: string[];
   permissions: string[];
+  has_avatar?: boolean;
   organizations: OrgMembership[];
 }
 
@@ -30,6 +31,7 @@ export interface EngagementRow {
   project_id?: number | null;
   project_name?: string | null;
   project_code?: string | null;
+  has_photo?: boolean;
 }
 
 export interface StorageOverview {

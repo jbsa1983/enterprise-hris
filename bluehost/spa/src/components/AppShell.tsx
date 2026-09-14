@@ -1,11 +1,12 @@
 
 import Link from "@/lib/Link";
 import { usePathname, useRouter } from "@/lib/nav";
-import { useEffect, useState } from "react";
-import { apiFetch, clearTokens, getAccessToken } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { apiFetch, apiUpload, clearTokens, getAccessToken } from "@/lib/api";
 import { useIdleLogout } from "@/lib/useIdleLogout";
 import type { CurrentUser } from "@/lib/types";
 import GeekLogo from "@/components/GeekLogo";
+import Avatar from "@/components/Avatar";
 
 // Sign out after this many minutes of no user activity.
 const IDLE_MINUTES = 3;
@@ -67,6 +68,21 @@ export default function AppShell({
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hasAvatar, setHasAvatar] = useState(false);
+  const [avatarKey, setAvatarKey] = useState(0);
+  const avatarInput = useRef<HTMLInputElement>(null);
+
+  async function onAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024) { alert("Image is too large — use a photo 2 MB or smaller."); e.target.value = ""; return; }
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      await apiUpload("/me/avatar", fd);
+      setHasAvatar(true); setAvatarKey((k) => k + 1);
+    } catch (err: any) { alert(err?.message || "Upload failed"); }
+    finally { e.target.value = ""; }
+  }
 
   useIdleLogout(IDLE_MINUTES);
 
@@ -96,6 +112,7 @@ export default function AppShell({
     apiFetch<CurrentUser>("/auth/me")
       .then((u) => {
         setUser(u);
+        setHasAvatar(!!u.has_avatar);
         const canOrg = u.is_superadmin || (u.permissions || []).includes("organization.view");
         const orgs = u.organizations || [];
         if (!canOrg && /\/dashboard$/.test(pathname)) {
@@ -339,6 +356,10 @@ export default function AppShell({
               <div className="text-sm font-medium text-slate-800">{user.full_name}</div>
               <div className="text-[11px] text-slate-500">{user.roles.join(", ") || "—"}</div>
             </div>
+            <button type="button" title="Change your photo" className="rounded-full ring-offset-2 hover:ring-2 hover:ring-geek-blue/40" onClick={() => avatarInput.current?.click()}>
+              <Avatar name={user.full_name} size="md" has={hasAvatar} src="/me/avatar" refreshKey={avatarKey} />
+            </button>
+            <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onAvatar} />
             <button onClick={logout} className="text-sm text-brand-700 hover:underline">
               Sign out
             </button>

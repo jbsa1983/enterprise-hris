@@ -5,6 +5,50 @@ import AppShell from "@/components/AppShell";
 import { apiFetch, apiDownload, apiUpload } from "@/lib/api";
 import { peso, statusColor } from "@/lib/format";
 import type { EngagementRow } from "@/lib/types";
+import Avatar from "@/components/Avatar";
+
+// ID photo for a person — upload / replace / remove, with a live preview.
+function PhotoSection({ orgId, engagementId, name, canEdit, initialHas }:
+  { orgId: number; engagementId: number; name: string; canEdit: boolean; initialHas: boolean }) {
+  const [has, setHas] = useState(initialHas);
+  const [key, setKey] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const src = `/organizations/${orgId}/people/${engagementId}/photo`;
+  async function onFile(e: any) {
+    const f = e.target.files?.[0]; if (!f) return;
+    if (f.size > 2 * 1024 * 1024) { setErr("Image is too large — use a photo 2 MB or smaller."); if (fileRef.current) fileRef.current.value = ""; return; }
+    setErr(""); setBusy(true);
+    try { const fd = new FormData(); fd.append("file", f); await apiUpload(src, fd); setHas(true); setKey((k) => k + 1); }
+    catch (e: any) { setErr(e.message || "Upload failed"); }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
+  }
+  async function remove() {
+    setBusy(true); setErr("");
+    try { await apiFetch(src, { method: "DELETE" }); setHas(false); setKey((k) => k + 1); }
+    catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <div className="mb-4 flex items-center gap-4 border-b border-slate-100 pb-4">
+      <Avatar name={name} size="lg" has={has} src={src} refreshKey={key} />
+      <div>
+        <div className="text-sm font-medium text-slate-700">ID photo</div>
+        <p className="text-[11px] text-slate-400">Square image recommended (about 400×400 px). JPG, PNG or WebP, max 2 MB.</p>
+        {canEdit ? (
+          <div className="mt-1.5 flex gap-2">
+            <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50">
+              {busy ? "Uploading…" : has ? "Replace photo" : "Upload photo"}
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onFile} disabled={busy} />
+            </label>
+            {has ? <button type="button" className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50" onClick={remove} disabled={busy}>Remove</button> : null}
+          </div>
+        ) : null}
+        {err ? <div className="mt-1 text-[11px] text-red-600">{err}</div> : null}
+      </div>
+    </div>
+  );
+}
 
 // --- 201-file documents (defined at module scope so typing in the upload
 //     fields never remounts the component / loses focus) --------------------
@@ -132,7 +176,7 @@ const EMPTY: any = {
   bank_name: "", bank_account_number: "", bank_account_name: "",
   engagement_type: "REGULAR", employee_number: "", salary_basis: "MONTHLY", base_rate: "",
   department_id: "", position_id: "", start_date: "", project_id: "", ewt_rate: "", hdmf_extra: "",
-  mp2_accounts: [] as Mp2Account[],
+  mp2_accounts: [] as Mp2Account[], has_photo: false,
 };
 const isConsultantType = (t: string) => t === "CONSULTANT_INDIVIDUAL" || t === "CONSULTANT_COMPANY";
 
@@ -243,6 +287,7 @@ export default function PeoplePage() {
       project_id: d.engagement.project_id ?? "",
       ewt_rate: d.engagement.ewt_rate ?? "",
       hdmf_extra: d.engagement.hdmf_extra ?? "",
+      has_photo: !!d.has_photo,
       mp2_accounts: (d.mp2_accounts || []).map((m: any) => ({
         account_number: m.account_number ?? "",
         employee_share: m.employee_share != null ? String(m.employee_share) : "",
@@ -437,7 +482,12 @@ export default function PeoplePage() {
               <tr key={r.engagement_id} className={`hover:bg-slate-50 ${selected.has(r.engagement_id) ? "bg-blue-50/50" : ""}`}>
                 {canBulk ? <td className="px-3 py-3"><input type="checkbox" aria-label={`Select ${r.full_name}`} checked={selected.has(r.engagement_id)} onChange={() => toggleSel(r.engagement_id)} /></td> : null}
                 <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.employee_number || "—"}</td>
-                <td className="px-4 py-3 font-medium text-slate-800">{r.full_name}</td>
+                <td className="px-4 py-3 font-medium text-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <Avatar name={r.full_name} size="sm" has={!!r.has_photo} src={`/organizations/${orgId}/people/${r.engagement_id}/photo`} />
+                    <span>{r.full_name}</span>
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-slate-600">{r.engagement_type}</td>
                 {isProject ? <td className="px-4 py-3 text-slate-600">{r.project_code ? `${r.project_code}` : (r.project_name || "—")}</td> : null}
                 <td className="px-4 py-3"><span className={`badge ${statusColor(r.status)}`}>{r.status}</span></td>
@@ -458,6 +508,9 @@ export default function PeoplePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditing(null)}>
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="mb-4 text-base font-semibold">{editing === "new" ? "Add Person" : "Edit Person"}</h2>
+            {typeof editing === "number"
+              ? <PhotoSection orgId={orgId} engagementId={editing} name={`${form.first_name || ""} ${form.last_name || ""}`.trim()} canEdit={canEdit} initialHas={!!form.has_photo} />
+              : <p className="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">Save this person first, then reopen to add an ID photo.</p>}
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Personal</div>
             <div className="grid grid-cols-2 gap-3">
               {F("first_name", "First name *")}{F("last_name", "Last name *")}

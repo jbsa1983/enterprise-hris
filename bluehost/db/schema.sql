@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS users (
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   is_superadmin TINYINT(1) NOT NULL DEFAULT 0,
   person_id INT NULL,
+  avatar_key VARCHAR(160) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX (person_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

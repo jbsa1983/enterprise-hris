@@ -8,6 +8,47 @@ class AuthController
         $r->get('/auth/me', [self::class, 'me']);
         $r->post('/auth/forgot', [self::class, 'forgot']);
         $r->post('/auth/reset', [self::class, 'reset']);
+        $r->post('/me/avatar', [self::class, 'uploadAvatar']);
+        $r->get('/me/avatar', [self::class, 'getAvatar']);
+        $r->delete('/me/avatar', [self::class, 'deleteAvatar']);
+    }
+
+    public static function uploadAvatar(): void
+    {
+        $u = Auth::require();
+        $img = ImageUpload::validate('file');
+        $dir = ImageUpload::baseDir() . '/users/' . $u['id'];
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            throw new HttpError('Could not create the photo folder — check permissions', 500);
+        }
+        $old = Database::scalar('SELECT avatar_key FROM users WHERE id = ?', [$u['id']]);
+        $key = 'users/' . $u['id'] . '/' . Util::uuid() . '.' . $img['ext'];
+        if (!move_uploaded_file($img['tmp'], ImageUpload::baseDir() . '/' . $key)) {
+            throw new HttpError('Could not save the photo', 500);
+        }
+        if ($old) { $f = ImageUpload::baseDir() . '/' . $old; if (is_file($f)) @unlink($f); }
+        Database::exec('UPDATE users SET avatar_key = ? WHERE id = ?', [$key, $u['id']]);
+        Http::json(['ok' => true, 'width' => $img['width'], 'height' => $img['height']]);
+    }
+
+    public static function getAvatar(): void
+    {
+        $u = Auth::require();
+        $key = Database::scalar('SELECT avatar_key FROM users WHERE id = ?', [$u['id']]);
+        if (!$key) throw new HttpError('No avatar', 404);
+        $path = ImageUpload::baseDir() . '/' . $key;
+        if (!is_file($path)) throw new HttpError('Photo missing from storage', 404);
+        $ext = strtolower(pathinfo($key, PATHINFO_EXTENSION));
+        Http::file(file_get_contents($path), ImageUpload::mimeFor($ext), 'avatar.' . $ext, true);
+    }
+
+    public static function deleteAvatar(): void
+    {
+        $u = Auth::require();
+        $key = Database::scalar('SELECT avatar_key FROM users WHERE id = ?', [$u['id']]);
+        if ($key) { $f = ImageUpload::baseDir() . '/' . $key; if (is_file($f)) @unlink($f); }
+        Database::exec('UPDATE users SET avatar_key = NULL WHERE id = ?', [$u['id']]);
+        Http::json(['ok' => true]);
     }
 
     /** Send a password-reset link. Always responds OK (never reveals if the email exists). */
@@ -103,10 +144,11 @@ class AuthController
             'SELECT ou.organization_id, o.name, o.code, ou.is_primary
                FROM organization_users ou JOIN organizations o ON o.id = ou.organization_id
               WHERE ou.user_id = ?', [$u['id']]);
+        $hasAvatar = (bool) Database::scalar('SELECT avatar_key FROM users WHERE id = ?', [$u['id']]);
         Http::json([
             'id' => $u['id'], 'uuid' => $u['uuid'], 'email' => $u['email'], 'full_name' => $u['full_name'],
             'is_superadmin' => $u['is_superadmin'], 'roles' => $u['roles'],
-            'permissions' => $u['permissions'],
+            'permissions' => $u['permissions'], 'has_avatar' => $hasAvatar,
             'organizations' => array_map(fn($o) => [
                 'organization_id' => (int) $o['organization_id'], 'name' => $o['name'],
                 'code' => $o['code'], 'is_primary' => (int) $o['is_primary'] === 1,

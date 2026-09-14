@@ -85,7 +85,7 @@ export async function apiFetch<T = any>(path: string, options: FetchOpts = {}, a
   return (await res.json()) as T;
 }
 
-async function apiBlob(path: string, options: RequestInit = {}): Promise<Blob> {
+export async function apiBlob(path: string, options: RequestInit = {}): Promise<Blob> {
   const token = getAccessToken();
   const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
   if (token) headers["Authorization"] = `Bearer ${token}`;
