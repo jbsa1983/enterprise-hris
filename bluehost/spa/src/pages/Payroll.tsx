@@ -15,6 +15,14 @@ interface Payslip {
 }
 interface Template { id: number; template_name: string; bank_name: string; file_type: string; }
 
+const LOCKED = ["LOCKED", "PAID", "CLOSED", "BANK_FILE_GENERATED"];
+const thisMonth = () => {
+  const d = new Date(); const y = d.getFullYear(); const m = d.getMonth();
+  const start = new Date(y, m, 1), end = new Date(y, m + 1, 0);
+  const iso = (x: Date) => x.toISOString().slice(0, 10);
+  return { name: d.toLocaleString("en-US", { month: "long" }) + " " + y, period_start: iso(start), period_end: iso(end), pay_date: iso(end) };
+};
+
 export default function PayrollPage() {
   const orgId = Number(useParams().orgId);
   const [runs, setRuns] = useState<Run[]>([]);
@@ -22,20 +30,53 @@ export default function PayrollPage() {
   const [slips, setSlips] = useState<Payslip[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [tplId, setTplId] = useState<number | null>(null);
+  const [periods, setPeriods] = useState<any[]>([]);
   const [preview, setPreview] = useState<any>(null);
   const [msg, setMsg] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [nf, setNf] = useState<any>({ period_id: "", frequency: "MONTHLY", ...thisMonth() });
+
+  const reloadRuns = useCallback((keepId?: number) => {
+    return apiFetch<Run[]>(`/organizations/${orgId}/payroll/runs`).then((r) => {
+      setRuns(r); setSel((prev) => r.find((x) => x.id === (keepId ?? prev?.id)) || r[0] || null);
+    });
+  }, [orgId]);
 
   useEffect(() => {
-    apiFetch<Run[]>(`/organizations/${orgId}/payroll/runs`).then((r) => { setRuns(r); setSel(r[0] || null); });
-    apiFetch<Template[]>(`/organizations/${orgId}/bank-templates`).then((t) => { setTemplates(t); setTplId(t[0]?.id ?? null); });
-  }, [orgId]);
+    reloadRuns();
+    apiFetch<Template[]>(`/organizations/${orgId}/bank-templates`).then((t) => { setTemplates(t); setTplId(t[0]?.id ?? null); }).catch(() => {});
+    apiFetch<any[]>(`/organizations/${orgId}/payroll/periods`).then(setPeriods).catch(() => {});
+  }, [orgId, reloadRuns]);
 
   const loadSlips = useCallback((runId: number) => {
     apiFetch<Payslip[]>(`/organizations/${orgId}/payroll/runs/${runId}/payslips`).then(setSlips).catch(() => setSlips([]));
   }, [orgId]);
 
   useEffect(() => { if (sel) loadSlips(sel.id); }, [sel, loadSlips]);
+
+  async function createRun() {
+    setBusy(true); setMsg("");
+    try {
+      let periodId = nf.period_id ? Number(nf.period_id) : 0;
+      if (!periodId) {
+        if (!nf.name || !nf.period_start || !nf.period_end) { setMsg("Fill in the period name and dates."); setBusy(false); return; }
+        const per = await apiFetch<{ id: number }>(`/organizations/${orgId}/payroll/periods`, { method: "POST", body: JSON.stringify({ name: nf.name, frequency: nf.frequency, period_start: nf.period_start, period_end: nf.period_end, pay_date: nf.pay_date || nf.period_end }) });
+        periodId = per.id;
+      }
+      const run = await apiFetch<{ id: number }>(`/organizations/${orgId}/payroll/runs`, { method: "POST", body: JSON.stringify({ period_id: periodId }) });
+      setShowNew(false); setNf({ period_id: "", frequency: "MONTHLY", ...thisMonth() });
+      apiFetch<any[]>(`/organizations/${orgId}/payroll/periods`).then(setPeriods).catch(() => {});
+      await reloadRuns(run.id);
+      setMsg("Run created. Click Compute to calculate pay for all active employees.");
+    } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  }
+  async function doAction(path: string, okMsg: string) {
+    if (!sel) return;
+    setBusy(true); setMsg("");
+    try { await apiFetch(`/organizations/${orgId}/payroll/runs/${sel.id}/${path}`, { method: "POST", body: JSON.stringify({}) }); await reloadRuns(sel.id); setMsg(okMsg); }
+    catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  }
 
   async function generate() {
     if (!sel) return;
@@ -76,7 +117,10 @@ export default function PayrollPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Runs list */}
         <div className="card lg:col-span-1">
-          <div className="stat-label mb-2">Payroll Runs</div>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="stat-label">Payroll Runs</div>
+            <button className="btn-primary px-3 py-1.5 text-sm" onClick={() => setShowNew(true)}>+ New run</button>
+          </div>
           <div className="space-y-2">
             {runs.map((r) => (
               <button key={r.id} onClick={() => setSel(r)}
@@ -108,6 +152,9 @@ export default function PayrollPage() {
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
+                  {!LOCKED.includes(sel.status) ? <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50" onClick={() => doAction("compute", "Payroll computed for all active employees.")} disabled={busy}>{sel.status === "CALCULATED" ? "Re-compute" : "Compute"}</button> : null}
+                  {sel.status === "CALCULATED" ? <button className="rounded-lg border border-emerald-300 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50" onClick={() => doAction("approve", "Payroll approved.")} disabled={busy}>Approve</button> : null}
+                  {sel.status === "APPROVED" ? <button className="rounded-lg border border-slate-400 px-3 py-2 text-sm hover:bg-slate-100" onClick={() => doAction("lock", "Payroll locked.")} disabled={busy}>Lock</button> : null}
                   <button className="btn-primary" onClick={generate} disabled={busy}>Generate Payslips</button>
                   <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
                     onClick={() => apiOpen(`/organizations/${orgId}/payroll/runs/${sel.id}/payslips.pdf`)} disabled={!slips.length}>
@@ -177,9 +224,43 @@ export default function PayrollPage() {
                 ) : null}
               </div>
             </>
-          ) : <div className="card text-sm text-slate-400">Select a payroll run.</div>}
+          ) : <div className="card text-sm text-slate-400">No run selected. Click <strong>+ New run</strong> to start a payroll.</div>}
         </div>
       </div>
+
+      {showNew ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowNew(false)}>
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="mb-1 text-base font-semibold">New payroll run</h2>
+            <p className="mb-4 text-xs text-slate-500">A run computes pay for every <strong>active</strong> employee in this organization for the chosen period.</p>
+            {periods.length > 0 ? (
+              <div className="mb-4">
+                <label className="mb-1 block text-xs text-slate-500">Use an existing period</label>
+                <select className="input" value={nf.period_id} onChange={(e) => setNf({ ...nf, period_id: e.target.value })}>
+                  <option value="">— create a new period below —</option>
+                  {periods.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.period_start} → {p.period_end})</option>)}
+                </select>
+              </div>
+            ) : null}
+            {!nf.period_id ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2"><label className="mb-1 block text-xs text-slate-500">Period name</label><input className="input" value={nf.name} onChange={(e) => setNf({ ...nf, name: e.target.value })} placeholder="e.g. September 2026" /></div>
+                <div><label className="mb-1 block text-xs text-slate-500">Frequency</label>
+                  <select className="input" value={nf.frequency} onChange={(e) => setNf({ ...nf, frequency: e.target.value })}>
+                    {["MONTHLY", "SEMI_MONTHLY", "WEEKLY"].map((f) => <option key={f} value={f}>{f.replace("_", "-")}</option>)}
+                  </select></div>
+                <div><label className="mb-1 block text-xs text-slate-500">Pay date</label><input type="date" className="input" value={nf.pay_date} onChange={(e) => setNf({ ...nf, pay_date: e.target.value })} /></div>
+                <div><label className="mb-1 block text-xs text-slate-500">Period start</label><input type="date" className="input" value={nf.period_start} onChange={(e) => setNf({ ...nf, period_start: e.target.value })} /></div>
+                <div><label className="mb-1 block text-xs text-slate-500">Period end</label><input type="date" className="input" value={nf.period_end} onChange={(e) => setNf({ ...nf, period_end: e.target.value })} /></div>
+              </div>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={() => setShowNew(false)}>Cancel</button>
+              <button className="btn-primary" onClick={createRun} disabled={busy}>{busy ? "Creating…" : "Create run"}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AppShell>
   );
 }
