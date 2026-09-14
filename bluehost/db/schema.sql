@@ -165,6 +165,20 @@ CREATE TABLE IF NOT EXISTS engagements (
   INDEX (person_id), INDEX (organization_id), INDEX (employee_number), INDEX (status), INDEX (project_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Pag-IBIG MP2 accounts: one or more per person (employees and consultants), each with
+-- its own MP2 account number (separate from the compulsory HDMF number) and an
+-- employee + employer monthly share. Total MP2 remittance = employee_share + employer_share.
+CREATE TABLE IF NOT EXISTS mp2_accounts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  engagement_id INT NOT NULL,
+  account_number VARCHAR(60) NULL,
+  employee_share DECIMAL(10,2) DEFAULT 0,
+  employer_share DECIMAL(10,2) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (organization_id), INDEX (engagement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS clients (
   id INT AUTO_INCREMENT PRIMARY KEY,
   organization_id INT NOT NULL,

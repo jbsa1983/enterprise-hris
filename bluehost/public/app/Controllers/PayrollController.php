@@ -140,8 +140,13 @@ class PayrollController
 
         $factor = Payroll::periodFactor($period['frequency'] ?? 'MONTHLY');
         $engs = Database::all("SELECT * FROM engagements WHERE organization_id = ? AND status = 'ACTIVE'", [$orgId]);
+        // MP2 employee-share totals per engagement (sum across the person's MP2 accounts).
+        $mp2map = [];
+        foreach (Database::all('SELECT engagement_id, SUM(employee_share) s FROM mp2_accounts WHERE organization_id = ? GROUP BY engagement_id', [$orgId]) as $m)
+            $mp2map[(int) $m['engagement_id']] = (float) $m['s'];
         $gt = $dt = $nt = 0.0;
         foreach ($engs as $eng) {
+            if (isset($mp2map[(int) $eng['id']])) $eng['mp2_ee_total'] = $mp2map[(int) $eng['id']];
             $loans = Database::all("SELECT * FROM loans WHERE person_id = ? AND payroll_deductible = 1 AND balance > 0 AND status = 'ACTIVE'", [$eng['person_id']]);
             $inst = []; $plan = [];
             foreach ($loans as $loan) {

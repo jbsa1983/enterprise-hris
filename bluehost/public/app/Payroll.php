@@ -103,13 +103,19 @@ class Payroll
             $taxable = max($gross - ($s + $ph + $hd), 0);
             $wt = $bir ? self::withholding($taxable, self::scaleBrackets($bir, $factor)) : 0;
             $deductions = ['sss' => $s, 'philhealth' => $ph, 'pagibig' => $hd, 'withholding_tax' => $wt];
-            // Voluntary Pag-IBIG additional + MP2 — fixed monthly amounts, prorated to the
-            // period, added after tax (they don't reduce taxable income).
+            // Voluntary Pag-IBIG additional to the compulsory account — fixed monthly amount,
+            // prorated to the period, added after tax (doesn't reduce taxable income).
             $extra = self::r2(((float) ($eng['hdmf_extra'] ?? 0)) * $factor);
             if ($extra > 0) $deductions['pagibig_extra'] = $extra;
-            $mp2 = self::r2(((float) ($eng['hdmf_mp2'] ?? 0)) * $factor);
-            if ($mp2 > 0) $deductions['pagibig_mp2'] = $mp2;
         }
+        // Pag-IBIG MP2 employee share — the member's own MP2 savings, collected by the
+        // employer to remit. Applies to employees AND consultants. Sum of employee_share
+        // across the person's MP2 accounts (mp2_ee_total), falling back to the legacy
+        // single field. The employer MP2 share is the employer's cost and is not deducted
+        // here — it appears only on the MP2 remittance form.
+        $mp2ee = ($eng['mp2_ee_total'] ?? null) !== null ? (float) $eng['mp2_ee_total'] : (float) ($eng['hdmf_mp2'] ?? 0);
+        $mp2 = self::r2($mp2ee * $factor);
+        if ($mp2 > 0) $deductions['pagibig_mp2'] = $mp2;
         foreach ($installments as $label => $amt) {
             if ($amt) $deductions[$label] = self::r2($amt);
         }

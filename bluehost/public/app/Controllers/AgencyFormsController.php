@@ -101,14 +101,43 @@ class AgencyFormsController
                     'ee' => $ee, 'er' => $er, 'extra' => round($x['hdmf_extra'], 2), 'mp2' => $mp2, 'total' => round($ee + $er, 2)];
             }
         }
+        // Pag-IBIG MP2 — one row per MP2 account (a person may hold several), for anyone
+        // paid this month (employees AND consultants). Employee + employer share are the
+        // configured monthly amounts; total remittance per account = EE + ER.
+        $mp2 = [];
+        $mp2rows = Database::all(
+            "SELECT m.account_number, m.employee_share, m.employer_share, e.employee_number,
+                    CONCAT_WS(' ', pe.first_name, pe.last_name) name, pe.pagibig_number
+               FROM mp2_accounts m
+               JOIN engagements e ON e.id = m.engagement_id
+               JOIN people pe ON pe.id = e.person_id
+              WHERE m.organization_id = ?
+                AND m.engagement_id IN (
+                    SELECT DISTINCT prp.engagement_id
+                      FROM payroll_run_people prp
+                      JOIN payroll_runs pr ON pr.id = prp.run_id
+                      JOIN payroll_periods pp ON pp.id = pr.period_id
+                     WHERE pr.organization_id = ?
+                       AND YEAR(COALESCE(pp.pay_date, pp.period_end)) = ?
+                       AND MONTH(COALESCE(pp.pay_date, pp.period_end)) = ?)
+              ORDER BY name, m.id", [$o, $o, $year, $month]);
+        foreach ($mp2rows as $r) {
+            $ee = round((float) $r['employee_share'], 2);
+            $er = round((float) $r['employer_share'], 2);
+            $mp2[] = ['id_number' => $r['account_number'] ?: '', 'pagibig_number' => $r['pagibig_number'] ?: '',
+                'employee_number' => $r['employee_number'], 'name' => $r['name'],
+                'ee' => $ee, 'er' => $er, 'total' => round($ee + $er, 2)];
+        }
+
         $sum = fn($arr, $k) => round(array_sum(array_column($arr, $k)), 2);
         Http::json([
             'company' => self::company($o), 'year' => $year, 'month' => $month, 'month_name' => self::MONTHS[$month],
-            'sss' => $sss, 'philhealth' => $phic, 'pagibig' => $hdmf,
+            'sss' => $sss, 'philhealth' => $phic, 'pagibig' => $hdmf, 'mp2' => $mp2,
             'totals' => [
                 'sss' => ['ee' => $sum($sss, 'ee'), 'er' => $sum($sss, 'er'), 'ec' => $sum($sss, 'ec'), 'total' => $sum($sss, 'total'), 'count' => count($sss)],
                 'philhealth' => ['ee' => $sum($phic, 'ee'), 'er' => $sum($phic, 'er'), 'total' => $sum($phic, 'total'), 'count' => count($phic)],
                 'pagibig' => ['ee' => $sum($hdmf, 'ee'), 'er' => $sum($hdmf, 'er'), 'mp2' => $sum($hdmf, 'mp2'), 'total' => $sum($hdmf, 'total'), 'count' => count($hdmf)],
+                'mp2' => ['ee' => $sum($mp2, 'ee'), 'er' => $sum($mp2, 'er'), 'total' => $sum($mp2, 'total'), 'count' => count($mp2)],
             ],
         ]);
     }
@@ -129,10 +158,12 @@ class AgencyFormsController
             'r3' => ['SSS Form R-3', 'Contribution Collection List (SSS)', 'SSS No.', true],
             'rf1' => ['PhilHealth RF-1', 'Employer Remittance Report (PhilHealth)', 'PhilHealth No.', false],
             'mcrf' => ['Pag-IBIG MCRF', 'Membership Contribution Remittance Form (Pag-IBIG)', 'Pag-IBIG MID No.', false],
+            'mp2' => ['Pag-IBIG MP2', 'MP2 Savings Remittance (Pag-IBIG Modified Pag-IBIG II)', 'MP2 Account No.', false],
         ];
         if (!isset($map[$form])) throw new HttpError('Unknown form', 400);
         [$formNo, $formTitle, $idLabel, $hasEc] = $map[$form];
-        $hasMp2 = ($form === 'mcrf'); // Pag-IBIG MP2 savings column
+        $hasMp2 = ($form === 'mcrf'); // Pag-IBIG MP2 savings column on the MCRF
+        $isMp2Form = ($form === 'mp2');
 
         $rows = ''; $tEE = 0; $tER = 0; $tEC = 0; $tMp2 = 0; $tT = 0;
         foreach ($lines as $l) {
@@ -169,11 +200,14 @@ class AgencyFormsController
             . "<div class='box'><div class='row'><div><div class='lbl'>Employer</div><div class='val'>" . self::e($company['name']) . "</div></div>"
             . "<div><div class='lbl'>Employer TIN / No.</div><div class='val'>" . (self::e($company['tin']) ?: '—') . "</div></div>"
             . "<div><div class='lbl'>Applicable month</div><div class='val'>$period</div></div></div></div>"
-            . "<table><thead><tr><th>$idLabel</th><th>Employee name</th><th class='num'>Employee share</th><th class='num'>Employer share</th>$ecHead<th class='num'>Total</th>$mp2Head</tr></thead>"
-            . "<tbody>$rows</tbody><tfoot><tr><td colspan='2'>Totals (" . count($lines) . " members)</td><td class='num'>" . self::n($tEE) . "</td><td class='num'>" . self::n($tER) . "</td>$ecFoot<td class='num'>" . self::n($tT) . "</td>$mp2Foot</tr></tfoot></table>"
+            . "<table><thead><tr><th>$idLabel</th><th>Member name</th><th class='num'>Employee share</th><th class='num'>Employer share</th>$ecHead<th class='num'>Total</th>$mp2Head</tr></thead>"
+            . "<tbody>$rows</tbody><tfoot><tr><td colspan='2'>Totals (" . count($lines) . ($isMp2Form ? " accounts)" : " members)") . "</td><td class='num'>" . self::n($tEE) . "</td><td class='num'>" . self::n($tER) . "</td>$ecFoot<td class='num'>" . self::n($tT) . "</td>$mp2Foot</tr></tfoot></table>"
             . "<div class='sig'><div><div class='line'>Prepared by</div></div><div><div class='line'>Authorized representative</div></div></div>"
-            . "<div class='note'><b>System-generated working copy of $formNo.</b> Employee shares come from posted payroll; employer shares are computed from the statutory rates. "
-            . "Verify against the official agency tables (SSS MSC / EC / WISP, PhilHealth, Pag-IBIG) and file through the agency's own facility (e.g. SSS/PhilHealth/Pag-IBIG online). This is not the official form.</div>"
+            . ($isMp2Form
+                ? "<div class='note'><b>System-generated working copy of $formNo.</b> One row per MP2 account (a member may hold several, each with its own MP2 account number, separate from the compulsory Pag-IBIG MID). "
+                    . "Employee and employer shares are the configured monthly amounts; total remittance per account = employee + employer share. Verify and file through the Pag-IBIG MP2 facility. This is not the official form.</div>"
+                : "<div class='note'><b>System-generated working copy of $formNo.</b> Employee shares come from posted payroll; employer shares are computed from the statutory rates. "
+                    . "Verify against the official agency tables (SSS MSC / EC / WISP, PhilHealth, Pag-IBIG) and file through the agency's own facility (e.g. SSS/PhilHealth/Pag-IBIG online). This is not the official form.</div>")
             . "</div></body></html>";
         exit;
     }

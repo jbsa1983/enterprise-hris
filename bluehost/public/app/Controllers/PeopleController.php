@@ -67,6 +67,7 @@ class PeopleController
         $engData['organization_id'] = $orgId;
         if (empty($engData['status'])) $engData['status'] = 'ACTIVE';
         $eid = Database::insert('engagements', $engData);
+        if (array_key_exists('mp2_accounts', $b)) self::saveMp2($orgId, (int) $eid, $b['mp2_accounts']);
         Audit::record('employee.create', $user, ['organization_id' => $orgId, 'entity' => 'person', 'entity_id' => $pid]);
         Http::json(['person_id' => $pid, 'engagement_id' => $eid]);
     }
@@ -141,13 +142,44 @@ class PeopleController
         Http::json(['imported' => $imported, 'skipped' => $skipped, 'error_count' => count($errors), 'errors' => array_slice($errors, 0, 50)]);
     }
 
+    /** Pag-IBIG MP2 accounts for an engagement (own account number + EE/ER monthly shares). */
+    private static function loadMp2(int $engId): array
+    {
+        return array_map(fn($m) => [
+            'id' => (int) $m['id'], 'account_number' => $m['account_number'],
+            'employee_share' => (float) $m['employee_share'], 'employer_share' => (float) $m['employer_share'],
+        ], Database::all('SELECT id, account_number, employee_share, employer_share FROM mp2_accounts WHERE engagement_id = ? ORDER BY id', [$engId]));
+    }
+
+    /** Replace all MP2 accounts for an engagement with the supplied set (skips empty rows). */
+    private static function saveMp2(int $orgId, int $engId, $accounts): void
+    {
+        if (!is_array($accounts)) return; // key absent → leave existing untouched
+        // The per-account model is now authoritative — retire the legacy single MP2 field
+        // so payroll can't count it on top of the accounts.
+        Database::exec('UPDATE engagements SET hdmf_mp2 = NULL WHERE id = ?', [$engId]);
+        Database::exec('DELETE FROM mp2_accounts WHERE engagement_id = ?', [$engId]);
+        foreach ($accounts as $a) {
+            $num = trim((string) ($a['account_number'] ?? ''));
+            $ee = (float) ($a['employee_share'] ?? 0);
+            $er = (float) ($a['employer_share'] ?? 0);
+            if ($num === '' && $ee <= 0 && $er <= 0) continue; // ignore blank rows
+            Database::insert('mp2_accounts', [
+                'organization_id' => $orgId, 'engagement_id' => $engId,
+                'account_number' => $num !== '' ? $num : null,
+                'employee_share' => $ee, 'employer_share' => $er,
+            ]);
+        }
+    }
+
     private static function detailArr(array $eng, array $person): array
     {
         $e = [];
         foreach (self::ENG_FIELDS as $f) $e[$f] = $eng[$f] ?? null;
         $pp = [];
         foreach (self::PERSON_FIELDS as $f) $pp[$f] = $person[$f] ?? null;
-        return ['engagement_id' => (int) $eng['id'], 'person_id' => (int) $person['id'], 'person' => $pp, 'engagement' => $e];
+        return ['engagement_id' => (int) $eng['id'], 'person_id' => (int) $person['id'], 'person' => $pp, 'engagement' => $e,
+            'mp2_accounts' => self::loadMp2((int) $eng['id'])];
     }
 
     public static function detail(array $p): void
@@ -168,6 +200,7 @@ class PeopleController
         $b = Http::body();
         if (!empty($b['person'])) Database::update('people', (int) $person['id'], self::pick($b['person'], self::PERSON_FIELDS));
         if (!empty($b['engagement'])) Database::update('engagements', (int) $eng['id'], self::pick($b['engagement'], self::ENG_FIELDS));
+        if (array_key_exists('mp2_accounts', $b)) self::saveMp2($orgId, (int) $eng['id'], $b['mp2_accounts']);
         Audit::record('employee.edit', $user, ['organization_id' => $orgId, 'entity' => 'engagement', 'entity_id' => $eng['id']]);
         $eng = Database::one('SELECT * FROM engagements WHERE id = ?', [$eng['id']]);
         $person = Database::one('SELECT * FROM people WHERE id = ?', [$person['id']]);
@@ -204,7 +237,8 @@ class PeopleController
             foreach ($loanIds as $lid) Database::exec('DELETE FROM loan_transactions WHERE loan_id = ?', [(int) $lid]);
             Database::exec('DELETE FROM loans WHERE engagement_id = ?', [$engId]);
             foreach (['project_assignments', 'attendance_logs', 'leave_requests', 'overtime_requests', 'leave_balances',
-                      'special_pay_lines', 'performance_reviews', 'training_assignments', 'service_tickets', 'lifecycle_checklists'] as $t) {
+                      'special_pay_lines', 'performance_reviews', 'training_assignments', 'service_tickets', 'lifecycle_checklists',
+                      'mp2_accounts'] as $t) {
                 Database::exec("DELETE FROM `$t` WHERE engagement_id = ?", [$engId]);
             }
             Database::exec('DELETE FROM engagements WHERE id = ?', [$engId]);
@@ -325,6 +359,7 @@ class PeopleController
                 // Forward-looking HR data follows the employee.
                 Database::exec('UPDATE leave_balances SET organization_id = ? WHERE engagement_id = ?', [$toOrg, $engId]);
                 Database::exec('UPDATE loans SET organization_id = ? WHERE engagement_id = ?', [$toOrg, $engId]);
+                Database::exec('UPDATE mp2_accounts SET organization_id = ? WHERE engagement_id = ?', [$toOrg, $engId]);
                 Database::exec('UPDATE benefits SET organization_id = ? WHERE person_id = ? AND organization_id = ?', [$toOrg, $personId, $fromOrg]);
                 Database::exec('UPDATE employee_documents SET organization_id = ? WHERE person_id = ? AND organization_id = ?', [$toOrg, $personId, $fromOrg]);
                 $moved[] = $engId;

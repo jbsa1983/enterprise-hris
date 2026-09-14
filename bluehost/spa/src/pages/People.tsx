@@ -131,9 +131,53 @@ const EMPTY: any = {
   tin: "", sss_number: "", philhealth_number: "", pagibig_number: "",
   bank_name: "", bank_account_number: "", bank_account_name: "",
   engagement_type: "REGULAR", employee_number: "", salary_basis: "MONTHLY", base_rate: "",
-  department_id: "", position_id: "", start_date: "", ewt_rate: "", hdmf_extra: "", hdmf_mp2: "",
+  department_id: "", position_id: "", start_date: "", ewt_rate: "", hdmf_extra: "",
+  mp2_accounts: [] as Mp2Account[],
 };
 const isConsultantType = (t: string) => t === "CONSULTANT_INDIVIDUAL" || t === "CONSULTANT_COMPANY";
+
+interface Mp2Account { account_number: string; employee_share: string; employer_share: string; }
+const num = (v: any) => { const n = Number(v); return isFinite(n) ? n : 0; };
+
+// Repeatable Pag-IBIG MP2 accounts editor. A person (employee or consultant) may hold
+// one or more MP2 accounts, each with its own account number and an employee + employer
+// monthly share. Module-scope so typing never remounts and loses focus.
+function Mp2Editor({ accounts, onChange }: { accounts: Mp2Account[]; onChange: (a: Mp2Account[]) => void }) {
+  const set = (i: number, patch: Partial<Mp2Account>) => onChange(accounts.map((a, j) => (j === i ? { ...a, ...patch } : a)));
+  const add = () => onChange([...accounts, { account_number: "", employee_share: "", employer_share: "" }]);
+  const remove = (i: number) => onChange(accounts.filter((_, j) => j !== i));
+  const grand = accounts.reduce((s, a) => s + num(a.employee_share) + num(a.employer_share), 0);
+  return (
+    <div className="mt-4">
+      <div className="mb-1 flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Pag-IBIG MP2 accounts</div>
+        <button type="button" className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50" onClick={add}>+ Add MP2 account</button>
+      </div>
+      {accounts.length === 0 ? (
+        <p className="text-[11px] text-slate-400">No MP2 accounts. MP2 is optional voluntary savings with its own account number (separate from the compulsory Pag-IBIG MID). Add one to record the employee and employer monthly shares.</p>
+      ) : (
+        <div className="space-y-2">
+          <div className="grid grid-cols-[1fr_110px_110px_90px_28px] items-center gap-2 text-[10px] uppercase tracking-wide text-slate-400">
+            <div>MP2 account no.</div><div className="text-right">Employee / mo</div><div className="text-right">Employer / mo</div><div className="text-right">Total</div><div></div>
+          </div>
+          {accounts.map((a, i) => (
+            <div key={i} className="grid grid-cols-[1fr_110px_110px_90px_28px] items-center gap-2">
+              <input className="input" placeholder="MP2 account number" value={a.account_number} onChange={(e) => set(i, { account_number: e.target.value })} />
+              <input className="input text-right" type="number" placeholder="0" value={a.employee_share} onChange={(e) => set(i, { employee_share: e.target.value })} />
+              <input className="input text-right" type="number" placeholder="0" value={a.employer_share} onChange={(e) => set(i, { employer_share: e.target.value })} />
+              <div className="text-right text-sm font-medium tabular-nums text-slate-700">{(num(a.employee_share) + num(a.employer_share)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <button type="button" className="text-slate-400 hover:text-red-600" title="Remove" onClick={() => remove(i)}>✕</button>
+            </div>
+          ))}
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-1 text-xs text-slate-500">
+            Total monthly MP2 remittance:&nbsp;<span className="font-semibold tabular-nums text-slate-700">₱ {grand.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+      )}
+      <p className="mt-1 text-[11px] text-slate-400">The employee share is deducted in payroll; the employer share is the employer's cost. Both appear on the Pag-IBIG MP2 remittance form (Statutory forms).</p>
+    </div>
+  );
+}
 
 export default function PeoplePage() {
   const orgId = Number(useParams().orgId);
@@ -188,7 +232,11 @@ export default function PeoplePage() {
       start_date: d.engagement.start_date || "",
       ewt_rate: d.engagement.ewt_rate ?? "",
       hdmf_extra: d.engagement.hdmf_extra ?? "",
-      hdmf_mp2: d.engagement.hdmf_mp2 ?? "",
+      mp2_accounts: (d.mp2_accounts || []).map((m: any) => ({
+        account_number: m.account_number ?? "",
+        employee_share: m.employee_share != null ? String(m.employee_share) : "",
+        employer_share: m.employer_share != null ? String(m.employer_share) : "",
+      })),
     });
     setEditing(engagementId);
   }
@@ -210,11 +258,15 @@ export default function PeoplePage() {
     if (form.position_id) e.position_id = Number(form.position_id);
     if (form.start_date) e.start_date = form.start_date;
     if (isConsultantType(form.engagement_type)) e.ewt_rate = form.ewt_rate !== "" ? Number(form.ewt_rate) : null;
-    else {
-      e.hdmf_extra = form.hdmf_extra !== "" ? Number(form.hdmf_extra) : null;
-      e.hdmf_mp2 = form.hdmf_mp2 !== "" ? Number(form.hdmf_mp2) : null;
-    }
+    else e.hdmf_extra = form.hdmf_extra !== "" ? Number(form.hdmf_extra) : null;
     return e;
+  }
+  function mp2Payload() {
+    return (form.mp2_accounts || []).map((a: Mp2Account) => ({
+      account_number: (a.account_number || "").trim(),
+      employee_share: num(a.employee_share),
+      employer_share: num(a.employer_share),
+    }));
   }
 
   async function save() {
@@ -222,12 +274,12 @@ export default function PeoplePage() {
     try {
       if (editing === "new") {
         await apiFetch(`/organizations/${orgId}/people/create`, {
-          method: "POST", body: JSON.stringify({ ...personPayload(), engagement: engagementPayload() }),
+          method: "POST", body: JSON.stringify({ ...personPayload(), engagement: engagementPayload(), mp2_accounts: mp2Payload() }),
         });
         setMsg("Person added.");
       } else if (typeof editing === "number") {
         await apiFetch(`/organizations/${orgId}/people/${editing}`, {
-          method: "PUT", body: JSON.stringify({ person: personPayload(), engagement: engagementPayload() }),
+          method: "PUT", body: JSON.stringify({ person: personPayload(), engagement: engagementPayload(), mp2_accounts: mp2Payload() }),
         });
         setMsg("Person updated.");
       }
@@ -432,13 +484,11 @@ export default function PeoplePage() {
                   <p className="mt-1 text-[11px] text-slate-400">Expanded withholding tax on this consultant's fees — used automatically in payroll and on Form 2307.</p>
                 </div>
               ) : (
-                <>
-                  {F("hdmf_extra", "Pag-IBIG additional / month", { type: "number", placeholder: "0" })}
-                  {F("hdmf_mp2", "Pag-IBIG MP2 / month", { type: "number", placeholder: "0" })}
-                </>
+                F("hdmf_extra", "Pag-IBIG additional / month", { type: "number", placeholder: "0" })
               )}
             </div>
-            {!isConsultantType(form.engagement_type) ? <p className="mt-1 text-[11px] text-slate-400">Optional fixed monthly Pag-IBIG voluntary top-up and MP2 savings — deducted in payroll on top of the mandatory contribution.</p> : null}
+            {!isConsultantType(form.engagement_type) ? <p className="mt-1 text-[11px] text-slate-400">Optional fixed monthly Pag-IBIG voluntary top-up to the compulsory account — deducted in payroll on top of the mandatory contribution.</p> : null}
+            <Mp2Editor accounts={form.mp2_accounts || []} onChange={(a) => setForm({ ...form, mp2_accounts: a })} />
             {typeof editing === "number" ? <DocumentsSection orgId={orgId} engagementId={editing} /> : null}
             {err ? <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
             <div className="mt-5 flex justify-end gap-2">
