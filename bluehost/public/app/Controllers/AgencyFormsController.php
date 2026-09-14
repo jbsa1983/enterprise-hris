@@ -70,10 +70,12 @@ class AgencyFormsController
             $id = (int) $r['engagement_id'];
             if (!isset($by[$id])) $by[$id] = ['employee_number' => $r['employee_number'], 'name' => $r['name'],
                 'sss_number' => $r['sss_number'] ?: '', 'philhealth_number' => $r['philhealth_number'] ?: '', 'pagibig_number' => $r['pagibig_number'] ?: '',
-                'sss_ee' => 0.0, 'phic_ee' => 0.0, 'hdmf_ee' => 0.0];
+                'sss_ee' => 0.0, 'phic_ee' => 0.0, 'hdmf_ee' => 0.0, 'hdmf_extra' => 0.0, 'hdmf_mp2' => 0.0];
             $by[$id]['sss_ee'] += (float) ($d['sss'] ?? 0);
             $by[$id]['phic_ee'] += (float) ($d['philhealth'] ?? 0);
             $by[$id]['hdmf_ee'] += (float) ($d['pagibig'] ?? 0);
+            $by[$id]['hdmf_extra'] += (float) ($d['pagibig_extra'] ?? 0);
+            $by[$id]['hdmf_mp2'] += (float) ($d['pagibig_mp2'] ?? 0);
         }
 
         $sss = []; $phic = []; $hdmf = [];
@@ -90,10 +92,13 @@ class AgencyFormsController
                 $phic[] = ['id_number' => $x['philhealth_number'], 'employee_number' => $x['employee_number'], 'name' => $x['name'],
                     'ee' => round($x['phic_ee'], 2), 'er' => $er, 'total' => round($x['phic_ee'] + $er, 2)];
             }
-            if ($x['hdmf_ee'] > 0) {
-                $er = round($x['hdmf_ee'], 2); // employer matches employee (2% / 2%)
+            if ($x['hdmf_ee'] > 0 || $x['hdmf_extra'] > 0 || $x['hdmf_mp2'] > 0) {
+                // Employee share = mandatory + voluntary additional; employer matches the mandatory.
+                $ee = round($x['hdmf_ee'] + $x['hdmf_extra'], 2);
+                $er = round($x['hdmf_ee'], 2);
+                $mp2 = round($x['hdmf_mp2'], 2);
                 $hdmf[] = ['id_number' => $x['pagibig_number'], 'employee_number' => $x['employee_number'], 'name' => $x['name'],
-                    'ee' => round($x['hdmf_ee'], 2), 'er' => $er, 'total' => round($x['hdmf_ee'] + $er, 2)];
+                    'ee' => $ee, 'er' => $er, 'extra' => round($x['hdmf_extra'], 2), 'mp2' => $mp2, 'total' => round($ee + $er, 2)];
             }
         }
         $sum = fn($arr, $k) => round(array_sum(array_column($arr, $k)), 2);
@@ -103,7 +108,7 @@ class AgencyFormsController
             'totals' => [
                 'sss' => ['ee' => $sum($sss, 'ee'), 'er' => $sum($sss, 'er'), 'ec' => $sum($sss, 'ec'), 'total' => $sum($sss, 'total'), 'count' => count($sss)],
                 'philhealth' => ['ee' => $sum($phic, 'ee'), 'er' => $sum($phic, 'er'), 'total' => $sum($phic, 'total'), 'count' => count($phic)],
-                'pagibig' => ['ee' => $sum($hdmf, 'ee'), 'er' => $sum($hdmf, 'er'), 'total' => $sum($hdmf, 'total'), 'count' => count($hdmf)],
+                'pagibig' => ['ee' => $sum($hdmf, 'ee'), 'er' => $sum($hdmf, 'er'), 'mp2' => $sum($hdmf, 'mp2'), 'total' => $sum($hdmf, 'total'), 'count' => count($hdmf)],
             ],
         ]);
     }
@@ -127,19 +132,23 @@ class AgencyFormsController
         ];
         if (!isset($map[$form])) throw new HttpError('Unknown form', 400);
         [$formNo, $formTitle, $idLabel, $hasEc] = $map[$form];
+        $hasMp2 = ($form === 'mcrf'); // Pag-IBIG MP2 savings column
 
-        $rows = ''; $tEE = 0; $tER = 0; $tEC = 0; $tT = 0;
+        $rows = ''; $tEE = 0; $tER = 0; $tEC = 0; $tMp2 = 0; $tT = 0;
         foreach ($lines as $l) {
-            $ee = (float) ($l['ee'] ?? 0); $er = (float) ($l['er'] ?? 0); $ec = (float) ($l['ec'] ?? 0);
+            $ee = (float) ($l['ee'] ?? 0); $er = (float) ($l['er'] ?? 0); $ec = (float) ($l['ec'] ?? 0); $mp2 = (float) ($l['mp2'] ?? 0);
             $tot = (float) ($l['total'] ?? ($ee + $er + ($hasEc ? $ec : 0)));
-            $tEE += $ee; $tER += $er; $tEC += $ec; $tT += $tot;
+            $tEE += $ee; $tER += $er; $tEC += $ec; $tMp2 += $mp2; $tT += $tot;
             $rows .= '<tr><td>' . self::e($l['id_number'] ?? '') . '</td><td>' . self::e($l['name'] ?? '')
                 . "</td><td class='num'>" . self::n($ee) . "</td><td class='num'>" . self::n($er) . '</td>'
                 . ($hasEc ? "<td class='num'>" . self::n($ec) . '</td>' : '')
-                . "<td class='num'>" . self::n($tot) . '</td></tr>';
+                . "<td class='num'>" . self::n($tot) . '</td>'
+                . ($hasMp2 ? "<td class='num'>" . self::n($mp2) . '</td>' : '') . '</tr>';
         }
         $ecHead = $hasEc ? "<th class='num'>EC (ER)</th>" : '';
         $ecFoot = $hasEc ? "<td class='num'>" . self::n($tEC) . '</td>' : '';
+        $mp2Head = $hasMp2 ? "<th class='num'>MP2 savings</th>" : '';
+        $mp2Foot = $hasMp2 ? "<td class='num'>" . self::n($tMp2) . '</td>' : '';
 
         $css = 'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#111;margin:0;padding:24px;background:#f3f4f6}'
             . '.sheet{max-width:900px;margin:0 auto;background:#fff;padding:26px 30px;box-shadow:0 1px 4px rgba(0,0,0,.1)}'
@@ -160,8 +169,8 @@ class AgencyFormsController
             . "<div class='box'><div class='row'><div><div class='lbl'>Employer</div><div class='val'>" . self::e($company['name']) . "</div></div>"
             . "<div><div class='lbl'>Employer TIN / No.</div><div class='val'>" . (self::e($company['tin']) ?: '—') . "</div></div>"
             . "<div><div class='lbl'>Applicable month</div><div class='val'>$period</div></div></div></div>"
-            . "<table><thead><tr><th>$idLabel</th><th>Employee name</th><th class='num'>Employee share</th><th class='num'>Employer share</th>$ecHead<th class='num'>Total</th></tr></thead>"
-            . "<tbody>$rows</tbody><tfoot><tr><td colspan='2'>Totals (" . count($lines) . " members)</td><td class='num'>" . self::n($tEE) . "</td><td class='num'>" . self::n($tER) . "</td>$ecFoot<td class='num'>" . self::n($tT) . "</td></tr></tfoot></table>"
+            . "<table><thead><tr><th>$idLabel</th><th>Employee name</th><th class='num'>Employee share</th><th class='num'>Employer share</th>$ecHead<th class='num'>Total</th>$mp2Head</tr></thead>"
+            . "<tbody>$rows</tbody><tfoot><tr><td colspan='2'>Totals (" . count($lines) . " members)</td><td class='num'>" . self::n($tEE) . "</td><td class='num'>" . self::n($tER) . "</td>$ecFoot<td class='num'>" . self::n($tT) . "</td>$mp2Foot</tr></tfoot></table>"
             . "<div class='sig'><div><div class='line'>Prepared by</div></div><div><div class='line'>Authorized representative</div></div></div>"
             . "<div class='note'><b>System-generated working copy of $formNo.</b> Employee shares come from posted payroll; employer shares are computed from the statutory rates. "
             . "Verify against the official agency tables (SSS MSC / EC / WISP, PhilHealth, Pag-IBIG) and file through the agency's own facility (e.g. SSS/PhilHealth/Pag-IBIG online). This is not the official form.</div>"

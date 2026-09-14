@@ -11,10 +11,10 @@ function generate(orgId: number, form: string, payload: any) {
   return apiOpen(`/organizations/${orgId}/agency/generate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ form, ...payload }) });
 }
 
-const TABS: { id: Tab; label: string; sub: string; form: string; ec: boolean }[] = [
-  { id: "sss", label: "SSS R-3", sub: "Contribution collection list", form: "r3", ec: true },
-  { id: "philhealth", label: "PhilHealth RF-1", sub: "Employer remittance report", form: "rf1", ec: false },
-  { id: "pagibig", label: "Pag-IBIG MCRF", sub: "Contribution remittance form", form: "mcrf", ec: false },
+const TABS: { id: Tab; label: string; sub: string; form: string; ec: boolean; mp2: boolean }[] = [
+  { id: "sss", label: "SSS R-3", sub: "Contribution collection list", form: "r3", ec: true, mp2: false },
+  { id: "philhealth", label: "PhilHealth RF-1", sub: "Employer remittance report", form: "rf1", ec: false, mp2: false },
+  { id: "pagibig", label: "Pag-IBIG MCRF", sub: "Contribution remittance form", form: "mcrf", ec: false, mp2: true },
 ];
 
 export default function AgencyFormsPage() {
@@ -87,6 +87,7 @@ export default function AgencyFormsPage() {
                   <th className="py-2 pr-2 text-right">Employee</th><th className="py-2 pr-2 text-right">Employer</th>
                   {cur.ec ? <th className="py-2 pr-2 text-right">EC</th> : null}
                   <th className="py-2 pr-2 text-right">Total</th>
+                  {cur.mp2 ? <th className="py-2 pr-2 text-right">MP2</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -98,9 +99,10 @@ export default function AgencyFormsPage() {
                     <td className="py-1.5 pr-2 text-right">{fmt(l.er)}</td>
                     {cur.ec ? <td className="py-1.5 pr-2 text-right">{fmt(l.ec)}</td> : null}
                     <td className="py-1.5 pr-2 text-right font-medium">{fmt(l.total)}</td>
+                    {cur.mp2 ? <td className="py-1.5 pr-2 text-right">{fmt(l.mp2)}</td> : null}
                   </tr>
                 ))}
-                {lines.length === 0 ? <tr><td colSpan={cur.ec ? 6 : 5} className="py-6 text-center text-slate-400">No contributions for this month.</td></tr> : null}
+                {lines.length === 0 ? <tr><td colSpan={cur.ec || cur.mp2 ? 6 : 5} className="py-6 text-center text-slate-400">No contributions for this month.</td></tr> : null}
               </tbody>
               {totals ? (
                 <tfoot>
@@ -110,6 +112,7 @@ export default function AgencyFormsPage() {
                     <td className="py-2 pr-2 text-right">₱ {fmt(totals.er)}</td>
                     {cur.ec ? <td className="py-2 pr-2 text-right">₱ {fmt(totals.ec)}</td> : null}
                     <td className="py-2 pr-2 text-right">₱ {fmt(totals.total)}</td>
+                    {cur.mp2 ? <td className="py-2 pr-2 text-right">₱ {fmt(totals.mp2)}</td> : null}
                   </tr>
                 </tfoot>
               ) : null}

@@ -156,6 +156,8 @@ CREATE TABLE IF NOT EXISTS engagements (
   work_site VARCHAR(100) NULL,
   tax_profile VARCHAR(50) NULL,
   ewt_rate DECIMAL(5,2) NULL,
+  hdmf_extra DECIMAL(10,2) NULL,
+  hdmf_mp2 DECIMAL(10,2) NULL,
   statutory_profile VARCHAR(50) NULL,
   benefits_profile VARCHAR(50) NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',

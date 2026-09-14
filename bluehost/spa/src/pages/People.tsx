@@ -131,7 +131,7 @@ const EMPTY: any = {
   tin: "", sss_number: "", philhealth_number: "", pagibig_number: "",
   bank_name: "", bank_account_number: "", bank_account_name: "",
   engagement_type: "REGULAR", employee_number: "", salary_basis: "MONTHLY", base_rate: "",
-  department_id: "", position_id: "", start_date: "", ewt_rate: "",
+  department_id: "", position_id: "", start_date: "", ewt_rate: "", hdmf_extra: "", hdmf_mp2: "",
 };
 const isConsultantType = (t: string) => t === "CONSULTANT_INDIVIDUAL" || t === "CONSULTANT_COMPANY";
 
@@ -187,6 +187,8 @@ export default function PeoplePage() {
       position_id: d.engagement.position_id ?? "",
       start_date: d.engagement.start_date || "",
       ewt_rate: d.engagement.ewt_rate ?? "",
+      hdmf_extra: d.engagement.hdmf_extra ?? "",
+      hdmf_mp2: d.engagement.hdmf_mp2 ?? "",
     });
     setEditing(engagementId);
   }
@@ -208,6 +210,10 @@ export default function PeoplePage() {
     if (form.position_id) e.position_id = Number(form.position_id);
     if (form.start_date) e.start_date = form.start_date;
     if (isConsultantType(form.engagement_type)) e.ewt_rate = form.ewt_rate !== "" ? Number(form.ewt_rate) : null;
+    else {
+      e.hdmf_extra = form.hdmf_extra !== "" ? Number(form.hdmf_extra) : null;
+      e.hdmf_mp2 = form.hdmf_mp2 !== "" ? Number(form.hdmf_mp2) : null;
+    }
     return e;
   }
 
@@ -425,8 +431,14 @@ export default function PeoplePage() {
                   </select>
                   <p className="mt-1 text-[11px] text-slate-400">Expanded withholding tax on this consultant's fees — used automatically in payroll and on Form 2307.</p>
                 </div>
-              ) : null}
+              ) : (
+                <>
+                  {F("hdmf_extra", "Pag-IBIG additional / month", { type: "number", placeholder: "0" })}
+                  {F("hdmf_mp2", "Pag-IBIG MP2 / month", { type: "number", placeholder: "0" })}
+                </>
+              )}
             </div>
+            {!isConsultantType(form.engagement_type) ? <p className="mt-1 text-[11px] text-slate-400">Optional fixed monthly Pag-IBIG voluntary top-up and MP2 savings — deducted in payroll on top of the mandatory contribution.</p> : null}
             {typeof editing === "number" ? <DocumentsSection orgId={orgId} engagementId={editing} /> : null}
             {err ? <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
             <div className="mt-5 flex justify-end gap-2">

@@ -103,6 +103,12 @@ class Payroll
             $taxable = max($gross - ($s + $ph + $hd), 0);
             $wt = $bir ? self::withholding($taxable, self::scaleBrackets($bir, $factor)) : 0;
             $deductions = ['sss' => $s, 'philhealth' => $ph, 'pagibig' => $hd, 'withholding_tax' => $wt];
+            // Voluntary Pag-IBIG additional + MP2 — fixed monthly amounts, prorated to the
+            // period, added after tax (they don't reduce taxable income).
+            $extra = self::r2(((float) ($eng['hdmf_extra'] ?? 0)) * $factor);
+            if ($extra > 0) $deductions['pagibig_extra'] = $extra;
+            $mp2 = self::r2(((float) ($eng['hdmf_mp2'] ?? 0)) * $factor);
+            if ($mp2 > 0) $deductions['pagibig_mp2'] = $mp2;
         }
         foreach ($installments as $label => $amt) {
             if ($amt) $deductions[$label] = self::r2($amt);
