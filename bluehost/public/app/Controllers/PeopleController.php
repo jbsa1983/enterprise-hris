@@ -46,9 +46,46 @@ class PeopleController
         return $out;
     }
 
+    /** Authorize a People action on one person. A project (site) worker can be managed by
+     *  anyone with the matching employee.* permission, OR by a holder of project.worker who
+     *  is assigned to that worker's project. Everyone else needs the employee.* permission. */
+    private static function authorizePerson(array $user, int $org, ?string $engType, $projectId, string $employeePerm): void
+    {
+        $isProject = $engType !== null && in_array($engType, self::PROJECT_TYPES, true);
+        if ($isProject && Auth::has($user, 'project.worker')) {
+            $pid = (int) $projectId;
+            if (!$pid) {
+                // Unassigned project worker — only an org-wide user may touch it.
+                if (!ProjectAccess::orgWide($user)) throw new HttpError('Assign this worker to a project you manage.', 403);
+            } else {
+                ProjectAccess::assert($user, $org, $pid);
+            }
+            return;
+        }
+        Auth::requirePerm($employeePerm);
+    }
+
+    /** Guard the Project Workers list: employee.view OR project.worker. Returns [user, orgId]. */
+    private static function projectGuard(array $p): array
+    {
+        $u = Auth::require();
+        $orgId = (int) ($p['organization_id'] ?? 0);
+        Auth::requireOrg($u, $orgId);
+        if (!Auth::has($u, 'employee.view') && !Auth::has($u, 'project.worker'))
+            throw new HttpError('Missing permission: project.worker', 403);
+        return [$u, $orgId];
+    }
+
     public static function create(array $p): void
     {
-        [$user, $orgId] = Auth::org($p, 'employee.create');
+        $user = Auth::require();
+        $orgId = (int) ($p['organization_id'] ?? 0);
+        Auth::requireOrg($user, $orgId);
+        $b = Http::body();
+        $eng = $b['engagement'] ?? [];
+        // A Project Manager / Project HR (project.worker) may add project workers on their
+        // projects; adding any other kind of person needs employee.create.
+        self::authorizePerson($user, $orgId, $eng['engagement_type'] ?? null, $eng['project_id'] ?? null, 'employee.create');
         // Licensed edition may cap the number of active employees.
         $max = License::maxUsers();
         if ($max > 0) {
@@ -57,8 +94,6 @@ class PeopleController
                 throw new HttpError("You've reached your plan's limit of {$max} active employees. Please upgrade your plan to add more.", 403);
             }
         }
-        $b = Http::body();
-        $eng = $b['engagement'] ?? [];
         $person = self::pick($b, self::PERSON_FIELDS);
         if (empty($person['first_name']) || empty($person['last_name'])) throw new HttpError('first_name and last_name are required', 422);
         $person['uuid'] = Util::uuid();
@@ -187,20 +222,29 @@ class PeopleController
 
     public static function detail(array $p): void
     {
-        [, $orgId] = Auth::org($p, 'employee.view');
+        $user = Auth::require();
+        $orgId = (int) ($p['organization_id'] ?? 0);
+        Auth::requireOrg($user, $orgId);
         $eng = Database::one('SELECT * FROM engagements WHERE id = ? AND organization_id = ?', [(int) $p['engagement_id'], $orgId]);
         if (!$eng) throw new HttpError('Engagement not found', 404);
+        self::authorizePerson($user, $orgId, $eng['engagement_type'], $eng['project_id'] ?? null, 'employee.view');
         $person = Database::one('SELECT * FROM people WHERE id = ?', [$eng['person_id']]);
         Http::json(self::detailArr($eng, $person));
     }
 
     public static function update(array $p): void
     {
-        [$user, $orgId] = Auth::org($p, 'employee.edit');
+        $user = Auth::require();
+        $orgId = (int) ($p['organization_id'] ?? 0);
+        Auth::requireOrg($user, $orgId);
         $eng = Database::one('SELECT * FROM engagements WHERE id = ? AND organization_id = ?', [(int) $p['engagement_id'], $orgId]);
         if (!$eng) throw new HttpError('Engagement not found', 404);
-        $person = Database::one('SELECT * FROM people WHERE id = ?', [$eng['person_id']]);
+        self::authorizePerson($user, $orgId, $eng['engagement_type'], $eng['project_id'] ?? null, 'employee.edit');
         $b = Http::body();
+        // A project-scoped user can't move a worker onto a project they don't manage.
+        if (!empty($b['engagement']['project_id']) && !ProjectAccess::orgWide($user))
+            ProjectAccess::assert($user, $orgId, (int) $b['engagement']['project_id']);
+        $person = Database::one('SELECT * FROM people WHERE id = ?', [$eng['person_id']]);
         if (!empty($b['person'])) Database::update('people', (int) $person['id'], self::pick($b['person'], self::PERSON_FIELDS));
         if (!empty($b['engagement'])) Database::update('engagements', (int) $eng['id'], self::pick($b['engagement'], self::ENG_FIELDS));
         if (array_key_exists('mp2_accounts', $b)) self::saveMp2($orgId, (int) $eng['id'], $b['mp2_accounts']);
@@ -212,9 +256,12 @@ class PeopleController
 
     public static function archive(array $p): void
     {
-        [$user, $orgId] = Auth::org($p, 'employee.archive');
+        $user = Auth::require();
+        $orgId = (int) ($p['organization_id'] ?? 0);
+        Auth::requireOrg($user, $orgId);
         $eng = Database::one('SELECT * FROM engagements WHERE id = ? AND organization_id = ?', [(int) $p['engagement_id'], $orgId]);
         if (!$eng) throw new HttpError('Engagement not found', 404);
+        self::authorizePerson($user, $orgId, $eng['engagement_type'], $eng['project_id'] ?? null, 'employee.archive');
         $status = Http::body()['status'] ?? 'SEPARATED';
         Database::update('engagements', (int) $eng['id'], ['status' => $status]);
         Audit::record('employee.archive', $user, ['organization_id' => $orgId, 'entity' => 'engagement', 'entity_id' => $eng['id'], 'after' => ['status' => $status]]);
@@ -377,7 +424,7 @@ class PeopleController
         Http::json(['moved' => $moved, 'to_organization_id' => $toOrg]);
     }
 
-    private static function rows(int $orgId, ?string $mode): array
+    private static function rows(int $orgId, ?string $mode, ?array $projectIds = null): array
     {
         $sql = "SELECT e.id eng_id, e.person_id, e.engagement_type, e.employee_number, e.status,
                        e.base_rate, e.salary_basis, e.start_date, e.end_date, e.project_id,
@@ -403,6 +450,13 @@ class PeopleController
             $in = implode(',', array_fill(0, count($project), '?'));
             $sql .= " AND e.engagement_type IN ($in)";
             $params = array_merge($params, $project);
+            // Scope to specific projects when the caller isn't org-wide (null = all).
+            if ($projectIds !== null) {
+                if (!$projectIds) return [];
+                $pin = implode(',', array_fill(0, count($projectIds), '?'));
+                $sql .= " AND e.project_id IN ($pin)";
+                $params = array_merge($params, $projectIds);
+            }
         }
         $sql .= ' ORDER BY p.last_name';
         return array_map(function ($r) {
@@ -430,5 +484,9 @@ class PeopleController
     public static function people(array $p): void { Http::json(self::rows(self::guard($p), null)); }
     public static function employees(array $p): void { Http::json(self::rows(self::guard($p), 'employees')); }
     public static function consultants(array $p): void { Http::json(self::rows(self::guard($p), 'consultants')); }
-    public static function projectWorkers(array $p): void { Http::json(self::rows(self::guard($p), 'project')); }
+    public static function projectWorkers(array $p): void
+    {
+        [$u, $o] = self::projectGuard($p);
+        Http::json(self::rows($o, 'project', ProjectAccess::accessibleIds($u, $o)));
+    }
 }

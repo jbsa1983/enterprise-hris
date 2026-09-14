@@ -19,6 +19,7 @@ require __DIR__ . '/Telegram.php';
 require __DIR__ . '/Notify.php';
 require __DIR__ . '/Digest.php';
 require __DIR__ . '/Payroll.php';
+require __DIR__ . '/ProjectAccess.php';
 require __DIR__ . '/Obligation.php';
 require __DIR__ . '/PayslipService.php';
 require __DIR__ . '/Router.php';

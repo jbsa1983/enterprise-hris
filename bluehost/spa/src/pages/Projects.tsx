@@ -15,11 +15,13 @@ export default function ProjectsPage() {
   const [range, setRange] = useState({ from: "", to: "" });
   const [alloc, setAlloc] = useState({ period_label: "", amount: "" });
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
+  const [orgAdmin, setOrgAdmin] = useState(false); // create/delete projects, assign access
 
   const load = useCallback(() => {
     apiFetch(`/organizations/${orgId}/projects`).then(setRows).catch((e) => setErr(e.message));
   }, [orgId]);
   useEffect(load, [load]);
+  useEffect(() => { apiFetch<any>("/auth/me").then((u) => setOrgAdmin(!!u.is_superadmin || (u.permissions || []).includes("organization.manage"))).catch(() => {}); }, []);
 
   const loadBudget = useCallback((projId: number) => {
     const q = new URLSearchParams();
@@ -64,7 +66,7 @@ export default function ProjectsPage() {
     <AppShell orgId={orgId}>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-900">Projects</h1>
-        <button className="btn-primary" onClick={() => { setForm({ status: "ACTIVE" }); setEditing("new"); }}>+ New Project</button>
+        {orgAdmin ? <button className="btn-primary" onClick={() => { setForm({ status: "ACTIVE" }); setEditing("new"); }}>+ New Project</button> : null}
       </div>
       {msg ? <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{msg}</div> : null}
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
@@ -81,7 +83,7 @@ export default function ProjectsPage() {
               <div className="mt-1 text-xs text-slate-500">Labor budget: {peso(p.labor_budget)}</div>
               <div className="mt-2 flex gap-3 text-xs">
                 <button className="text-brand-700 hover:underline" onClick={(e) => { e.stopPropagation(); setForm(p); setEditing(p); }}>Edit</button>
-                <button className="text-red-600 hover:underline" onClick={(e) => { e.stopPropagation(); del(p); }}>Delete</button>
+                {orgAdmin ? <button className="text-red-600 hover:underline" onClick={(e) => { e.stopPropagation(); del(p); }}>Delete</button> : null}
               </div>
             </div>
           ))}
@@ -153,6 +155,7 @@ export default function ProjectsPage() {
               <F label="Start date" v={form.start_date} on={(x: string) => setForm({ ...form, start_date: x })} type="date" />
               <F label="Target end" v={form.target_end_date} on={(x: string) => setForm({ ...form, target_end_date: x })} type="date" />
             </div>
+            {editing !== "new" && editing?.id ? <ProjectAccessEditor orgId={orgId} projectId={editing.id} /> : null}
             <div className="mt-5 flex justify-end gap-2">
               <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={() => setEditing(null)}>Cancel</button>
               <button className="btn-primary" onClick={save}>Save</button>
@@ -161,6 +164,47 @@ export default function ProjectsPage() {
         </div>
       ) : null}
     </AppShell>
+  );
+}
+
+// Assign which users (Project Managers / Project HR) may work on this project. The
+// endpoint requires project.manage, so this only saves for admins and the project's PMs.
+function ProjectAccessEditor({ orgId, projectId }: { orgId: number; projectId: number }) {
+  const [users, setUsers] = useState<any[]>([]);
+  const [assigned, setAssigned] = useState<number[]>([]);
+  const [msg, setMsg] = useState(""); const [err, setErr] = useState(""); const [ok, setOk] = useState(true);
+  useEffect(() => {
+    apiFetch<any>(`/organizations/${orgId}/projects/${projectId}/access`)
+      .then((d) => { setUsers(d.users || []); setAssigned((d.assigned || []).map(Number)); })
+      .catch(() => setOk(false)); // no project.manage → hide the panel
+  }, [orgId, projectId]);
+  if (!ok) return null;
+  const toggle = (id: number) => setAssigned((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
+  const save = async () => {
+    setErr("");
+    try { await apiFetch(`/organizations/${orgId}/projects/${projectId}/access`, { method: "POST", body: JSON.stringify({ user_ids: assigned }) }); setMsg("Access saved."); }
+    catch (e: any) { setErr(e.message); }
+  };
+  return (
+    <div className="mt-4 rounded-lg border border-slate-200 p-3">
+      <div className="mb-1 flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Project access — who can manage this project</div>
+        <button type="button" className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs hover:bg-slate-50" onClick={save}>Save access</button>
+      </div>
+      {msg ? <div className="mb-1 text-[11px] text-emerald-700">{msg}</div> : null}
+      {err ? <div className="mb-1 text-[11px] text-red-600">{err}</div> : null}
+      {users.length === 0 ? <p className="text-[11px] text-slate-400">No other users in this company yet.</p> : (
+        <div className="max-h-40 space-y-1 overflow-y-auto">
+          {users.map((u) => (
+            <label key={u.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={assigned.includes(u.id)} onChange={() => toggle(u.id)} />
+              {u.full_name} <span className="text-xs text-slate-400">{u.email}</span>
+            </label>
+          ))}
+        </div>
+      )}
+      <p className="mt-1 text-[11px] text-slate-400">Tick a Project Manager or Project HR so they can work on <strong>only</strong> this project. Give them the matching role in <strong>Admin → Roles &amp; Scopes</strong> to control what they can do.</p>
+    </div>
   );
 }
 

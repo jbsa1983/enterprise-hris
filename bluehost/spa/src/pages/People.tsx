@@ -193,6 +193,7 @@ export default function PeoplePage() {
   const [msg, setMsg] = useState("");
   const [isSuper, setIsSuper] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
+  const [canBulk, setCanBulk] = useState(false); // HR-level: bulk actions, CSV import/template
   const [orgs, setOrgs] = useState<{ id: number; name: string }[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [xferOrg, setXferOrg] = useState("");
@@ -201,7 +202,11 @@ export default function PeoplePage() {
   useEffect(() => {
     const apply = (c: { perms: string[]; superadmin: boolean }) => {
       setIsSuper(c.superadmin);
-      setCanEdit(c.superadmin || c.perms.includes("employee.edit"));
+      // Project Managers / Project HR can manage project workers via project.worker,
+      // even without the general employee.edit permission.
+      const projectManage = type === "project" && c.perms.includes("project.worker");
+      setCanEdit(c.superadmin || c.perms.includes("employee.edit") || projectManage);
+      setCanBulk(c.superadmin || c.perms.includes("employee.edit"));
       if (c.superadmin) apiFetch<{ id: number; name: string }[]>("/organizations").then(setOrgs).catch(() => {});
     };
     if (_permsCache) { apply(_permsCache); return; }
@@ -381,19 +386,19 @@ export default function PeoplePage() {
           <p className="text-sm text-slate-500">{filtered.length} record(s)</p></div>
         <div className="flex flex-wrap gap-2">
           <input className="input max-w-xs" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
-          <button className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
-            onClick={() => apiDownload(`/organizations/${orgId}/people/template`, "employees_template.csv")}>Template</button>
-          <label className="cursor-pointer whitespace-nowrap rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+          {canBulk ? <button className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+            onClick={() => apiDownload(`/organizations/${orgId}/people/template`, "employees_template.csv")}>Template</button> : null}
+          {canBulk ? <label className="cursor-pointer whitespace-nowrap rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
             Import CSV
             <input type="file" accept=".csv" className="hidden" onChange={onImport} />
-          </label>
-          <button className="btn-primary whitespace-nowrap" onClick={openCreate}>+ Add Person</button>
+          </label> : null}
+          {canEdit ? <button className="btn-primary whitespace-nowrap" onClick={openCreate}>+ Add Person</button> : null}
         </div>
       </div>
       {msg ? <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{msg}</div> : null}
       {err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
 
-      {canEdit && selected.size > 0 ? (
+      {canBulk && selected.size > 0 ? (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
           <span className="font-medium text-slate-700">{selected.size} selected</span>
           <div className="flex items-center gap-2">
@@ -422,7 +427,7 @@ export default function PeoplePage() {
       <div className="card p-0 overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50"><tr className="text-left text-xs uppercase text-slate-500">
-            {canEdit ? <th className="px-3 py-3"><input type="checkbox" aria-label="Select all" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleAll} /></th> : null}
+            {canBulk ? <th className="px-3 py-3"><input type="checkbox" aria-label="Select all" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleAll} /></th> : null}
             <th className="px-4 py-3">Emp. No.</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Type</th>
             {isProject ? <th className="px-4 py-3">Project</th> : null}
             <th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">{isProject ? "Daily rate" : "Base Rate"}</th><th className="px-4 py-3"></th>
@@ -430,7 +435,7 @@ export default function PeoplePage() {
           <tbody className="divide-y divide-slate-100">
             {filtered.map((r) => (
               <tr key={r.engagement_id} className={`hover:bg-slate-50 ${selected.has(r.engagement_id) ? "bg-blue-50/50" : ""}`}>
-                {canEdit ? <td className="px-3 py-3"><input type="checkbox" aria-label={`Select ${r.full_name}`} checked={selected.has(r.engagement_id)} onChange={() => toggleSel(r.engagement_id)} /></td> : null}
+                {canBulk ? <td className="px-3 py-3"><input type="checkbox" aria-label={`Select ${r.full_name}`} checked={selected.has(r.engagement_id)} onChange={() => toggleSel(r.engagement_id)} /></td> : null}
                 <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.employee_number || "—"}</td>
                 <td className="px-4 py-3 font-medium text-slate-800">{r.full_name}</td>
                 <td className="px-4 py-3 text-slate-600">{r.engagement_type}</td>
@@ -438,13 +443,13 @@ export default function PeoplePage() {
                 <td className="px-4 py-3"><span className={`badge ${statusColor(r.status)}`}>{r.status}</span></td>
                 <td className="px-4 py-3 text-right">{peso(r.base_rate)}</td>
                 <td className="px-4 py-3 text-right space-x-2">
-                  <button className="text-brand-700 hover:underline" onClick={() => openEdit(r.engagement_id)}>Edit</button>
-                  {r.status === "ACTIVE" ? <button className="text-amber-600 hover:underline" onClick={() => archive(r.engagement_id)}>Archive</button> : null}
+                  <button className="text-brand-700 hover:underline" onClick={() => openEdit(r.engagement_id)}>{canEdit ? "Edit" : "View"}</button>
+                  {canEdit && r.status === "ACTIVE" ? <button className="text-amber-600 hover:underline" onClick={() => archive(r.engagement_id)}>Archive</button> : null}
                   {isSuper ? <button className="text-red-600 hover:underline" onClick={() => destroy(r)}>Delete</button> : null}
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 ? <tr><td colSpan={(canEdit ? 7 : 6) + (isProject ? 1 : 0)} className="px-4 py-8 text-center text-slate-400">No records.</td></tr> : null}
+            {filtered.length === 0 ? <tr><td colSpan={(canBulk ? 7 : 6) + (isProject ? 1 : 0)} className="px-4 py-8 text-center text-slate-400">No records.</td></tr> : null}
           </tbody>
         </table>
       </div>

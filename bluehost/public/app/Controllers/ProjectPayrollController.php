@@ -27,17 +27,19 @@ class ProjectPayrollController
         $r->post("$b/projects/{project_id}/end", [self::class, 'endProject']);
     }
 
-    private static function project(int $orgId, int $projectId): array
+    private static function project(int $orgId, int $projectId, ?array $user = null): array
     {
         $p = Database::one('SELECT * FROM projects WHERE id = ? AND organization_id = ?', [$projectId, $orgId]);
         if (!$p) throw new HttpError('Project not found', 404);
+        if ($user !== null) ProjectAccess::assert($user, $orgId, (int) $p['id']);
         return $p;
     }
 
-    private static function findRun(int $orgId, int $runId): array
+    private static function findRun(int $orgId, int $runId, ?array $user = null): array
     {
         $run = Database::one('SELECT * FROM project_pay_runs WHERE id = ? AND organization_id = ?', [$runId, $orgId]);
         if (!$run) throw new HttpError('Pay run not found', 404);
+        if ($user !== null) ProjectAccess::assert($user, $orgId, (int) $run['project_id']);
         return $run;
     }
 
@@ -125,8 +127,8 @@ class ProjectPayrollController
 
     public static function listRuns(array $p): void
     {
-        [, $o] = Auth::org($p, 'payroll.view');
-        $proj = self::project($o, (int) $p['project_id']);
+        [$u, $o] = Auth::org($p, 'project.view');
+        $proj = self::project($o, (int) $p['project_id'], $u);
         $runs = Database::all('SELECT * FROM project_pay_runs WHERE project_id = ? ORDER BY period_start DESC, id DESC', [$proj['id']]);
         Http::json(array_map(fn($r) => [
             'id' => (int) $r['id'], 'reference' => $r['reference'], 'status' => $r['status'],
@@ -139,8 +141,8 @@ class ProjectPayrollController
 
     public static function createRun(array $p): void
     {
-        [$u, $o] = Auth::org($p, 'payroll.compute');
-        $proj = self::project($o, (int) $p['project_id']);
+        [$u, $o] = Auth::org($p, 'project.payroll');
+        $proj = self::project($o, (int) $p['project_id'], $u);
         $b = Http::body();
         $start = trim((string) ($b['period_start'] ?? '')); $end = trim((string) ($b['period_end'] ?? ''));
         if (!$start || !$end) throw new HttpError('period_start and period_end are required', 422);
@@ -170,8 +172,8 @@ class ProjectPayrollController
 
     public static function getRun(array $p): void
     {
-        [, $o] = Auth::org($p, 'payroll.view');
-        $run = self::findRun($o, (int) $p['run_id']);
+        [$u, $o] = Auth::org($p, 'project.view');
+        $run = self::findRun($o, (int) $p['run_id'], $u);
         $proj = self::project($o, (int) $run['project_id']);
         $lines = array_map(function ($l) {
             $eng = Database::one('SELECT employee_number, engagement_type FROM engagements WHERE id = ?', [$l['engagement_id']]);
@@ -194,8 +196,8 @@ class ProjectPayrollController
 
     public static function updateLine(array $p): void
     {
-        [$u, $o] = Auth::org($p, 'payroll.compute');
-        $run = self::findRun($o, (int) $p['run_id']);
+        [$u, $o] = Auth::org($p, 'project.payroll');
+        $run = self::findRun($o, (int) $p['run_id'], $u);
         if ($run['status'] === 'APPROVED') throw new HttpError('This run is approved — reopen it to edit.', 409);
         $line = Database::one('SELECT * FROM project_pay_lines WHERE id = ? AND run_id = ?', [(int) $p['line_id'], $run['id']]);
         if (!$line) throw new HttpError('Line not found', 404);
@@ -217,8 +219,8 @@ class ProjectPayrollController
 
     public static function recompute(array $p): void
     {
-        [, $o] = Auth::org($p, 'payroll.compute');
-        $run = self::findRun($o, (int) $p['run_id']);
+        [$u, $o] = Auth::org($p, 'project.payroll');
+        $run = self::findRun($o, (int) $p['run_id'], $u);
         if ($run['status'] === 'APPROVED') throw new HttpError('This run is approved — reopen it to recompute.', 409);
         foreach (Database::all('SELECT * FROM project_pay_lines WHERE run_id = ?', [$run['id']]) as $l) {
             // Re-snapshot the daily rate from the engagement in case it changed.
@@ -231,8 +233,8 @@ class ProjectPayrollController
 
     public static function approve(array $p): void
     {
-        [$u, $o] = Auth::org($p, 'payroll.approve');
-        $run = self::findRun($o, (int) $p['run_id']);
+        [$u, $o] = Auth::org($p, 'project.payroll');
+        $run = self::findRun($o, (int) $p['run_id'], $u);
         if ($run['status'] === 'APPROVED') throw new HttpError('This run is already approved.', 409);
         // Apply loan/cash-advance installments against live balances, then lock.
         self::reverseLoans((int) $run['id']); // safety — clear any stale entries
@@ -271,8 +273,8 @@ class ProjectPayrollController
 
     public static function reopen(array $p): void
     {
-        [$u, $o] = Auth::org($p, 'payroll.compute');
-        $run = self::findRun($o, (int) $p['run_id']);
+        [$u, $o] = Auth::org($p, 'project.payroll');
+        $run = self::findRun($o, (int) $p['run_id'], $u);
         // Give back the loan installments this run deducted, then recompute estimates.
         self::reverseLoans((int) $run['id']);
         foreach (Database::all('SELECT * FROM project_pay_lines WHERE run_id = ?', [$run['id']]) as $l) self::computeAndSaveLine($run, $l);
@@ -351,8 +353,8 @@ class ProjectPayrollController
     /** DOLE labour report: all staff on a project with days, gross, statutory, net, plus budget. */
     public static function doleReport(array $p): void
     {
-        [, $o] = Auth::org($p, 'reports.view');
-        $proj = self::project($o, (int) $p['project_id']);
+        [$u, $o] = Auth::org($p, 'project.view');
+        $proj = self::project($o, (int) $p['project_id'], $u);
         $from = Http::query('date_from') ?: null; $to = Http::query('date_to') ?: null;
         $fmt = Http::query('fmt', 'json');
         $rows = self::lines((int) $proj['id'], $from, $to);
@@ -410,8 +412,8 @@ class ProjectPayrollController
     /** Per-project statutory remittance summary (employee + employer shares). */
     public static function statutoryReport(array $p): void
     {
-        [, $o] = Auth::org($p, 'reports.view');
-        $proj = self::project($o, (int) $p['project_id']);
+        [$u, $o] = Auth::org($p, 'project.view');
+        $proj = self::project($o, (int) $p['project_id'], $u);
         $from = Http::query('date_from') ?: null; $to = Http::query('date_to') ?: null;
         $fmt = Http::query('fmt', 'json');
         $rows = self::lines((int) $proj['id'], $from, $to);
@@ -455,8 +457,8 @@ class ProjectPayrollController
     /** Per-project 13th month: total basic earned on the project ÷ 12, per worker. */
     public static function thirteenth(array $p): void
     {
-        [, $o] = Auth::org($p, 'reports.view');
-        $proj = self::project($o, (int) $p['project_id']);
+        [$u, $o] = Auth::org($p, 'project.view');
+        $proj = self::project($o, (int) $p['project_id'], $u);
         $fmt = Http::query('fmt', 'json');
         $rows = self::lines((int) $proj['id'], Http::query('date_from') ?: null, Http::query('date_to') ?: null);
         $by = [];
@@ -482,8 +484,8 @@ class ProjectPayrollController
     /** Printable payslips for every worker in a run. */
     public static function payslips(array $p): void
     {
-        [, $o] = Auth::org($p, 'payroll.view');
-        $run = self::findRun($o, (int) $p['run_id']);
+        [$u, $o] = Auth::org($p, 'project.view');
+        $run = self::findRun($o, (int) $p['run_id'], $u);
         $proj = self::project($o, (int) $run['project_id']);
         $c = self::company($o);
         // One worker's payslip (to send individually) when ?line= is given, else the whole run.
@@ -524,8 +526,8 @@ class ProjectPayrollController
 
     public static function endProject(array $p): void
     {
-        [$u, $o] = Auth::org($p, 'organization.manage');
-        $proj = self::project($o, (int) $p['project_id']);
+        [$u, $o] = Auth::org($p, 'project.manage');
+        $proj = self::project($o, (int) $p['project_id'], $u);
         $end = trim((string) (Http::body()['actual_end_date'] ?? '')) ?: date('Y-m-d');
         $open = (int) Database::scalar("SELECT COUNT(*) FROM project_pay_runs WHERE project_id = ? AND status = 'DRAFT'", [(int) $proj['id']]);
         Database::update('projects', (int) $proj['id'], ['status' => 'COMPLETED', 'actual_end_date' => $end]);

@@ -220,6 +220,18 @@ CREATE TABLE IF NOT EXISTS project_pay_lines (
   INDEX (run_id), INDEX (engagement_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Per-project access: links a user (e.g. a Project Manager or Project HR) to the
+-- specific project(s) they may work on when they don't have org-wide reach.
+CREATE TABLE IF NOT EXISTS project_access (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  project_id INT NOT NULL,
+  user_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_project_user (project_id, user_id),
+  INDEX (organization_id), INDEX (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS clients (
   id INT AUTO_INCREMENT PRIMARY KEY,
   organization_id INT NOT NULL,
