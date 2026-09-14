@@ -16,13 +16,29 @@ export default function TrainingPage() {
   const [q, setQ] = useState("");
   const [due, setDue] = useState("");
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
+  const [orgs, setOrgs] = useState<{ id: number; name: string }[]>([]);
+  const [copyTgt, setCopyTgt] = useState("");
 
   const load = useCallback(() => {
     apiFetch(`/organizations/${orgId}/training/courses`).then(setCourses).catch(() => {});
     apiFetch(`/organizations/${orgId}/training/assignments`).then(setRows).catch(() => {});
     apiFetch(`/organizations/${orgId}/people`).then(setPeople).catch(() => {});
+    apiFetch<{ id: number; name: string }[]>("/organizations").then(setOrgs).catch(() => {});
   }, [orgId]);
   useEffect(load, [load]);
+
+  async function copyCourses() {
+    if (!copyTgt) return;
+    const name = orgs.find((o) => o.id === Number(copyTgt))?.name || "the selected organization";
+    if (!window.confirm(`Copy all ${courses.length} course(s) to ${name}? Courses already there (same title) are skipped.`)) return;
+    setErr(""); setMsg("");
+    try {
+      const r = await apiFetch<{ training_courses: number }>(`/organizations/${orgId}/setup/copy-to`, {
+        method: "POST", body: JSON.stringify({ target_organization_id: Number(copyTgt), include_positions: false, include_cost_centers: false, include_leave_types: false, include_benefit_types: false, include_training_courses: true }),
+      });
+      setMsg(`Copied ${r.training_courses} course(s) to ${name}.`); setCopyTgt("");
+    } catch (e: any) { setErr(e.message); }
+  }
 
   const filteredPeople = people.filter((p) => p.full_name.toLowerCase().includes(q.toLowerCase()));
   const toggle = (set: Set<number>, id: number) => { const n = new Set(set); n.has(id) ? n.delete(id) : n.add(id); return n; };
@@ -113,6 +129,16 @@ export default function TrainingPage() {
             </div>
             <button className="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50" onClick={addCourse}>+ Add course</button>
           </div>
+          {orgs.filter((o) => o.id !== orgId).length > 0 && courses.length > 0 ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+              <span className="text-xs text-slate-500">Copy courses to</span>
+              <select className="input max-w-[180px] py-1.5" value={copyTgt} onChange={(e) => setCopyTgt(e.target.value)}>
+                <option value="">another org…</option>
+                {orgs.filter((o) => o.id !== orgId).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+              <button className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-40" disabled={!copyTgt} onClick={copyCourses}>Copy</button>
+            </div>
+          ) : null}
         </div>
       </div>
 
