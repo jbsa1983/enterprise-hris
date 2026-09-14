@@ -19,6 +19,7 @@ const NAV: { label: string; perm?: string; href: (o?: number) => string }[] = [
   { label: "Organization Dashboard", perm: "organization.view", href: (o) => (o ? `/o/${o}/dashboard` : "/dashboard") },
   { label: "People", perm: "employee.view", href: (o) => (o ? `/o/${o}/people` : "#") },
   { label: "Consultants", perm: "employee.view", href: (o) => (o ? `/o/${o}/people?type=consultants` : "#") },
+  { label: "Project Workers", perm: "employee.view", href: (o) => (o ? `/o/${o}/people?type=project` : "#") },
   { label: "Projects", perm: "employee.view", href: (o) => (o ? `/o/${o}/projects` : "#") },
   { label: "Payroll", perm: "payroll.view", href: (o) => (o ? `/o/${o}/payroll` : "#") },
   { label: "13th Month & Bonuses", perm: "payroll.view", href: (o) => (o ? `/o/${o}/special-pay` : "#") },

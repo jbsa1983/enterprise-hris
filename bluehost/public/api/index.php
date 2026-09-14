@@ -27,6 +27,7 @@ DashboardController::routes($router);
 PeopleController::routes($router);
 OrgStructureController::routes($router);
 ProjectsController::routes($router);
+ProjectPayrollController::routes($router);
 PayrollController::routes($router);
 PayslipController::routes($router);
 BankExportController::routes($router);

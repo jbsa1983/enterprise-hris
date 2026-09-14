@@ -139,7 +139,13 @@ class PayrollController
         Database::exec('DELETE FROM payroll_run_people WHERE run_id = ?', [$run['id']]);
 
         $factor = Payroll::periodFactor($period['frequency'] ?? 'MONTHLY');
-        $engs = Database::all("SELECT * FROM engagements WHERE organization_id = ? AND status = 'ACTIVE'", [$orgId]);
+        // Project-assigned daily/site workers are paid through their project's own
+        // short-cycle pay runs — keep them out of the regular monthly run to avoid
+        // double payment. Unassigned daily workers still run here.
+        $engs = Database::all(
+            "SELECT * FROM engagements
+              WHERE organization_id = ? AND status = 'ACTIVE'
+                AND NOT (engagement_type IN ('PROJECT_BASED','DAILY_PAID') AND project_id IS NOT NULL)", [$orgId]);
         // MP2 employee-share totals per engagement (sum across the person's MP2 accounts).
         $mp2map = [];
         foreach (Database::all('SELECT engagement_id, SUM(employee_share) s FROM mp2_accounts WHERE organization_id = ? GROUP BY engagement_id', [$orgId]) as $m)

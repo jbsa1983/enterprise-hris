@@ -26,6 +26,10 @@ export interface EngagementRow {
   base_rate: number | null;
   start_date: string | null;
   end_date: string | null;
+  salary_basis?: string | null;
+  project_id?: number | null;
+  project_name?: string | null;
+  project_code?: string | null;
 }
 
 export interface StorageOverview {

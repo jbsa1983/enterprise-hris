@@ -88,6 +88,8 @@ class ProjectsController
 
     private static function actualByPeriod(int $projectId): array
     {
+        $out = [];
+        // Regular payroll spend attributed to the project (engagements tagged to it).
         $rows = Database::all(
             "SELECT DATE_FORMAT(pp.period_start,'%Y-%m') period, COALESCE(SUM(prp.gross_pay),0) total
                FROM payroll_periods pp
@@ -95,8 +97,13 @@ class ProjectsController
                JOIN payroll_run_people prp ON prp.run_id = pr.id
                JOIN engagements e ON e.id = prp.engagement_id
               WHERE e.project_id = ? GROUP BY period", [$projectId]);
-        $out = [];
         foreach ($rows as $r) $out[$r['period']] = (float) $r['total'];
+        // Project (daily-wage) pay runs.
+        $prows = Database::all(
+            "SELECT DATE_FORMAT(r.period_start,'%Y-%m') period, COALESCE(SUM(l.gross_pay),0) total
+               FROM project_pay_runs r JOIN project_pay_lines l ON l.run_id = r.id
+              WHERE r.project_id = ? GROUP BY period", [$projectId]);
+        foreach ($prows as $r) $out[$r['period']] = ($out[$r['period']] ?? 0) + (float) $r['total'];
         return $out;
     }
 

@@ -2,6 +2,8 @@
 class PeopleController
 {
     const CONSULTANT_TYPES = ['CONSULTANT_INDIVIDUAL', 'CONSULTANT_COMPANY'];
+    // Project (construction / site) worker engagement types — daily-wage, paid via project runs.
+    const PROJECT_TYPES = ['PROJECT_BASED', 'DAILY_PAID'];
     const ENG_TYPES = ['REGULAR', 'PROBATIONARY', 'PROJECT_BASED', 'FIXED_TERM', 'DAILY_PAID', 'HOURLY_PAID',
         'PART_TIME', 'CONSULTANT_INDIVIDUAL', 'CONSULTANT_COMPANY', 'CONTRACTOR', 'OJT', 'TRAINEE'];
 
@@ -24,6 +26,7 @@ class PeopleController
         $r->get("$b/people", [self::class, 'people']);
         $r->get("$b/employees", [self::class, 'employees']);
         $r->get("$b/consultants", [self::class, 'consultants']);
+        $r->get("$b/project-workers", [self::class, 'projectWorkers']);
         $r->post("$b/people/create", [self::class, 'create']);
         $r->get("$b/people/template", [self::class, 'template']);
         $r->post("$b/people/import", [self::class, 'importPeople']);
@@ -377,19 +380,29 @@ class PeopleController
     private static function rows(int $orgId, ?string $mode): array
     {
         $sql = "SELECT e.id eng_id, e.person_id, e.engagement_type, e.employee_number, e.status,
-                       e.base_rate, e.start_date, e.end_date,
+                       e.base_rate, e.salary_basis, e.start_date, e.end_date, e.project_id,
+                       pr.project_name, pr.project_code,
                        p.first_name, p.middle_name, p.last_name, p.suffix
                   FROM engagements e JOIN people p ON p.id = e.person_id
+                  LEFT JOIN projects pr ON pr.id = e.project_id
                  WHERE e.organization_id = ?";
         $params = [$orgId];
+        $consult = self::CONSULTANT_TYPES;
+        $project = self::PROJECT_TYPES;
         if ($mode === 'employees') {
-            $in = implode(',', array_fill(0, count(self::CONSULTANT_TYPES), '?'));
+            // Regular employees: not consultants and not project (site) workers.
+            $ex = array_merge($consult, $project);
+            $in = implode(',', array_fill(0, count($ex), '?'));
             $sql .= " AND e.engagement_type NOT IN ($in)";
-            $params = array_merge($params, self::CONSULTANT_TYPES);
+            $params = array_merge($params, $ex);
         } elseif ($mode === 'consultants') {
-            $in = implode(',', array_fill(0, count(self::CONSULTANT_TYPES), '?'));
+            $in = implode(',', array_fill(0, count($consult), '?'));
             $sql .= " AND e.engagement_type IN ($in)";
-            $params = array_merge($params, self::CONSULTANT_TYPES);
+            $params = array_merge($params, $consult);
+        } elseif ($mode === 'project') {
+            $in = implode(',', array_fill(0, count($project), '?'));
+            $sql .= " AND e.engagement_type IN ($in)";
+            $params = array_merge($params, $project);
         }
         $sql .= ' ORDER BY p.last_name';
         return array_map(function ($r) {
@@ -399,7 +412,9 @@ class PeopleController
                 'full_name' => $name, 'engagement_type' => $r['engagement_type'],
                 'employee_number' => $r['employee_number'], 'status' => $r['status'],
                 'base_rate' => $r['base_rate'] !== null ? (float) $r['base_rate'] : null,
-                'start_date' => $r['start_date'], 'end_date' => $r['end_date'],
+                'salary_basis' => $r['salary_basis'], 'start_date' => $r['start_date'], 'end_date' => $r['end_date'],
+                'project_id' => $r['project_id'] !== null ? (int) $r['project_id'] : null,
+                'project_name' => $r['project_name'], 'project_code' => $r['project_code'],
             ];
         }, Database::all($sql, $params));
     }
@@ -415,4 +430,5 @@ class PeopleController
     public static function people(array $p): void { Http::json(self::rows(self::guard($p), null)); }
     public static function employees(array $p): void { Http::json(self::rows(self::guard($p), 'employees')); }
     public static function consultants(array $p): void { Http::json(self::rows(self::guard($p), 'consultants')); }
+    public static function projectWorkers(array $p): void { Http::json(self::rows(self::guard($p), 'project')); }
 }

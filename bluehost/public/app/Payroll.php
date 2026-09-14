@@ -70,6 +70,69 @@ class Payroll
         return $params;
     }
 
+    /** Compute one construction/project daily-wage line for a short pay cycle
+     *  (weekly / every few days). Pay = daily rate x days worked (+ OT + allowance).
+     *  Statutory is prorated by time worked (days/22 of a month) and tagged to the
+     *  project; withholding tax uses the same time-scaled brackets. */
+    public static function computeProjectLine(float $dailyRate, float $daysWorked, string $onDate,
+        float $otAmount = 0.0, float $allowance = 0.0, float $otherDeduction = 0.0, bool $withStatutory = true): array
+    {
+        $basic = self::r2($dailyRate * $daysWorked);
+        $ot = self::r2($otAmount);
+        $allow = self::r2($allowance);
+        $gross = self::r2($basic + $ot + $allow);
+        $monthlyEquiv = $dailyRate * 22.0;
+        // Time-based proration: a full month of work is ~22 days = the full monthly
+        // contribution; a week is a fraction of that. Capped at one month per run.
+        $factor = $monthlyEquiv > 0 ? min($daysWorked / 22.0, 1.0) : 0.0;
+
+        $sss = $ph = $hd = $wt = 0.0;
+        if ($withStatutory && $factor > 0) {
+            $sssR = self::resolveRule('SSS', $onDate);
+            $phicR = self::resolveRule('PHIC', $onDate);
+            $hdmfR = self::resolveRule('HDMF', $onDate);
+            $birR = self::resolveRule('BIR', $onDate);
+            $sMonthly = $sssR ? max(min($monthlyEquiv, $sssR['msc_cap']), $sssR['msc_floor'] ?? 0) * $sssR['employee_rate'] : 0;
+            $phMonthly = $phicR ? max(min($monthlyEquiv, $phicR['salary_cap']), $phicR['floor']) * $phicR['employee_rate'] : 0;
+            $hdMonthly = $hdmfR ? min($monthlyEquiv * $hdmfR['employee_rate'], $hdmfR['contribution_cap']) : 0;
+            $sss = self::r2($sMonthly * $factor);
+            $ph = self::r2($phMonthly * $factor);
+            $hd = self::r2($hdMonthly * $factor);
+            $taxable = max($gross - ($sss + $ph + $hd), 0);
+            $wt = $birR ? self::withholding($taxable, self::scaleBrackets($birR, $factor)) : 0;
+        }
+        $other = self::r2($otherDeduction);
+        $totalDed = self::r2($sss + $ph + $hd + $wt + $other);
+        if ($totalDed > $gross) $totalDed = $gross;
+        $net = self::r2($gross - $totalDed);
+        return ['basic_pay' => $basic, 'ot_amount' => $ot, 'allowance' => $allow, 'gross_pay' => $gross,
+            'sss' => $sss, 'philhealth' => $ph, 'pagibig' => $hd, 'withholding_tax' => $wt,
+            'other_deduction' => $other, 'statutory' => self::r2($sss + $ph + $hd),
+            'total_deductions' => $totalDed, 'net_pay' => $net];
+    }
+
+    /** Daily rate implied by an engagement's base rate and salary basis. */
+    public static function dailyRate(array $eng): float
+    {
+        $rate = (float) ($eng['base_rate'] ?? 0);
+        switch (strtoupper($eng['salary_basis'] ?? 'DAILY')) {
+            case 'DAILY': return $rate;
+            case 'HOURLY': return $rate * 8;
+            default: return $rate / 22.0; // MONTHLY → per-day
+        }
+    }
+
+    /** Employer statutory shares for a set of employee contributions, for per-project
+     *  remittance summaries (SSS uses the effective ER/EE ratio; PhilHealth & Pag-IBIG match). */
+    public static function employerShares(float $sssEe, float $phicEe, float $hdmfEe, string $onDate): array
+    {
+        $sssR = self::resolveRule('SSS', $onDate) ?: [];
+        $eeRate = (float) ($sssR['employee_rate'] ?? 0.05);
+        $erRate = (float) ($sssR['employer_rate'] ?? ($eeRate * 2));
+        $ratio = $eeRate > 0 ? $erRate / $eeRate : 2.0;
+        return ['sss' => self::r2($sssEe * $ratio), 'philhealth' => self::r2($phicEe), 'pagibig' => self::r2($hdmfEe)];
+    }
+
     /** Compute one payroll line. $factor prorates a monthly rate to the pay period
      *  (e.g. 0.5 for a semi-monthly run). Returns [gross_pay, total_deductions, net_pay, earnings, deductions]. */
     public static function computeLine(array $eng, string $onDate, float $allowance = 0.0, array $installments = [], float $factor = 1.0): array

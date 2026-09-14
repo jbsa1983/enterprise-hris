@@ -131,7 +131,7 @@ const EMPTY: any = {
   tin: "", sss_number: "", philhealth_number: "", pagibig_number: "",
   bank_name: "", bank_account_number: "", bank_account_name: "",
   engagement_type: "REGULAR", employee_number: "", salary_basis: "MONTHLY", base_rate: "",
-  department_id: "", position_id: "", start_date: "", ewt_rate: "", hdmf_extra: "",
+  department_id: "", position_id: "", start_date: "", project_id: "", ewt_rate: "", hdmf_extra: "",
   mp2_accounts: [] as Mp2Account[],
 };
 const isConsultantType = (t: string) => t === "CONSULTANT_INDIVIDUAL" || t === "CONSULTANT_COMPANY";
@@ -185,6 +185,7 @@ export default function PeoplePage() {
   const [rows, setRows] = useState<EngagementRow[]>([]);
   const [depts, setDepts] = useState<any[]>([]);
   const [positions, setPositions] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<null | "new" | number>(null); // engagement_id when editing
   const [form, setForm] = useState<any>({ ...EMPTY });
@@ -207,17 +208,21 @@ export default function PeoplePage() {
     apiFetch<any>("/auth/me").then((u) => { _permsCache = { perms: u.permissions || [], superadmin: !!u.is_superadmin }; apply(_permsCache); }).catch(() => {});
   }, []);
 
-  const endpoint = type === "employees" ? "employees" : type === "consultants" ? "consultants" : "people";
-  const title = type === "employees" ? "Employees" : type === "consultants" ? "Consultants" : "People";
+  const isProject = type === "project";
+  const endpoint = type === "employees" ? "employees" : type === "consultants" ? "consultants" : type === "project" ? "project-workers" : "people";
+  const title = type === "employees" ? "Employees" : type === "consultants" ? "Consultants" : type === "project" ? "Project Workers" : "People";
 
   const load = useCallback(() => {
     apiFetch<EngagementRow[]>(`/organizations/${orgId}/${endpoint}`).then(setRows).catch((e) => setErr(e.message));
     apiFetch(`/organizations/${orgId}/departments`).then(setDepts).catch(() => {});
     apiFetch(`/organizations/${orgId}/positions`).then(setPositions).catch(() => {});
+    apiFetch(`/organizations/${orgId}/projects`).then(setProjects).catch(() => {});
   }, [orgId, endpoint]);
   useEffect(load, [load]);
 
-  function openCreate() { setForm({ ...EMPTY }); setEditing("new"); setErr(""); }
+  // Project workers default to a daily-wage, project-based engagement.
+  const emptyForm = () => (isProject ? { ...EMPTY, engagement_type: "DAILY_PAID", salary_basis: "DAILY" } : { ...EMPTY });
+  function openCreate() { setForm(emptyForm()); setEditing("new"); setErr(""); }
   async function openEdit(engagementId: number) {
     setErr("");
     const d: any = await apiFetch(`/organizations/${orgId}/people/${engagementId}`);
@@ -230,6 +235,7 @@ export default function PeoplePage() {
       department_id: d.engagement.department_id ?? "",
       position_id: d.engagement.position_id ?? "",
       start_date: d.engagement.start_date || "",
+      project_id: d.engagement.project_id ?? "",
       ewt_rate: d.engagement.ewt_rate ?? "",
       hdmf_extra: d.engagement.hdmf_extra ?? "",
       mp2_accounts: (d.mp2_accounts || []).map((m: any) => ({
@@ -256,6 +262,7 @@ export default function PeoplePage() {
     if (form.base_rate !== "") e.base_rate = Number(form.base_rate);
     if (form.department_id) e.department_id = Number(form.department_id);
     if (form.position_id) e.position_id = Number(form.position_id);
+    if (form.project_id) e.project_id = Number(form.project_id);
     if (form.start_date) e.start_date = form.start_date;
     if (isConsultantType(form.engagement_type)) e.ewt_rate = form.ewt_rate !== "" ? Number(form.ewt_rate) : null;
     else e.hdmf_extra = form.hdmf_extra !== "" ? Number(form.hdmf_extra) : null;
@@ -417,7 +424,8 @@ export default function PeoplePage() {
           <thead className="bg-slate-50"><tr className="text-left text-xs uppercase text-slate-500">
             {canEdit ? <th className="px-3 py-3"><input type="checkbox" aria-label="Select all" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleAll} /></th> : null}
             <th className="px-4 py-3">Emp. No.</th><th className="px-4 py-3">Name</th><th className="px-4 py-3">Type</th>
-            <th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Base Rate</th><th className="px-4 py-3"></th>
+            {isProject ? <th className="px-4 py-3">Project</th> : null}
+            <th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">{isProject ? "Daily rate" : "Base Rate"}</th><th className="px-4 py-3"></th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map((r) => (
@@ -426,6 +434,7 @@ export default function PeoplePage() {
                 <td className="px-4 py-3 font-mono text-xs text-slate-600">{r.employee_number || "—"}</td>
                 <td className="px-4 py-3 font-medium text-slate-800">{r.full_name}</td>
                 <td className="px-4 py-3 text-slate-600">{r.engagement_type}</td>
+                {isProject ? <td className="px-4 py-3 text-slate-600">{r.project_code ? `${r.project_code}` : (r.project_name || "—")}</td> : null}
                 <td className="px-4 py-3"><span className={`badge ${statusColor(r.status)}`}>{r.status}</span></td>
                 <td className="px-4 py-3 text-right">{peso(r.base_rate)}</td>
                 <td className="px-4 py-3 text-right space-x-2">
@@ -435,7 +444,7 @@ export default function PeoplePage() {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 ? <tr><td colSpan={canEdit ? 7 : 6} className="px-4 py-8 text-center text-slate-400">No records.</td></tr> : null}
+            {filtered.length === 0 ? <tr><td colSpan={(canEdit ? 7 : 6) + (isProject ? 1 : 0)} className="px-4 py-8 text-center text-slate-400">No records.</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -473,6 +482,10 @@ export default function PeoplePage() {
                 <select className="input" value={form.position_id} onChange={(e) => setForm({ ...form, position_id: e.target.value })}>
                   <option value="">—</option>{positions.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
                 </select></div>
+              <div><label className="mb-1 block text-xs text-slate-500">Project {isProject ? "*" : "(optional)"}</label>
+                <select className="input" value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
+                  <option value="">—</option>{projects.map((pr) => <option key={pr.id} value={pr.id}>{pr.project_code ? `${pr.project_code} — ${pr.project_name}` : pr.project_name}</option>)}
+                </select></div>
               {F("start_date", "Start date", { type: "date" })}
               {isConsultantType(form.engagement_type) ? (
                 <div><label className="mb-1 block text-xs text-slate-500">EWT rate (%)</label>
@@ -487,6 +500,7 @@ export default function PeoplePage() {
                 F("hdmf_extra", "Pag-IBIG additional / month", { type: "number", placeholder: "0" })
               )}
             </div>
+            {isProject ? <p className="mt-1 text-[11px] text-slate-400">Project (site) worker — set Salary basis to <strong>DAILY</strong> and enter the <strong>daily rate</strong> as the base rate. They're paid through the project's short-cycle pay runs (Projects → the project → Project payroll).</p> : null}
             {!isConsultantType(form.engagement_type) ? <p className="mt-1 text-[11px] text-slate-400">Optional fixed monthly Pag-IBIG voluntary top-up to the compulsory account — deducted in payroll on top of the mandatory contribution.</p> : null}
             <Mp2Editor accounts={form.mp2_accounts || []} onChange={(a) => setForm({ ...form, mp2_accounts: a })} />
             {typeof editing === "number" ? <DocumentsSection orgId={orgId} engagementId={editing} /> : null}

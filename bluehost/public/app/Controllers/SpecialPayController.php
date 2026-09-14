@@ -64,7 +64,10 @@ class SpecialPayController
         $runId = Database::insert('special_pay_runs', ['uuid' => Util::uuid(), 'organization_id' => $o, 'pay_type' => $type,
             'name' => $b['name'] ?? "$type $year", 'year' => $year, 'status' => 'DRAFT']);
         $in = implode(',', array_fill(0, count(self::CONSULTANT_TYPES), '?'));
-        $sql = "SELECT id FROM engagements WHERE organization_id = ? AND status='ACTIVE' AND engagement_type NOT IN ($in)";
+        // Exclude consultants and project-assigned site workers (the latter get 13th month
+        // per project via the project payroll reports).
+        $sql = "SELECT id FROM engagements WHERE organization_id = ? AND status='ACTIVE' AND engagement_type NOT IN ($in)
+                  AND NOT (engagement_type IN ('PROJECT_BASED','DAILY_PAID') AND project_id IS NOT NULL)";
         $params = array_merge([$o], self::CONSULTANT_TYPES);
         if (!empty($b['engagement_ids'])) { $ph = implode(',', array_fill(0, count($b['engagement_ids']), '?')); $sql .= " AND id IN ($ph)"; $params = array_merge($params, $b['engagement_ids']); }
         $total = 0.0;
