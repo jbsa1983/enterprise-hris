@@ -16,6 +16,7 @@ export default function OrgSetup() {
   const [incCc, setIncCc] = useState(true);
   const [incLt, setIncLt] = useState(true);
   const [incBt, setIncBt] = useState(true);
+  const [incTc, setIncTc] = useState(true);
   const [copyMsg, setCopyMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -32,10 +33,10 @@ export default function OrgSetup() {
     if (!window.confirm(`Copy this organization's setup to ${name}? Existing items there are kept (duplicates skipped).`)) return;
     setBusy(true); setErr(""); setCopyMsg("");
     try {
-      const r = await apiFetch<{ departments: number; positions: number; cost_centers: number; leave_types: number; benefit_types: number }>(`/organizations/${orgId}/setup/copy-to`, {
-        method: "POST", body: JSON.stringify({ target_organization_id: Number(copyTgt), include_positions: incPos, include_cost_centers: incCc, include_leave_types: incLt, include_benefit_types: incBt }),
+      const r = await apiFetch<{ departments: number; positions: number; cost_centers: number; leave_types: number; benefit_types: number; training_courses: number }>(`/organizations/${orgId}/setup/copy-to`, {
+        method: "POST", body: JSON.stringify({ target_organization_id: Number(copyTgt), include_positions: incPos, include_cost_centers: incCc, include_leave_types: incLt, include_benefit_types: incBt, include_training_courses: incTc }),
       });
-      setCopyMsg(`Copied to ${name}: ${r.departments} department(s), ${r.positions} position(s), ${r.cost_centers} cost center(s), ${r.leave_types} leave type(s), ${r.benefit_types} benefit type(s).`);
+      setCopyMsg(`Copied to ${name}: ${r.departments} department(s), ${r.positions} position(s), ${r.cost_centers} cost center(s), ${r.leave_types} leave type(s), ${r.benefit_types} benefit type(s), ${r.training_courses} training course(s).`);
       setCopyTgt("");
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   }
@@ -84,6 +85,7 @@ export default function OrgSetup() {
             <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={incCc} onChange={(e) => setIncCc(e.target.checked)} /> Cost centers</label>
             <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={incLt} onChange={(e) => setIncLt(e.target.checked)} /> Leave types</label>
             <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={incBt} onChange={(e) => setIncBt(e.target.checked)} /> Benefit types</label>
+            <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={incTc} onChange={(e) => setIncTc(e.target.checked)} /> Training courses</label>
             <button className="btn-primary" disabled={busy || !copyTgt} onClick={copySetup}>{busy ? "Copying…" : "Copy setup"}</button>
           </div>
         </div>

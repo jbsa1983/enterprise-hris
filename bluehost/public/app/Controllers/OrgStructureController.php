@@ -154,8 +154,27 @@ class OrgStructureController
             } catch (\Throwable $e) { /* benefit_types table not migrated yet */ }
         }
 
+        $tcAdded = 0;
+        if (($b['include_training_courses'] ?? true)) {
+            try {
+                $existTc = []; foreach (Database::all('SELECT LOWER(title) t FROM training_courses WHERE organization_id = ?', [$tgt]) as $r) $existTc[$r['t']] = true;
+                foreach (Database::all('SELECT * FROM training_courses WHERE organization_id = ?', [$src]) as $tc) {
+                    if (isset($existTc[strtolower($tc['title'])])) continue;
+                    Database::insert('training_courses', ['organization_id' => $tgt, 'title' => $tc['title'], 'category' => $tc['category'],
+                        'provider' => $tc['provider'], 'points' => $tc['points'] ?? 0]);
+                    $tcAdded++;
+                }
+            } catch (\Throwable $e) { /* training_courses.points not migrated yet — retry without it */
+                foreach (Database::all('SELECT * FROM training_courses WHERE organization_id = ?', [$src]) as $tc) {
+                    if (isset($existTc[strtolower($tc['title'])])) continue;
+                    Database::insert('training_courses', ['organization_id' => $tgt, 'title' => $tc['title'], 'category' => $tc['category'], 'provider' => $tc['provider']]);
+                    $tcAdded++;
+                }
+            }
+        }
+
         Audit::record('org.setup_copy', $u, ['organization_id' => $src, 'entity' => 'organization', 'entity_id' => $tgt,
-            'after' => ['to' => $tgt, 'departments' => $deptsAdded, 'positions' => $posAdded, 'cost_centers' => $ccAdded, 'leave_types' => $ltAdded, 'benefit_types' => $btAdded]]);
-        Http::json(['departments' => $deptsAdded, 'positions' => $posAdded, 'cost_centers' => $ccAdded, 'leave_types' => $ltAdded, 'benefit_types' => $btAdded]);
+            'after' => ['to' => $tgt, 'departments' => $deptsAdded, 'positions' => $posAdded, 'cost_centers' => $ccAdded, 'leave_types' => $ltAdded, 'benefit_types' => $btAdded, 'training_courses' => $tcAdded]]);
+        Http::json(['departments' => $deptsAdded, 'positions' => $posAdded, 'cost_centers' => $ccAdded, 'leave_types' => $ltAdded, 'benefit_types' => $btAdded, 'training_courses' => $tcAdded]);
     }
 }
