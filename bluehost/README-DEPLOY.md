@@ -37,6 +37,10 @@ bluehost/
 3. **Import the schema** — cPanel → *phpMyAdmin* → select your DB → *Import* →
    upload `db/schema.sql` → Go. (Or via SSH: `mysql -u USER -p DBNAME < db/schema.sql`.)
 
+   For an existing installation, import `db/migrate-hr-workflows.sql` instead.
+   It adds Service Desk conversations, performance review approvals, and the
+   related role permissions without deleting existing records.
+
 4. **Upload the app** — put the **contents of `public/`** into `public_html`
    (File Manager → Upload/extract a zip, or `git clone` via SSH then move files).
    Put the `db/` folder inside `public_html/db` too (it's protected by its

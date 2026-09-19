@@ -182,10 +182,14 @@ foreach ($orgs as $oi => $oid) {
         Database::insert('service_tickets', ['uuid' => uuid(), 'organization_id' => $oid, 'ticket_number' => 'TKT-' . $oid . '-' . str_pad((string) ($ti + 1), 4, '0', STR_PAD_LEFT),
             'engagement_id' => $engIds[$ti] ?? null, 'category' => $cat, 'priority' => 'NORMAL', 'status' => 'OPEN', 'subject' => "$cat request"]);
     $cycleId = Database::insert('performance_cycles', ['organization_id' => $oid, 'name' => date('Y') . ' Annual Review', 'cycle_type' => 'ANNUAL', 'status' => 'OPEN']);
+    $workflowId = Database::insert('approval_workflows', ['organization_id' => $oid, 'name' => 'Performance Review Approval',
+        'transaction_type' => 'PERFORMANCE_REVIEW', 'active' => 1]);
+    Database::insert('approval_workflow_steps', ['workflow_id' => $workflowId, 'step_order' => 1,
+        'name' => 'HR Approval', 'approver_role' => 'HR Manager']);
     foreach (array_slice($engIds, 0, 5) as $eid2) {
         $ss = [3.5, 4.0, 4.5][array_rand([3.5, 4.0, 4.5])]; $sp = [3.0, 4.0, 5.0][array_rand([3.0, 4.0, 5.0])];
         Database::insert('performance_reviews', ['organization_id' => $oid, 'cycle_id' => $cycleId, 'engagement_id' => $eid2,
-            'self_score' => $ss, 'supervisor_score' => $sp, 'final_rating' => round(($ss + $sp) / 2, 2), 'status' => 'COMPLETED']);
+            'self_score' => $ss, 'supervisor_score' => $sp, 'final_rating' => round(($ss + $sp) / 2, 2), 'status' => 'DRAFT']);
     }
     $courseId = Database::insert('training_courses', ['organization_id' => $oid, 'title' => 'Data Privacy Act Orientation', 'category' => 'Compliance', 'provider' => 'Internal']);
     foreach (array_slice($engIds, 0, 6) as $eid2)

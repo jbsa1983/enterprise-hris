@@ -4,7 +4,7 @@ import AppShell from "@/components/AppShell";
 import { apiFetch, apiOpen, apiUpload } from "@/lib/api";
 import { peso } from "@/lib/format";
 
-const TABS = ["Profile", "Payslips", "13th Month", "Leave", "Attendance", "Overtime", "Loans", "Benefits", "Assets", "Training", "Contributions", "Security"];
+const TABS = ["Profile", "Payslips", "13th Month", "Leave", "Attendance", "Overtime", "Loans", "Benefits", "Assets", "Service Desk", "Performance", "Training", "Contributions", "Security"];
 const LOAN_TYPES = ["CASH_ADVANCE", "COMPANY_LOAN", "SALARY_LOAN", "EMERGENCY_LOAN", "TRAVEL_ADVANCE", "OTHER"];
 const loanLabel = (t: string) => t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -23,6 +23,11 @@ export default function SelfServicePage() {
   const [assets, setAssets] = useState<any[]>([]);
   const [benefits, setBenefits] = useState<any[]>([]);
   const [trainings, setTrainings] = useState<any[]>([]);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [ticketForm, setTicketForm] = useState({ subject: "", category: "HR Question", priority: "NORMAL", description: "" });
+  const [ticketReplies, setTicketReplies] = useState<Record<number, string>>({});
+  const [assessments, setAssessments] = useState<Record<number, { score: string; comments: string }>>({});
   const [certFor, setCertFor] = useState<number | null>(null);
   const [certFile, setCertFile] = useState<File | null>(null);
   const [certNote, setCertNote] = useState("");
@@ -50,6 +55,8 @@ export default function SelfServicePage() {
     apiFetch("/me/contributions").then(setContrib).catch(() => {});
     apiFetch("/me/telegram").then(setTg).catch(() => {});
     apiFetch("/me/training").then(setTrainings).catch(() => {});
+    apiFetch("/me/service-tickets").then(setTickets).catch(() => {});
+    apiFetch("/me/performance-reviews").then(setReviews).catch(() => {});
   }, []);
   useEffect(load, [load]);
 
@@ -143,6 +150,22 @@ export default function SelfServicePage() {
       await apiFetch("/me/password", { method: "POST", body: JSON.stringify(pw) });
       setMsg("Password changed."); setPw({ current_password: "", new_password: "" });
     } catch (e: any) { setErr(e.message); }
+  }
+
+  async function createTicket() {
+    setErr(""); setMsg("");
+    try { await apiFetch("/me/service-tickets", { method: "POST", body: JSON.stringify(ticketForm) }); setTicketForm({ subject: "", category: "HR Question", priority: "NORMAL", description: "" }); setMsg("Your HR service ticket was submitted."); load(); }
+    catch (e: any) { setErr(e.message); }
+  }
+  async function replyTicket(id: number) {
+    setErr(""); setMsg("");
+    try { await apiFetch(`/me/service-tickets/${id}/comments`, { method: "POST", body: JSON.stringify({ body: ticketReplies[id] || "" }) }); setTicketReplies({ ...ticketReplies, [id]: "" }); setMsg("Reply added."); load(); }
+    catch (e: any) { setErr(e.message); }
+  }
+  async function submitAssessment(id: number) {
+    const a = assessments[id] || { score: "", comments: "" }; setErr(""); setMsg("");
+    try { await apiFetch(`/me/performance-reviews/${id}/self-assessment`, { method: "POST", body: JSON.stringify({ self_score: Number(a.score), employee_comments: a.comments }) }); setMsg("Self-assessment submitted to your supervisor."); load(); }
+    catch (e: any) { setErr(e.message); }
   }
 
   return (
@@ -365,6 +388,30 @@ export default function SelfServicePage() {
             </tbody>
           </table>
         </Section>
+      ) : null}
+
+      {tab === "Service Desk" ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Section title="Ask HR for help">
+            <div className="space-y-2">
+              <input className="input" placeholder="Subject" value={ticketForm.subject} onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })} />
+              <div className="grid grid-cols-2 gap-2"><select className="input" value={ticketForm.category} onChange={(e) => setTicketForm({ ...ticketForm, category: e.target.value })}><option>HR Question</option><option>Payroll</option><option>Benefits</option><option>Leave</option><option>IT Access</option></select><select className="input" value={ticketForm.priority} onChange={(e) => setTicketForm({ ...ticketForm, priority: e.target.value })}><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></div>
+              <textarea className="input min-h-24" placeholder="Describe your concern" value={ticketForm.description} onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })} />
+              <button className="btn-primary" onClick={createTicket}>Submit ticket</button>
+            </div>
+          </Section>
+          <Section title={`My tickets (${tickets.length})`}><div className="max-h-[38rem] space-y-3 overflow-y-auto">
+            {tickets.map((t) => <div key={t.id} className="rounded-lg border border-slate-200 p-3"><div className="flex justify-between"><span className="font-mono text-xs text-geek-blue">{t.ticket_number}</span><span className="badge bg-slate-100 text-slate-600">{t.status}</span></div><div className="mt-1 font-medium">{t.subject}</div><p className="text-sm text-slate-500">{t.description}</p>{t.resolution ? <div className="mt-2 rounded bg-emerald-50 p-2 text-sm text-emerald-800"><strong>Resolution:</strong> {t.resolution}</div> : null}<div className="mt-2 space-y-1">{t.comments?.map((c: any) => <div key={c.id} className="rounded bg-slate-50 p-2 text-sm"><div className="text-xs text-slate-400">{c.author || "HR"}</div>{c.body}</div>)}</div>{t.status !== "CLOSED" ? <div className="mt-2 flex gap-2"><input className="input" placeholder="Add a reply" value={ticketReplies[t.id] || ""} onChange={(e) => setTicketReplies({ ...ticketReplies, [t.id]: e.target.value })} /><button className="rounded border px-3 text-sm" onClick={() => replyTicket(t.id)}>Reply</button></div> : null}</div>)}
+            {!tickets.length ? <p className="py-6 text-center text-sm text-slate-400">You have no service tickets.</p> : null}
+          </div></Section>
+        </div>
+      ) : null}
+
+      {tab === "Performance" ? (
+        <Section title={`My performance reviews (${reviews.length})`}><div className="space-y-4">
+          {reviews.map((r) => { const editable = ["DRAFT", "SELF_SUBMITTED", "REJECTED"].includes(r.status); const a = assessments[r.id] || { score: String(r.self_score ?? ""), comments: r.employee_comments || "" }; return <div key={r.id} className="rounded-lg border border-slate-200 p-4"><div className="flex flex-wrap justify-between gap-2"><div><div className="font-medium">{r.cycle_name}</div><div className="text-xs text-slate-400">{r.period_start || "—"} to {r.period_end || "—"}</div></div><span className="badge bg-slate-100 text-slate-600">{r.status}</span></div><div className="mt-3 grid gap-3 sm:grid-cols-3"><div><div className="text-xs text-slate-400">Self score</div><div className="font-semibold">{r.self_score ?? "—"}</div></div><div><div className="text-xs text-slate-400">Supervisor score</div><div className="font-semibold">{r.supervisor_score ?? "—"}</div></div><div><div className="text-xs text-slate-400">Final rating</div><div className="font-semibold">{r.final_rating ?? "—"}</div></div></div>{r.supervisor_comments ? <p className="mt-2 text-sm"><strong>Supervisor:</strong> {r.supervisor_comments}</p> : null}{editable ? <div className="mt-3 rounded-lg bg-slate-50 p-3"><label className="text-xs text-slate-500">Your score (1–5)</label><input type="number" min="1" max="5" step="0.1" className="input mt-1 w-28" value={a.score} onChange={(e) => setAssessments({ ...assessments, [r.id]: { ...a, score: e.target.value } })} /><textarea className="input mt-2" placeholder="Achievements, goals, and comments" value={a.comments} onChange={(e) => setAssessments({ ...assessments, [r.id]: { ...a, comments: e.target.value } })} /><button className="btn-primary mt-2" onClick={() => submitAssessment(r.id)}>Submit self-assessment</button></div> : null}{r.status === "APPROVED" ? <button className="btn-primary mt-3" onClick={async () => { try { await apiFetch(`/me/performance-reviews/${r.id}/acknowledge`, { method: "POST" }); setMsg("Review acknowledged."); load(); } catch (e: any) { setErr(e.message); } }}>Acknowledge review</button> : null}</div>; })}
+          {!reviews.length ? <p className="py-6 text-center text-sm text-slate-400">No performance reviews assigned.</p> : null}
+        </div></Section>
       ) : null}
 
       {tab === "Training" ? (

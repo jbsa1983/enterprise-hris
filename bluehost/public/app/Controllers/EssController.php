@@ -29,6 +29,80 @@ class EssController
         $r->post('/me/training/self', [self::class, 'addSelfTraining']);
         $r->post('/me/training/{id}/complete', [self::class, 'completeTraining']);
         $r->get('/me/training/{id}/certificate', [self::class, 'trainingCertificate']);
+        $r->get('/me/service-tickets', [self::class, 'serviceTickets']);
+        $r->post('/me/service-tickets', [self::class, 'createServiceTicket']);
+        $r->post('/me/service-tickets/{id}/comments', [self::class, 'commentServiceTicket']);
+        $r->get('/me/performance-reviews', [self::class, 'performanceReviews']);
+        $r->post('/me/performance-reviews/{id}/self-assessment', [self::class, 'selfAssessment']);
+        $r->post('/me/performance-reviews/{id}/acknowledge', [self::class, 'acknowledgeReview']);
+    }
+
+    public static function serviceTickets(): void
+    {
+        $u=Auth::require(); $engs=self::engIds(self::personId($u));
+        if (!$engs) { Http::json([]); return; }
+        $in=implode(',',array_fill(0,count($engs),'?'));
+        $rows=Database::all("SELECT * FROM service_tickets WHERE engagement_id IN ($in) ORDER BY id DESC",$engs);
+        foreach ($rows as &$t) $t['comments']=Database::all("SELECT c.id,c.body,c.created_at,u.full_name author FROM service_ticket_comments c LEFT JOIN users u ON u.id=c.user_id WHERE c.ticket_id=? AND c.is_internal=0 ORDER BY c.id",[$t['id']]);
+        Http::json($rows);
+    }
+    public static function createServiceTicket(): void
+    {
+        $u=Auth::require(); $eng=self::primaryEngagement(self::personId($u)); $b=Http::body();
+        if (!$eng) throw new HttpError('No active engagement found',404);
+        $subject=trim((string)($b['subject']??'')); if ($subject==='') throw new HttpError('Subject is required',422);
+        $o=(int)$eng['organization_id']; $n=(int)Database::scalar('SELECT COUNT(*) FROM service_tickets WHERE organization_id=?',[$o]);
+        $num='TKT-'.$o.'-'.str_pad((string)($n+1),4,'0',STR_PAD_LEFT);
+        $id=Database::insert('service_tickets',['uuid'=>Util::uuid(),'organization_id'=>$o,'ticket_number'=>$num,'engagement_id'=>(int)$eng['id'],
+            'category'=>$b['category']??'HR Question','priority'=>$b['priority']??'NORMAL','subject'=>$subject,'description'=>$b['description']??null,
+            'status'=>'OPEN','created_by_user_id'=>$u['id'],'updated_at'=>date('Y-m-d H:i:s')]);
+        Notify::toApprovers($o,'service_desk.manage','service_desk.new',"New service ticket $num",self::myName($u).": $subject",'/o/'.$o.'/hr?tab=service');
+        Audit::record('service_desk.employee_create',$u,['organization_id'=>$o,'entity'=>'service_ticket','entity_id'=>$id]);
+        Http::json(['id'=>$id,'ticket_number'=>$num]);
+    }
+    public static function commentServiceTicket(array $p): void
+    {
+        $u=Auth::require(); $engs=self::engIds(self::personId($u)); $b=Http::body();
+        $in=$engs?implode(',',array_fill(0,count($engs),'?')):'0';
+        $t=$engs?Database::one("SELECT * FROM service_tickets WHERE id=? AND engagement_id IN ($in)",array_merge([(int)$p['id']],$engs)):null;
+        if (!$t) throw new HttpError('Ticket not found',404); if (in_array($t['status'],['CLOSED'],true)) throw new HttpError('Closed tickets cannot receive replies',409);
+        $body=trim((string)($b['body']??'')); if ($body==='') throw new HttpError('Reply is required',422);
+        $id=Database::insert('service_ticket_comments',['ticket_id'=>$t['id'],'user_id'=>$u['id'],'body'=>$body,'is_internal'=>0]);
+        Database::update('service_tickets',(int)$t['id'],['updated_at'=>date('Y-m-d H:i:s'),'status'=>$t['status']==='WAITING_EMPLOYEE'?'IN_PROGRESS':$t['status']]);
+        Notify::toApprovers((int)$t['organization_id'],'service_desk.manage','service_desk.reply',"Reply on {$t['ticket_number']}",self::myName($u).' replied to a service ticket.','/o/'.(int)$t['organization_id'].'/hr?tab=service');
+        Http::json(['id'=>$id]);
+    }
+    public static function performanceReviews(): void
+    {
+        $u=Auth::require(); $engs=self::engIds(self::personId($u)); if(!$engs){Http::json([]);return;}
+        $in=implode(',',array_fill(0,count($engs),'?'));
+        $rows=Database::all("SELECT pr.*,pc.name cycle_name,pc.period_start,pc.period_end FROM performance_reviews pr JOIN performance_cycles pc ON pc.id=pr.cycle_id WHERE pr.engagement_id IN ($in) ORDER BY pr.id DESC",$engs);
+        Http::json(array_map(fn($r)=>['id'=>(int)$r['id'],'cycle_name'=>$r['cycle_name'],'period_start'=>$r['period_start'],'period_end'=>$r['period_end'],
+            'self_score'=>$r['self_score']!==null?(float)$r['self_score']:null,'supervisor_score'=>$r['supervisor_score']!==null?(float)$r['supervisor_score']:null,
+            'final_rating'=>$r['final_rating']!==null?(float)$r['final_rating']:null,'status'=>$r['status'],'employee_comments'=>$r['employee_comments'],
+            'supervisor_comments'=>$r['supervisor_comments'],'hr_comments'=>$r['hr_comments']],$rows));
+    }
+    public static function selfAssessment(array $p): void
+    {
+        $u=Auth::require(); $engs=self::engIds(self::personId($u)); $b=Http::body();
+        $in=$engs?implode(',',array_fill(0,count($engs),'?')):'0';
+        $r=$engs?Database::one("SELECT * FROM performance_reviews WHERE id=? AND engagement_id IN ($in)",array_merge([(int)$p['id']],$engs)):null;
+        if(!$r) throw new HttpError('Review not found',404); if(!in_array($r['status'],['DRAFT','SELF_SUBMITTED','REJECTED'],true)) throw new HttpError('This review can no longer be edited',409);
+        $score=(float)($b['self_score']??0); if($score<1||$score>5) throw new HttpError('Self score must be between 1 and 5',422);
+        $data=['self_score'=>$score,'employee_comments'=>trim((string)($b['employee_comments']??'')),'status'=>'SELF_SUBMITTED'];
+        if($r['supervisor_score']!==null)$data['final_rating']=round(($score+(float)$r['supervisor_score'])/2,2);
+        Database::update('performance_reviews',(int)$r['id'],$data);
+        Notify::toApprovers((int)$r['organization_id'],'performance.manage','performance.self_submitted','Self-assessment submitted',self::myName($u).' submitted a performance self-assessment.','/o/'.(int)$r['organization_id'].'/hr?tab=performance');
+        Http::json(['id'=>(int)$r['id'],'status'=>'SELF_SUBMITTED']);
+    }
+    public static function acknowledgeReview(array $p): void
+    {
+        $u=Auth::require(); $engs=self::engIds(self::personId($u)); $in=$engs?implode(',',array_fill(0,count($engs),'?')):'0';
+        $r=$engs?Database::one("SELECT * FROM performance_reviews WHERE id=? AND engagement_id IN ($in)",array_merge([(int)$p['id']],$engs)):null;
+        if(!$r) throw new HttpError('Review not found',404); if($r['status']!=='APPROVED') throw new HttpError('Only approved reviews can be acknowledged',409);
+        Database::update('performance_reviews',(int)$r['id'],['status'=>'ACKNOWLEDGED','acknowledged_at'=>date('Y-m-d H:i:s')]);
+        Audit::record('performance.acknowledge',$u,['organization_id'=>$r['organization_id'],'entity'=>'performance_review','entity_id'=>(int)$r['id']]);
+        Http::json(['id'=>(int)$r['id'],'status'=>'ACKNOWLEDGED']);
     }
 
     /** Trainings assigned to the signed-in employee. */

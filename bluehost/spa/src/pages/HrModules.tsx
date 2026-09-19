@@ -1,64 +1,56 @@
-
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "@/lib/nav";
 import AppShell from "@/components/AppShell";
 import { apiFetch } from "@/lib/api";
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="card p-0">
-      <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium">{title}</div>
-      <div className="max-h-80 overflow-y-auto">{children}</div>
-    </div>
-  );
-}
+const tabs = [{ id: "service", label: "Service Desk" }, { id: "performance", label: "Performance Reviews" }, { id: "approvals", label: "Approval Instances" }];
+function Panel({ title, children }: { title: string; children: React.ReactNode }) { return <div className="card p-0"><div className="border-b border-slate-100 px-4 py-3 font-medium">{title}</div><div className="p-4">{children}</div></div>; }
 
 export default function HrModulesPage() {
   const orgId = Number(useParams().orgId);
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [training, setTraining] = useState<any[]>([]);
-  const [approvals, setApprovals] = useState<any[]>([]);
-
-  useEffect(() => {
-    apiFetch(`/organizations/${orgId}/service-tickets`).then(setTickets).catch(() => setTickets([]));
-    apiFetch(`/organizations/${orgId}/performance/reviews`).then(setReviews).catch(() => setReviews([]));
-    apiFetch(`/organizations/${orgId}/training/assignments`).then(setTraining).catch(() => setTraining([]));
-    apiFetch(`/organizations/${orgId}/approvals`).then(setApprovals).catch(() => setApprovals([]));
+  const [tab, setTab] = useState(new URLSearchParams(window.location.search).get("tab") || "service");
+  const [tickets, setTickets] = useState<any[]>([]), [ticket, setTicket] = useState<any>(null);
+  const [reviews, setReviews] = useState<any[]>([]), [cycles, setCycles] = useState<any[]>([]), [people, setPeople] = useState<any[]>([]);
+  const [approvals, setApprovals] = useState<any[]>([]), [workflows, setWorkflows] = useState<any[]>([]);
+  const [ticketForm, setTicketForm] = useState({ subject: "", category: "HR Question", priority: "NORMAL", description: "" });
+  const [cycleForm, setCycleForm] = useState({ name: "", cycle_type: "ANNUAL", period_start: "", period_end: "" });
+  const [reviewForm, setReviewForm] = useState({ cycle_id: "", engagement_id: "" });
+  const [reply, setReply] = useState(""), [internal, setInternal] = useState(false), [msg, setMsg] = useState(""), [err, setErr] = useState("");
+  const load = useCallback(async () => {
+    const r = await Promise.allSettled([
+      apiFetch<any[]>(`/organizations/${orgId}/service-tickets`), apiFetch<any[]>(`/organizations/${orgId}/performance/reviews`),
+      apiFetch<any[]>(`/organizations/${orgId}/performance/cycles`), apiFetch<any[]>(`/organizations/${orgId}/approvals`),
+      apiFetch<any[]>(`/organizations/${orgId}/workflows`), apiFetch<any[]>(`/organizations/${orgId}/people?status=ACTIVE`),
+    ]);
+    if (r[0].status === "fulfilled") setTickets(r[0].value); if (r[1].status === "fulfilled") setReviews(r[1].value);
+    if (r[2].status === "fulfilled") setCycles(r[2].value); if (r[3].status === "fulfilled") setApprovals(r[3].value);
+    if (r[4].status === "fulfilled") setWorkflows(r[4].value); if (r[5].status === "fulfilled") setPeople(r[5].value);
   }, [orgId]);
+  useEffect(() => { load(); }, [load]);
+  async function run(action: () => Promise<any>, success: string) { setErr(""); setMsg(""); try { await action(); setMsg(success); await load(); } catch (e: any) { setErr(e.message); } }
+  async function openTicket(id: number) { try { setTicket(await apiFetch(`/organizations/${orgId}/service-tickets/${id}`)); } catch (e: any) { setErr(e.message); } }
+  function chooseTab(id: string) { setTab(id); history.replaceState(null, "", `?tab=${id}`); }
 
-  return (
-    <AppShell orgId={orgId}>
-      <h1 className="mb-4 text-lg font-semibold text-slate-900">HR Modules</h1>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card title={`Service Desk (${tickets.length})`}>
-          <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
-            {tickets.map((t) => (<tr key={t.id}><td className="px-4 py-2 font-mono text-xs">{t.ticket_number}</td><td className="px-4 py-2">{t.subject}</td><td className="px-4 py-2 text-xs text-slate-500">{t.priority}</td><td className="px-4 py-2"><span className="badge bg-slate-100 text-slate-600">{t.status}</span></td></tr>))}
-            {tickets.length === 0 ? <tr><td className="px-4 py-6 text-center text-slate-400">No tickets.</td></tr> : null}
-          </tbody></table>
-        </Card>
+  return <AppShell orgId={orgId}>
+    <h1 className="mb-1 text-lg font-semibold">HR Workflows</h1><p className="mb-4 text-sm text-slate-500">Handle employee concerns, complete reviews, and approve submitted transactions.</p>
+    <div className="mb-4 flex flex-wrap gap-1 border-b border-slate-200">{tabs.map((t) => <button key={t.id} onClick={() => chooseTab(t.id)} className={`rounded-t-lg px-4 py-2 text-sm ${tab === t.id ? "border-b-2 border-geek-blue font-medium text-geek-blue" : "text-slate-500"}`}>{t.label}</button>)}</div>
+    {msg ? <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{msg}</div> : null}{err ? <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div> : null}
 
-        <Card title={`Performance Reviews (${reviews.length})`}>
-          <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
-            {reviews.map((r) => (<tr key={r.id}><td className="px-4 py-2 text-xs text-slate-500">Eng #{r.engagement_id}</td><td className="px-4 py-2">Self {r.self_score} · Sup {r.supervisor_score}</td><td className="px-4 py-2 font-semibold">Final {r.final_rating ?? "—"}</td><td className="px-4 py-2"><span className="badge bg-slate-100 text-slate-600">{r.status}</span></td></tr>))}
-            {reviews.length === 0 ? <tr><td className="px-4 py-6 text-center text-slate-400">No reviews.</td></tr> : null}
-          </tbody></table>
-        </Card>
+    {tab === "service" ? <div className="grid gap-5 xl:grid-cols-3">
+      <Panel title="New service ticket"><div className="space-y-2"><input className="input" placeholder="Subject" value={ticketForm.subject} onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })} /><div className="grid grid-cols-2 gap-2"><select className="input" value={ticketForm.category} onChange={(e) => setTicketForm({ ...ticketForm, category: e.target.value })}><option>HR Question</option><option>Payroll</option><option>Benefits</option><option>Leave</option><option>IT Access</option></select><select className="input" value={ticketForm.priority} onChange={(e) => setTicketForm({ ...ticketForm, priority: e.target.value })}><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></div><textarea className="input min-h-24" placeholder="Describe the request" value={ticketForm.description} onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })} /><button className="btn-primary" onClick={() => run(async () => { await apiFetch(`/organizations/${orgId}/service-tickets`, { method: "POST", body: JSON.stringify(ticketForm) }); setTicketForm({ subject: "", category: "HR Question", priority: "NORMAL", description: "" }); }, "Ticket created.")}>Create ticket</button></div></Panel>
+      <Panel title={`Ticket queue (${tickets.length})`}><div className="max-h-[34rem] space-y-2 overflow-y-auto">{tickets.map((t) => <button key={t.id} onClick={() => openTicket(t.id)} className="block w-full rounded-lg border border-slate-200 p-3 text-left hover:border-geek-blue"><div className="flex justify-between"><span className="font-mono text-xs text-geek-blue">{t.ticket_number}</span><span className="badge bg-slate-100 text-slate-600">{t.status}</span></div><div className="mt-1 text-sm font-medium">{t.subject}</div><div className="text-xs text-slate-400">{t.employee || "Internal"} · {t.category} · {t.priority}</div></button>)}{!tickets.length ? <p className="py-6 text-center text-sm text-slate-400">No tickets.</p> : null}</div></Panel>
+      <Panel title={ticket ? `${ticket.ticket_number} details` : "Select a ticket"}>{ticket ? <div className="space-y-3 text-sm"><div><div className="font-medium">{ticket.subject}</div><p className="mt-1 text-slate-600">{ticket.description || "No description."}</p></div><div className="space-y-2">{ticket.comments?.map((c: any) => <div key={c.id} className={`rounded-lg p-2 ${Number(c.is_internal) ? "bg-amber-50" : "bg-slate-50"}`}><div className="text-xs text-slate-400">{c.author || "User"}{Number(c.is_internal) ? " · Internal note" : ""}</div>{c.body}</div>)}</div><textarea className="input" placeholder="Reply or internal note" value={reply} onChange={(e) => setReply(e.target.value)} /><label className="flex gap-2 text-xs"><input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />Internal HR note</label><button className="btn-primary" onClick={() => run(async () => { await apiFetch(`/organizations/${orgId}/service-tickets/${ticket.id}/comments`, { method: "POST", body: JSON.stringify({ body: reply, is_internal: internal }) }); setReply(""); await openTicket(ticket.id); }, "Reply saved.")}>Add reply</button><div className="border-t pt-3"><select className="input" value={ticket.status} onChange={(e) => setTicket({ ...ticket, status: e.target.value })}><option>OPEN</option><option>IN_PROGRESS</option><option>WAITING_EMPLOYEE</option><option>RESOLVED</option><option>CLOSED</option></select><textarea className="input mt-2" placeholder="Resolution / update" value={ticket.resolution || ""} onChange={(e) => setTicket({ ...ticket, resolution: e.target.value })} /><button className="btn-primary mt-2" onClick={() => run(async () => { await apiFetch(`/organizations/${orgId}/service-tickets/${ticket.id}/status`, { method: "POST", body: JSON.stringify({ status: ticket.status, resolution: ticket.resolution }) }); await openTicket(ticket.id); }, "Ticket updated.")}>Update status</button></div></div> : <p className="py-8 text-center text-sm text-slate-400">Choose a ticket from the queue.</p>}</Panel>
+    </div> : null}
 
-        <Card title={`Training Assignments (${training.length})`}>
-          <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
-            {training.slice(0, 12).map((t) => (<tr key={t.id}><td className="px-4 py-2">{t.employee || `Eng #${t.engagement_id}`}</td><td className="px-4 py-2 text-slate-600">{t.course_title || `Course #${t.course_id}`}</td><td className="px-4 py-2"><span className={`badge ${t.status === "COMPLETED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{t.status}</span></td></tr>))}
-            {training.length === 0 ? <tr><td className="px-4 py-6 text-center text-slate-400">No assignments. Manage in the Training tab.</td></tr> : null}
-          </tbody></table>
-        </Card>
+    {tab === "performance" ? <div className="space-y-5"><div className="grid gap-5 lg:grid-cols-2"><Panel title="Create review cycle"><div className="grid gap-2 sm:grid-cols-2"><input className="input sm:col-span-2" placeholder="Cycle name" value={cycleForm.name} onChange={(e) => setCycleForm({ ...cycleForm, name: e.target.value })} /><select className="input" value={cycleForm.cycle_type} onChange={(e) => setCycleForm({ ...cycleForm, cycle_type: e.target.value })}><option>ANNUAL</option><option>SEMI_ANNUAL</option><option>QUARTERLY</option><option>PROBATIONARY</option></select><span /><input type="date" className="input" value={cycleForm.period_start} onChange={(e) => setCycleForm({ ...cycleForm, period_start: e.target.value })} /><input type="date" className="input" value={cycleForm.period_end} onChange={(e) => setCycleForm({ ...cycleForm, period_end: e.target.value })} /><button className="btn-primary" onClick={() => run(async () => { await apiFetch(`/organizations/${orgId}/performance/cycles`, { method: "POST", body: JSON.stringify(cycleForm) }); setCycleForm({ name: "", cycle_type: "ANNUAL", period_start: "", period_end: "" }); }, "Review cycle created.")}>Create cycle</button></div></Panel><Panel title="Assign employee review"><div className="space-y-2"><select className="input" value={reviewForm.cycle_id} onChange={(e) => setReviewForm({ ...reviewForm, cycle_id: e.target.value })}><option value="">Choose open cycle</option>{cycles.filter((c) => c.status === "OPEN").map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><select className="input" value={reviewForm.engagement_id} onChange={(e) => setReviewForm({ ...reviewForm, engagement_id: e.target.value })}><option value="">Choose employee</option>{people.map((p) => <option key={p.engagement_id} value={p.engagement_id}>{p.full_name}</option>)}</select><button className="btn-primary" onClick={() => run(async () => { await apiFetch(`/organizations/${orgId}/performance/reviews`, { method: "POST", body: JSON.stringify({ cycle_id: Number(reviewForm.cycle_id), engagement_id: Number(reviewForm.engagement_id) }) }); setReviewForm({ cycle_id: "", engagement_id: "" }); }, "Review assigned. The employee can submit a self-assessment.")}>Assign review</button></div></Panel></div>
+      <Panel title={`Performance reviews (${reviews.length})`}><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr className="text-left text-xs uppercase text-slate-400"><th className="py-2">Employee</th><th>Cycle</th><th>Self</th><th>Supervisor score and comments</th><th>Final</th><th>Status / Action</th></tr></thead><tbody className="divide-y divide-slate-100">{reviews.map((r) => <ReviewRow key={r.id} review={r} save={(data) => run(() => apiFetch(`/organizations/${orgId}/performance/reviews/${r.id}`, { method: "PUT", body: JSON.stringify(data) }), "Review saved.")} submit={() => run(() => apiFetch(`/organizations/${orgId}/performance/reviews/${r.id}/submit`, { method: "POST" }), "Review sent to Approvals.")} />)}{!reviews.length ? <tr><td colSpan={6} className="py-8 text-center text-slate-400">No reviews yet.</td></tr> : null}</tbody></table></div></Panel></div> : null}
 
-        <Card title={`Approval Instances (${approvals.length})`}>
-          <table className="min-w-full text-sm"><tbody className="divide-y divide-slate-100">
-            {approvals.map((a) => (<tr key={a.id}><td className="px-4 py-2">{a.transaction_type}</td><td className="px-4 py-2 text-xs text-slate-500">step {a.current_step}</td><td className="px-4 py-2"><span className="badge bg-slate-100 text-slate-600">{a.status}</span></td></tr>))}
-            {approvals.length === 0 ? <tr><td className="px-4 py-6 text-center text-slate-400">No approvals raised.</td></tr> : null}
-          </tbody></table>
-        </Card>
-      </div>
-    </AppShell>
-  );
+    {tab === "approvals" ? <div className="grid gap-5 lg:grid-cols-3"><div className="lg:col-span-2"><Panel title={`Approval queue (${approvals.length})`}><div className="space-y-3">{approvals.map((a) => <div key={a.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="font-medium">{a.entity_label || `${a.transaction_type} #${a.entity_id}`}</div><div className="text-xs text-slate-400">{a.workflow_name || "Standard approval"} · Step {a.current_step}{a.required_role ? ` · ${a.required_role}` : ""}</div></div><span className="badge bg-slate-100 text-slate-600">{a.status}</span></div>{a.actions?.length ? <div className="mt-2 text-xs text-slate-500">{a.actions.map((x: any) => `${x.action}${x.remarks ? ` — ${x.remarks}` : ""}`).join(" · ")}</div> : null}{a.status === "PENDING" ? <div className="mt-3 flex gap-2"><button className="btn-primary" onClick={() => run(() => apiFetch(`/organizations/${orgId}/approvals/${a.id}/act`, { method: "POST", body: JSON.stringify({ action: "APPROVE" }) }), "Approval completed.")}>Approve</button><button className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700" onClick={() => { const remarks = prompt("Reason for rejection") || "Rejected"; run(() => apiFetch(`/organizations/${orgId}/approvals/${a.id}/act`, { method: "POST", body: JSON.stringify({ action: "REJECT", remarks }) }), "Request rejected."); }}>Reject</button></div> : null}</div>)}{!approvals.length ? <p className="py-8 text-center text-sm text-slate-400">No approval instances.</p> : null}</div></Panel></div><Panel title="Approval workflows"><div className="space-y-3">{workflows.map((w) => <div key={w.id} className="rounded-lg border border-slate-200 p-3"><div className="font-medium">{w.name}</div><div className="text-xs text-slate-400">{w.transaction_type}</div><ol className="mt-2 space-y-1 text-sm">{w.steps.map((s: any) => <li key={s.step_order}>{s.step_order}. {s.name} <span className="text-slate-400">({s.approver_role || "Any approver"})</span></li>)}</ol></div>)}<p className="text-xs text-slate-500">Performance approvals are created automatically on submission. Only the role required for the current step can act.</p></div></Panel></div> : null}
+  </AppShell>;
+}
+
+function ReviewRow({ review: r, save, submit }: { review: any; save: (d: any) => void; submit: () => void }) {
+  const [score, setScore] = useState(r.supervisor_score ?? ""), [comments, setComments] = useState(r.supervisor_comments || ""), [hr, setHr] = useState(r.hr_comments || "");
+  const editable = !["PENDING_APPROVAL", "APPROVED", "ACKNOWLEDGED"].includes(r.status);
+  return <tr><td className="py-3 pr-3"><div className="font-medium">{r.employee}</div><div className="text-xs text-slate-400">{r.employee_number}</div></td><td className="pr-3">{r.cycle_name}</td><td className="pr-3">{r.self_score ?? "—"}<div className="max-w-44 text-xs text-slate-400">{r.employee_comments}</div></td><td className="min-w-60 pr-3"><div className="flex gap-2"><input type="number" min="1" max="5" step="0.1" disabled={!editable} className="input w-20" value={score} onChange={(e) => setScore(e.target.value)} /><input disabled={!editable} className="input" placeholder="Supervisor comments" value={comments} onChange={(e) => setComments(e.target.value)} /></div><input disabled={!editable} className="input mt-1" placeholder="Private HR notes" value={hr} onChange={(e) => setHr(e.target.value)} /></td><td className="pr-3 font-semibold">{r.final_rating ?? "—"}</td><td><span className="badge bg-slate-100 text-slate-600">{r.status}</span>{editable ? <div className="mt-2 flex gap-1"><button className="rounded border px-2 py-1 text-xs" onClick={() => save({ supervisor_score: Number(score), supervisor_comments: comments, hr_comments: hr })}>Save</button><button className="rounded bg-geek-blue px-2 py-1 text-xs text-white" disabled={!r.self_score || !score} onClick={submit}>Send for approval</button></div> : null}</td></tr>;
 }

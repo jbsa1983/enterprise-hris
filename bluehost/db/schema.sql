@@ -610,6 +610,13 @@ CREATE TABLE IF NOT EXISTS performance_reviews (
   final_rating DECIMAL(5,2) NULL,
   status VARCHAR(20) DEFAULT 'DRAFT',
   comments TEXT NULL,
+  employee_comments TEXT NULL,
+  supervisor_comments TEXT NULL,
+  hr_comments TEXT NULL,
+  submitted_at DATETIME NULL,
+  approved_by_user_id INT NULL,
+  approved_at DATETIME NULL,
+  acknowledged_at DATETIME NULL,
   INDEX (organization_id), INDEX (cycle_id), INDEX (engagement_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -657,8 +664,24 @@ CREATE TABLE IF NOT EXISTS service_tickets (
   status VARCHAR(20) DEFAULT 'OPEN',
   subject VARCHAR(200) NOT NULL,
   description TEXT NULL,
+  resolution TEXT NULL,
+  created_by_user_id INT NULL,
+  assigned_user_id INT NULL,
+  updated_at DATETIME NULL,
+  resolved_at DATETIME NULL,
+  closed_at DATETIME NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX (organization_id), INDEX (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS service_ticket_comments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ticket_id INT NOT NULL,
+  user_id INT NULL,
+  body TEXT NOT NULL,
+  is_internal TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (ticket_id), INDEX (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --- Onboarding / offboarding ------------------------------------------------
@@ -704,6 +727,8 @@ CREATE TABLE IF NOT EXISTS approval_instances (
   amount DECIMAL(14,2) NULL,
   current_step INT DEFAULT 1,
   status VARCHAR(20) DEFAULT 'PENDING',
+  requested_by_user_id INT NULL,
+  completed_at DATETIME NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX (organization_id), INDEX (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

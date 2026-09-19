@@ -41,6 +41,13 @@ class Rbac
         'storage.view' => 'View storage monitoring',
         'system.admin' => 'System administration',
         'audit.view' => 'View audit trail',
+        'service_desk.view' => 'View service desk tickets',
+        'service_desk.manage' => 'Assign and resolve service desk tickets',
+        'performance.view' => 'View performance reviews',
+        'performance.manage' => 'Create, score and submit performance reviews',
+        'approval.view' => 'View approval instances',
+        'approval.act' => 'Approve or reject assigned workflow steps',
+        'approval.manage' => 'Configure workflows and raise approval requests',
     ];
 
     public static function all(): array { return array_keys(self::PERMISSIONS); }
@@ -60,13 +67,13 @@ class Rbac
             'Super Admin' => $all,
             'Enterprise Admin' => $all,
             'Company Admin' => self::prefixed(['organization.view', 'employee', 'salary', 'payroll', 'loan',
-                'attendance', 'leave', 'documents', 'reports', 'project', 'storage', 'audit']),
+                'attendance', 'leave', 'documents', 'reports', 'project', 'storage', 'audit', 'service_desk', 'performance', 'approval']),
             'HR Director' => self::prefixed(['organization.view', 'employee', 'salary.view', 'payroll.view',
-                'loan.view', 'loan.approve', 'attendance', 'leave', 'documents', 'reports', 'project']),
+                'loan.view', 'loan.approve', 'attendance', 'leave', 'documents', 'reports', 'project', 'service_desk', 'performance', 'approval']),
             'HR Manager' => self::prefixed(['organization.view', 'employee.view', 'employee.create', 'employee.edit',
-                'loan.view', 'loan.approve', 'attendance', 'leave', 'documents.view', 'documents.upload', 'reports.view']),
+                'loan.view', 'loan.approve', 'attendance', 'leave', 'documents.view', 'documents.upload', 'reports.view', 'service_desk', 'performance', 'approval']),
             'HR Staff' => ['organization.view', 'employee.view', 'attendance.view', 'leave.view', 'leave.apply',
-                'documents.view', 'reports.view'],
+                'documents.view', 'reports.view', 'service_desk.view', 'service_desk.manage', 'performance.view', 'approval.view'],
             'Payroll Administrator' => ['organization.view', 'employee.view', 'salary.view', 'payroll.view',
                 'payroll.prepare', 'payroll.compute', 'payroll.export', 'loan.view', 'reports.view', 'reports.export'],
             'Payroll Approver' => ['organization.view', 'employee.view', 'salary.view', 'payroll.view',
@@ -75,9 +82,9 @@ class Rbac
             'Training Officer' => ['organization.view', 'employee.view', 'reports.view'],
             'Finance' => ['organization.view', 'payroll.view', 'loan.view', 'loan.approve', 'reports.view', 'reports.export', 'salary.view'],
             'Department Head' => ['organization.view', 'employee.view', 'attendance.view', 'attendance.approve',
-                'leave.view', 'leave.approve', 'loan.view', 'loan.approve', 'reports.view'],
+                'leave.view', 'leave.approve', 'loan.view', 'loan.approve', 'reports.view', 'performance.view', 'performance.manage', 'approval.view', 'approval.act'],
             'Supervisor' => ['organization.view', 'employee.view', 'attendance.view', 'attendance.approve',
-                'leave.view', 'leave.approve', 'loan.view', 'loan.approve'],
+                'leave.view', 'leave.approve', 'loan.view', 'loan.approve', 'performance.view', 'performance.manage', 'approval.view', 'approval.act'],
             // Project-scoped roles — access is further limited to the project(s) the user
             // is assigned to (Projects → a project → Project access). Both are just bundles
             // of scopes; a superadmin can clone/rename them (e.g. "Site Payroll Officer").

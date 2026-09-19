@@ -10,11 +10,9 @@ cd "$(dirname "$0")"
 OUT_ARG="${1:-geek-hris-bluehost.zip}"
 case "$OUT_ARG" in /*) OUT="$OUT_ARG";; *) OUT="$PWD/$OUT_ARG";; esac
 
-# 1. Build the React SPA (produces spa/dist).
-if [ ! -f spa/dist/index.html ] || [ "${REBUILD_SPA:-0}" = "1" ]; then
-    echo "Building React SPA…"
-    ( cd spa && { [ -d node_modules ] || npm install --no-audit --no-fund; } && npm run build )
-fi
+# 1. Always rebuild the React SPA so a deployment ZIP cannot contain stale UI files.
+echo "Building React SPA…"
+( cd spa && { [ -d node_modules ] || npm install --no-audit --no-fund; } && npm run build )
 
 STAGEROOT="$(mktemp -d)"
 STAGE="$STAGEROOT/geek-hris-bluehost"
