@@ -590,9 +590,44 @@ CREATE TABLE IF NOT EXISTS leave_balances (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --- Performance -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS performance_templates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  description TEXT NULL,
+  rating_min DECIMAL(4,2) DEFAULT 1,
+  rating_max DECIMAL(4,2) DEFAULT 5,
+  active TINYINT(1) DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL,
+  INDEX (organization_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS performance_template_sections (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  template_id INT NOT NULL,
+  title VARCHAR(150) NOT NULL,
+  description TEXT NULL,
+  sort_order INT DEFAULT 1,
+  INDEX (template_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS performance_template_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  section_id INT NOT NULL,
+  title VARCHAR(180) NOT NULL,
+  description TEXT NULL,
+  weight DECIMAL(6,2) NOT NULL DEFAULT 0,
+  sort_order INT DEFAULT 1,
+  employee_rates TINYINT(1) DEFAULT 1,
+  supervisor_rates TINYINT(1) DEFAULT 1,
+  INDEX (section_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS performance_cycles (
   id INT AUTO_INCREMENT PRIMARY KEY,
   organization_id INT NOT NULL,
+  template_id INT NULL,
   name VARCHAR(120) NOT NULL,
   cycle_type VARCHAR(30) DEFAULT 'ANNUAL',
   period_start DATE NULL, period_end DATE NULL,
@@ -600,11 +635,31 @@ CREATE TABLE IF NOT EXISTS performance_cycles (
   INDEX (organization_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS performance_review_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  review_id INT NOT NULL,
+  template_item_id INT NULL,
+  section_title VARCHAR(150) NOT NULL,
+  item_title VARCHAR(180) NOT NULL,
+  item_description TEXT NULL,
+  weight DECIMAL(6,2) NOT NULL DEFAULT 0,
+  sort_order INT DEFAULT 1,
+  employee_rates TINYINT(1) DEFAULT 1,
+  supervisor_rates TINYINT(1) DEFAULT 1,
+  self_score DECIMAL(5,2) NULL,
+  supervisor_score DECIMAL(5,2) NULL,
+  employee_comment TEXT NULL,
+  supervisor_comment TEXT NULL,
+  INDEX (review_id), INDEX (template_item_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS performance_reviews (
   id INT AUTO_INCREMENT PRIMARY KEY,
   organization_id INT NOT NULL,
   cycle_id INT NOT NULL,
   engagement_id INT NOT NULL,
+  rating_min DECIMAL(4,2) DEFAULT 1,
+  rating_max DECIMAL(4,2) DEFAULT 5,
   self_score DECIMAL(5,2) NULL,
   supervisor_score DECIMAL(5,2) NULL,
   final_rating DECIMAL(5,2) NULL,

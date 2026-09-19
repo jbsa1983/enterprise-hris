@@ -41,6 +41,9 @@ bluehost/
    It adds Service Desk conversations, performance review approvals, and the
    related role permissions without deleting existing records.
 
+   Then import `db/migrate-performance-criteria.sql` to add configurable review
+   templates, weighted criteria, per-item ratings, and historical snapshots.
+
 4. **Upload the app** — put the **contents of `public/`** into `public_html`
    (File Manager → Upload/extract a zip, or `git clone` via SSH then move files).
    Put the `db/` folder inside `public_html/db` too (it's protected by its

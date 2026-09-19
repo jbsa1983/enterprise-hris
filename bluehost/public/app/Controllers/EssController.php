@@ -77,10 +77,11 @@ class EssController
         $u=Auth::require(); $engs=self::engIds(self::personId($u)); if(!$engs){Http::json([]);return;}
         $in=implode(',',array_fill(0,count($engs),'?'));
         $rows=Database::all("SELECT pr.*,pc.name cycle_name,pc.period_start,pc.period_end FROM performance_reviews pr JOIN performance_cycles pc ON pc.id=pr.cycle_id WHERE pr.engagement_id IN ($in) ORDER BY pr.id DESC",$engs);
-        Http::json(array_map(fn($r)=>['id'=>(int)$r['id'],'cycle_name'=>$r['cycle_name'],'period_start'=>$r['period_start'],'period_end'=>$r['period_end'],
+        Http::json(array_map(function($r){$items=Database::all('SELECT * FROM performance_review_items WHERE review_id=? ORDER BY sort_order,id',[$r['id']]);return ['id'=>(int)$r['id'],'cycle_name'=>$r['cycle_name'],'period_start'=>$r['period_start'],'period_end'=>$r['period_end'],
             'self_score'=>$r['self_score']!==null?(float)$r['self_score']:null,'supervisor_score'=>$r['supervisor_score']!==null?(float)$r['supervisor_score']:null,
             'final_rating'=>$r['final_rating']!==null?(float)$r['final_rating']:null,'status'=>$r['status'],'employee_comments'=>$r['employee_comments'],
-            'supervisor_comments'=>$r['supervisor_comments'],'hr_comments'=>$r['hr_comments']],$rows));
+            'rating_min'=>(float)$r['rating_min'],'rating_max'=>(float)$r['rating_max'],'items'=>array_map(['HrModulesController','reviewItemOut'],$items),
+            'supervisor_comments'=>$r['supervisor_comments'],'hr_comments'=>$r['hr_comments']];},$rows));
     }
     public static function selfAssessment(array $p): void
     {
@@ -88,7 +89,9 @@ class EssController
         $in=$engs?implode(',',array_fill(0,count($engs),'?')):'0';
         $r=$engs?Database::one("SELECT * FROM performance_reviews WHERE id=? AND engagement_id IN ($in)",array_merge([(int)$p['id']],$engs)):null;
         if(!$r) throw new HttpError('Review not found',404); if(!in_array($r['status'],['DRAFT','SELF_SUBMITTED','REJECTED'],true)) throw new HttpError('This review can no longer be edited',409);
-        $score=(float)($b['self_score']??0); if($score<1||$score>5) throw new HttpError('Self score must be between 1 and 5',422);
+        if(isset($b['ratings'])&&is_array($b['ratings'])) foreach($b['ratings'] as $x){$item=Database::one('SELECT * FROM performance_review_items WHERE id=? AND review_id=?',[(int)($x['id']??0),$r['id']]);if(!$item||!(int)$item['employee_rates'])continue;$score=(float)($x['score']??0);if($score<(float)$r['rating_min']||$score>(float)$r['rating_max'])throw new HttpError("Every self-rating must be between {$r['rating_min']} and {$r['rating_max']}",422);Database::update('performance_review_items',(int)$item['id'],['self_score'=>$score,'employee_comment'=>trim((string)($x['comment']??''))]);}
+        $score=HrModulesController::weightedScore((int)$r['id'],'self_score','employee_rates');
+        if($score===null){$score=(float)($b['self_score']??0);if($score<(float)$r['rating_min']||$score>(float)$r['rating_max'])throw new HttpError("Complete every self-rating between {$r['rating_min']} and {$r['rating_max']}",422);}
         $data=['self_score'=>$score,'employee_comments'=>trim((string)($b['employee_comments']??'')),'status'=>'SELF_SUBMITTED'];
         if($r['supervisor_score']!==null)$data['final_rating']=round(($score+(float)$r['supervisor_score'])/2,2);
         Database::update('performance_reviews',(int)$r['id'],$data);

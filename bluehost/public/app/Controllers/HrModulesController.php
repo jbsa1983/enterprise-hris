@@ -10,6 +10,10 @@ class HrModulesController
     {
         $b = '/organizations/{organization_id}';
         // Performance
+        $r->get("$b/performance/templates", [self::class, 'perfTemplates']);
+        $r->post("$b/performance/templates", [self::class, 'createPerfTemplate']);
+        $r->put("$b/performance/templates/{id}", [self::class, 'updatePerfTemplate']);
+        $r->delete("$b/performance/templates/{id}", [self::class, 'deletePerfTemplate']);
         $r->get("$b/performance/cycles", [self::class, 'perfCycles']);
         $r->post("$b/performance/cycles", [self::class, 'createCycle']);
         $r->get("$b/performance/reviews", [self::class, 'perfReviews']);
@@ -45,16 +49,58 @@ class HrModulesController
         $r->post("$b/approvals/{id}/act", [self::class, 'actApproval']);
     }
 
+    private static function templateOut(array $t): array
+    {
+        $sections = Database::all('SELECT * FROM performance_template_sections WHERE template_id=? ORDER BY sort_order,id', [$t['id']]);
+        foreach ($sections as &$s) {
+            $s['id']=(int)$s['id']; $s['sort_order']=(int)$s['sort_order'];
+            $s['items']=array_map(fn($i)=>['id'=>(int)$i['id'],'title'=>$i['title'],'description'=>$i['description'],
+                'weight'=>(float)$i['weight'],'sort_order'=>(int)$i['sort_order'],'employee_rates'=>(bool)$i['employee_rates'],
+                'supervisor_rates'=>(bool)$i['supervisor_rates']], Database::all('SELECT * FROM performance_template_items WHERE section_id=? ORDER BY sort_order,id',[$s['id']]));
+        }
+        return ['id'=>(int)$t['id'],'name'=>$t['name'],'description'=>$t['description'],'rating_min'=>(float)$t['rating_min'],
+            'rating_max'=>(float)$t['rating_max'],'active'=>(bool)$t['active'],'sections'=>$sections];
+    }
+    public static function perfTemplates(array $p): void
+    {
+        [, $o]=Auth::org($p,'performance.view');
+        Http::json(array_map([self::class,'templateOut'],Database::all('SELECT * FROM performance_templates WHERE organization_id=? ORDER BY active DESC,name',[$o])));
+    }
+    private static function saveTemplate(int $o, array $b, ?int $id=null): int
+    {
+        $name=trim((string)($b['name']??'')); $min=(float)($b['rating_min']??1); $max=(float)($b['rating_max']??5);
+        if($name==='') throw new HttpError('Template name is required',422);
+        if($min<0||$max<=$min) throw new HttpError('Rating maximum must be greater than the minimum',422);
+        $sections=$b['sections']??[]; $total=0; $count=0;
+        foreach($sections as $s) foreach($s['items']??[] as $i){if(isset($i['employee_rates'])&&!$i['employee_rates']&&isset($i['supervisor_rates'])&&!$i['supervisor_rates'])throw new HttpError('Every criterion must be rated by the employee, supervisor, or both',422);$total+=(float)($i['weight']??0);$count++;}
+        if($count===0) throw new HttpError('Add at least one review criterion',422);
+        if(abs($total-100)>0.01) throw new HttpError('Criteria weights must total exactly 100%',422);
+        $pdo=Database::pdo(); $pdo->beginTransaction();
+        try {
+            $data=['organization_id'=>$o,'name'=>$name,'description'=>$b['description']??null,'rating_min'=>$min,'rating_max'=>$max,'active'=>!isset($b['active'])||$b['active']?1:0,'updated_at'=>date('Y-m-d H:i:s')];
+            if($id){Database::update('performance_templates',$id,$data);$old=Database::all('SELECT id FROM performance_template_sections WHERE template_id=?',[$id]);foreach($old as $s)Database::exec('DELETE FROM performance_template_items WHERE section_id=?',[$s['id']]);Database::exec('DELETE FROM performance_template_sections WHERE template_id=?',[$id]);}
+            else $id=Database::insert('performance_templates',$data);
+            foreach($sections as $si=>$s){$title=trim((string)($s['title']??''));if($title==='')throw new HttpError('Every section needs a title',422);$sid=Database::insert('performance_template_sections',['template_id'=>$id,'title'=>$title,'description'=>$s['description']??null,'sort_order'=>$si+1]);foreach($s['items']??[] as $ii=>$i){$it=trim((string)($i['title']??''));if($it==='')throw new HttpError('Every criterion needs a title',422);Database::insert('performance_template_items',['section_id'=>$sid,'title'=>$it,'description'=>$i['description']??null,'weight'=>(float)$i['weight'],'sort_order'=>$ii+1,'employee_rates'=>!isset($i['employee_rates'])||$i['employee_rates']?1:0,'supervisor_rates'=>!isset($i['supervisor_rates'])||$i['supervisor_rates']?1:0]);}}
+            $pdo->commit(); return $id;
+        } catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    }
+    public static function createPerfTemplate(array $p): void { [$u,$o]=Auth::org($p,'performance.manage');$id=self::saveTemplate($o,Http::body());Audit::record('performance.template_create',$u,['organization_id'=>$o,'entity'=>'performance_template','entity_id'=>$id]);Http::json(self::templateOut(Database::one('SELECT * FROM performance_templates WHERE id=?',[$id]))); }
+    public static function updatePerfTemplate(array $p): void { [$u,$o]=Auth::org($p,'performance.manage');$t=Database::one('SELECT * FROM performance_templates WHERE id=? AND organization_id=?',[(int)$p['id'],$o]);if(!$t)throw new HttpError('Template not found',404);$id=self::saveTemplate($o,Http::body(),(int)$t['id']);Audit::record('performance.template_update',$u,['organization_id'=>$o,'entity'=>'performance_template','entity_id'=>$id]);Http::json(self::templateOut(Database::one('SELECT * FROM performance_templates WHERE id=?',[$id]))); }
+    public static function deletePerfTemplate(array $p): void { [$u,$o]=Auth::org($p,'performance.manage');$t=Database::one('SELECT * FROM performance_templates WHERE id=? AND organization_id=?',[(int)$p['id'],$o]);if(!$t)throw new HttpError('Template not found',404);Database::update('performance_templates',(int)$t['id'],['active'=>0,'updated_at'=>date('Y-m-d H:i:s')]);Audit::record('performance.template_archive',$u,['organization_id'=>$o,'entity'=>'performance_template','entity_id'=>(int)$t['id']]);Http::json(['archived'=>(int)$t['id']]); }
+    public static function reviewItemOut(array $i): array { return ['id'=>(int)$i['id'],'section_title'=>$i['section_title'],'title'=>$i['item_title'],'description'=>$i['item_description'],'weight'=>(float)$i['weight'],'employee_rates'=>(bool)$i['employee_rates'],'supervisor_rates'=>(bool)$i['supervisor_rates'],'self_score'=>$i['self_score']!==null?(float)$i['self_score']:null,'supervisor_score'=>$i['supervisor_score']!==null?(float)$i['supervisor_score']:null,'employee_comment'=>$i['employee_comment'],'supervisor_comment'=>$i['supervisor_comment']]; }
+    public static function weightedScore(int $reviewId,string $scoreCol,string $flagCol): ?float { $rows=Database::all("SELECT weight,$scoreCol score FROM performance_review_items WHERE review_id=? AND $flagCol=1",[$reviewId]);if(!$rows)return null;$sum=0;$weights=0;foreach($rows as $x){if($x['score']===null)return null;$w=(float)$x['weight'];$sum+=(float)$x['score']*$w;$weights+=$w;}return $weights>0?round($sum/$weights,2):null; }
+
     public static function perfCycles(array $p): void
     {
         [, $o] = Auth::org($p, 'performance.view');
-        Http::json(Database::all('SELECT id, name, cycle_type, period_start, period_end, status FROM performance_cycles WHERE organization_id = ? ORDER BY id DESC', [$o]));
+        Http::json(Database::all('SELECT pc.id,pc.template_id,pc.name,pc.cycle_type,pc.period_start,pc.period_end,pc.status,pt.name template_name FROM performance_cycles pc LEFT JOIN performance_templates pt ON pt.id=pc.template_id WHERE pc.organization_id=? ORDER BY pc.id DESC', [$o]));
     }
     public static function createCycle(array $p): void
     {
         [$u, $o] = Auth::org($p, 'performance.manage'); $b = Http::body();
         if (trim((string) ($b['name'] ?? '')) === '') throw new HttpError('Cycle name is required', 422);
-        $id = Database::insert('performance_cycles', ['organization_id' => $o, 'name' => trim($b['name']),
+        $templateId=(int)($b['template_id']??0); if(!$templateId||!Database::one('SELECT id FROM performance_templates WHERE id=? AND organization_id=? AND active=1',[$templateId,$o])) throw new HttpError('Choose an active review template',422);
+        $id = Database::insert('performance_cycles', ['organization_id' => $o, 'template_id'=>$templateId, 'name' => trim($b['name']),
             'cycle_type' => $b['cycle_type'] ?? 'ANNUAL', 'period_start' => $b['period_start'] ?? null,
             'period_end' => $b['period_end'] ?? null, 'status' => 'OPEN']);
         Audit::record('performance.cycle_create', $u, ['organization_id' => $o, 'entity' => 'performance_cycle', 'entity_id' => $id]);
@@ -74,27 +120,31 @@ class HrModulesController
                  WHERE pr.organization_id = ?";
         $params = [$o];
         if ($c = Http::query('cycle_id')) { $sql .= ' AND cycle_id = ?'; $params[] = (int) $c; }
-        Http::json(array_map(fn($r) => ['id' => (int) $r['id'], 'engagement_id' => (int) $r['engagement_id'], 'cycle_id' => (int) $r['cycle_id'],
+        Http::json(array_map(function($r){$items=Database::all('SELECT * FROM performance_review_items WHERE review_id=? ORDER BY sort_order,id',[$r['id']]);return ['id' => (int) $r['id'], 'engagement_id' => (int) $r['engagement_id'], 'cycle_id' => (int) $r['cycle_id'],
             'employee' => $r['employee'], 'employee_number' => $r['employee_number'], 'cycle_name' => $r['cycle_name'],
             'self_score' => $r['self_score'] !== null ? (float) $r['self_score'] : null, 'supervisor_score' => $r['supervisor_score'] !== null ? (float) $r['supervisor_score'] : null,
             'final_rating' => $r['final_rating'] !== null ? (float) $r['final_rating'] : null, 'status' => $r['status'],
+            'rating_min'=>(float)$r['rating_min'],'rating_max'=>(float)$r['rating_max'],
             'employee_comments' => $r['employee_comments'], 'supervisor_comments' => $r['supervisor_comments'], 'hr_comments' => $r['hr_comments'],
-            'approval_id' => $r['approval_id'] !== null ? (int) $r['approval_id'] : null,
-            'approval_step' => $r['approval_step'] !== null ? (int) $r['approval_step'] : null, 'approval_status' => $r['approval_status']], Database::all($sql . ' ORDER BY pr.id DESC', $params)));
+            'items'=>array_map([self::class,'reviewItemOut'],$items),'approval_id' => $r['approval_id'] !== null ? (int) $r['approval_id'] : null,
+            'approval_step' => $r['approval_step'] !== null ? (int) $r['approval_step'] : null, 'approval_status' => $r['approval_status']];}, Database::all($sql . ' ORDER BY pr.id DESC', $params)));
     }
     public static function createReview(array $p): void
     {
         [$u, $o] = Auth::org($p, 'performance.manage'); $b = Http::body();
         $eng = Database::one('SELECT id FROM engagements WHERE id=? AND organization_id=?', [(int) ($b['engagement_id'] ?? 0), $o]);
-        $cycle = Database::one("SELECT id FROM performance_cycles WHERE id=? AND organization_id=? AND status='OPEN'", [(int) ($b['cycle_id'] ?? 0), $o]);
+        $cycle = Database::one("SELECT pc.id,pc.template_id,pt.rating_min,pt.rating_max FROM performance_cycles pc JOIN performance_templates pt ON pt.id=pc.template_id WHERE pc.id=? AND pc.organization_id=? AND pc.status='OPEN'", [(int) ($b['cycle_id'] ?? 0), $o]);
         if (!$eng || !$cycle) throw new HttpError('Choose a valid employee and open review cycle', 422);
         if (Database::one('SELECT id FROM performance_reviews WHERE cycle_id=? AND engagement_id=?', [(int) $b['cycle_id'], (int) $b['engagement_id']]))
             throw new HttpError('This employee already has a review in that cycle', 409);
+        $items=Database::all('SELECT i.*,s.title section_title,s.sort_order section_order FROM performance_template_items i JOIN performance_template_sections s ON s.id=i.section_id WHERE s.template_id=? ORDER BY s.sort_order,i.sort_order,i.id',[$cycle['template_id']]);
+        if(!$items) throw new HttpError('The selected cycle template has no criteria',422);
         $self = $b['self_score'] ?? null; $sup = $b['supervisor_score'] ?? null;
         $final = ($self !== null && $sup !== null) ? round(((float) $self + (float) $sup) / 2, 2) : null;
-        $id = Database::insert('performance_reviews', ['organization_id' => $o, 'cycle_id' => (int) $b['cycle_id'], 'engagement_id' => (int) $b['engagement_id'],
+        $id = Database::insert('performance_reviews', ['organization_id' => $o, 'cycle_id' => (int) $b['cycle_id'], 'engagement_id' => (int) $b['engagement_id'], 'rating_min'=>$cycle['rating_min'],'rating_max'=>$cycle['rating_max'],
             'self_score' => $self, 'supervisor_score' => $sup, 'final_rating' => $final,
             'supervisor_comments' => $b['supervisor_comments'] ?? null, 'status' => 'DRAFT']);
+        foreach($items as $n=>$i) Database::insert('performance_review_items',['review_id'=>$id,'template_item_id'=>$i['id'],'section_title'=>$i['section_title'],'item_title'=>$i['title'],'item_description'=>$i['description'],'weight'=>$i['weight'],'sort_order'=>$n+1,'employee_rates'=>$i['employee_rates'],'supervisor_rates'=>$i['supervisor_rates']]);
         Audit::record('performance.review_create', $u, ['organization_id' => $o, 'entity' => 'performance_review', 'entity_id' => $id]);
         $person = Database::scalar('SELECT person_id FROM engagements WHERE id=?', [(int) $b['engagement_id']]);
         if ($person) Notify::toPerson((int) $person, 'performance.created', 'Performance review started', 'A performance review is ready for your self-assessment.', '/me');
@@ -108,9 +158,11 @@ class HrModulesController
         if (!$r) throw new HttpError('Review not found', 404);
         if (in_array($r['status'], ['PENDING_APPROVAL','APPROVED','ACKNOWLEDGED'], true)) throw new HttpError('Reopen or reject the approval before editing this review', 409);
         $data = [];
+        if(isset($b['ratings'])&&is_array($b['ratings'])) foreach($b['ratings'] as $x){$item=Database::one('SELECT * FROM performance_review_items WHERE id=? AND review_id=?',[(int)($x['id']??0),$r['id']]);if(!$item||!(int)$item['supervisor_rates'])continue;$score=(float)($x['score']??0);if($score<(float)$r['rating_min']||$score>(float)$r['rating_max'])throw new HttpError("Every supervisor rating must be between {$r['rating_min']} and {$r['rating_max']}",422);Database::update('performance_review_items',(int)$item['id'],['supervisor_score'=>$score,'supervisor_comment'=>trim((string)($x['comment']??''))]);}
         foreach (['supervisor_score','supervisor_comments','hr_comments'] as $f) if (array_key_exists($f, $b)) $data[$f] = $b[$f] === '' ? null : $b[$f];
-        $self = array_key_exists('self_score', $b) ? $b['self_score'] : $r['self_score'];
-        $sup = array_key_exists('supervisor_score', $b) ? $b['supervisor_score'] : $r['supervisor_score'];
+        $self = self::weightedScore((int)$r['id'],'self_score','employee_rates') ?? (array_key_exists('self_score', $b) ? $b['self_score'] : $r['self_score']);
+        $sup = self::weightedScore((int)$r['id'],'supervisor_score','supervisor_rates') ?? (array_key_exists('supervisor_score', $b) ? $b['supervisor_score'] : $r['supervisor_score']);
+        if($self!==null)$data['self_score']=$self;if($sup!==null)$data['supervisor_score']=$sup;
         if ($self !== null && $sup !== null) $data['final_rating'] = round(((float) $self + (float) $sup) / 2, 2);
         Database::update('performance_reviews', (int) $r['id'], $data);
         Audit::record('performance.review_update', $u, ['organization_id' => $o, 'entity' => 'performance_review', 'entity_id' => (int) $r['id'], 'after' => $data]);
@@ -122,7 +174,8 @@ class HrModulesController
         [$u, $o] = Auth::org($p, 'performance.manage');
         $r = Database::one('SELECT * FROM performance_reviews WHERE id=? AND organization_id=?', [(int) $p['id'], $o]);
         if (!$r) throw new HttpError('Review not found', 404);
-        if ($r['self_score'] === null || $r['supervisor_score'] === null) throw new HttpError('Both self and supervisor scores are required before submission', 422);
+        $missing=(int)Database::scalar('SELECT COUNT(*) FROM performance_review_items WHERE review_id=? AND ((employee_rates=1 AND self_score IS NULL) OR (supervisor_rates=1 AND supervisor_score IS NULL))',[$r['id']]);
+        if ($missing>0 || $r['self_score'] === null || $r['supervisor_score'] === null) throw new HttpError('Complete every required employee and supervisor criterion before submission', 422);
         $existing = Database::one("SELECT id,status FROM approval_instances WHERE entity='performance_review' AND entity_id=? AND status='PENDING'", [$r['id']]);
         if ($existing) throw new HttpError('This review is already awaiting approval', 409);
         $wf = self::matchWorkflow($o, 'PERFORMANCE_REVIEW', null);

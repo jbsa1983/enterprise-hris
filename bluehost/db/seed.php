@@ -181,15 +181,21 @@ foreach ($orgs as $oi => $oid) {
     foreach (['Certificate of Employment', 'Payroll concern', 'HMO'] as $ti => $cat)
         Database::insert('service_tickets', ['uuid' => uuid(), 'organization_id' => $oid, 'ticket_number' => 'TKT-' . $oid . '-' . str_pad((string) ($ti + 1), 4, '0', STR_PAD_LEFT),
             'engagement_id' => $engIds[$ti] ?? null, 'category' => $cat, 'priority' => 'NORMAL', 'status' => 'OPEN', 'subject' => "$cat request"]);
-    $cycleId = Database::insert('performance_cycles', ['organization_id' => $oid, 'name' => date('Y') . ' Annual Review', 'cycle_type' => 'ANNUAL', 'status' => 'OPEN']);
+    $templateId = Database::insert('performance_templates', ['organization_id'=>$oid,'name'=>'Standard Performance Review','description'=>'Balanced review for all employees','rating_min'=>1,'rating_max'=>5,'active'=>1]);
+    $sectionId = Database::insert('performance_template_sections', ['template_id'=>$templateId,'title'=>'Core Performance','description'=>'Standard competencies','sort_order'=>1]);
+    foreach ([['Quality of Work','Accuracy, completeness, and reliability of output'],['Productivity','Timely completion of assigned work and goals'],['Communication','Clear, respectful, and effective communication'],['Teamwork','Cooperation, accountability, and support for colleagues'],['Attendance and Reliability','Punctuality, availability, and dependability']] as $ii=>$criterion)
+        Database::insert('performance_template_items',['section_id'=>$sectionId,'title'=>$criterion[0],'description'=>$criterion[1],'weight'=>20,'sort_order'=>$ii+1,'employee_rates'=>1,'supervisor_rates'=>1]);
+    $cycleId = Database::insert('performance_cycles', ['organization_id' => $oid, 'template_id'=>$templateId, 'name' => date('Y') . ' Annual Review', 'cycle_type' => 'ANNUAL', 'status' => 'OPEN']);
     $workflowId = Database::insert('approval_workflows', ['organization_id' => $oid, 'name' => 'Performance Review Approval',
         'transaction_type' => 'PERFORMANCE_REVIEW', 'active' => 1]);
     Database::insert('approval_workflow_steps', ['workflow_id' => $workflowId, 'step_order' => 1,
         'name' => 'HR Approval', 'approver_role' => 'HR Manager']);
     foreach (array_slice($engIds, 0, 5) as $eid2) {
         $ss = [3.5, 4.0, 4.5][array_rand([3.5, 4.0, 4.5])]; $sp = [3.0, 4.0, 5.0][array_rand([3.0, 4.0, 5.0])];
-        Database::insert('performance_reviews', ['organization_id' => $oid, 'cycle_id' => $cycleId, 'engagement_id' => $eid2,
+        $reviewId=Database::insert('performance_reviews', ['organization_id' => $oid, 'cycle_id' => $cycleId, 'engagement_id' => $eid2,
             'self_score' => $ss, 'supervisor_score' => $sp, 'final_rating' => round(($ss + $sp) / 2, 2), 'status' => 'DRAFT']);
+        $criteria=Database::all('SELECT i.*,s.title section_title FROM performance_template_items i JOIN performance_template_sections s ON s.id=i.section_id WHERE s.template_id=? ORDER BY i.sort_order',[$templateId]);
+        foreach($criteria as $ci=>$criterion) Database::insert('performance_review_items',['review_id'=>$reviewId,'template_item_id'=>$criterion['id'],'section_title'=>$criterion['section_title'],'item_title'=>$criterion['title'],'item_description'=>$criterion['description'],'weight'=>$criterion['weight'],'sort_order'=>$ci+1,'employee_rates'=>1,'supervisor_rates'=>1,'self_score'=>$ss,'supervisor_score'=>$sp]);
     }
     $courseId = Database::insert('training_courses', ['organization_id' => $oid, 'title' => 'Data Privacy Act Orientation', 'category' => 'Compliance', 'provider' => 'Internal']);
     foreach (array_slice($engIds, 0, 6) as $eid2)
