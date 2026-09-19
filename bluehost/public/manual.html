@@ -303,6 +303,8 @@
       <ol>
         <li><a href="#selfservice">Your Self-Service area</a></li>
         <li><a href="#requests">Requests &amp; approvals</a></li>
+        <li><a href="#staff-service-desk">Service Desk</a></li>
+        <li><a href="#staff-performance">Performance reviews</a></li>
         <li><a href="#payslip">Download your payslip</a></li>
         <li><a href="#contributions">Reading your contributions</a></li>
       </ol>
@@ -319,6 +321,8 @@
         <li><a href="#hr-project">Project (construction) payroll</a></li>
         <li><a href="#hr-bir">BIR forms</a></li>
         <li><a href="#hr-reports">Reports &amp; export</a></li>
+        <li><a href="#hr-service-desk">Service Desk workflow</a></li>
+        <li><a href="#hr-performance">Performance review workflow</a></li>
         <li><a href="#hr-approvals">Approvals &amp; the digest</a></li>
       </ol>
     </nav>
@@ -413,6 +417,8 @@
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>Loans</div><p><strong>Request a loan or cash advance</strong>, and see your existing obligations with the remaining balance.</p></div>
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-blue)"></span>Benefits</div><p>Your benefits (such as HMO / health coverage) and the beneficiaries linked to each.</p></div>
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-red)"></span>Assets</div><p>Company items issued to you — laptop, phone, etc. — including anything you've already returned.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-blue)"></span>Service Desk</div><p>Ask HR for help, follow the ticket status, read HR's response, and reply in the same conversation.</p></div>
+      <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>Performance</div><p>Complete your self-assessment, see supervisor scores and comments, and acknowledge an approved review.</p></div>
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-green)"></span>Contributions</div><p>Your government contributions by period — SSS, PhilHealth, Pag-IBIG, and withholding tax.</p></div>
       <div class="tabcard"><div class="tname"><span class="dot" style="background:var(--geek-amber)"></span>Security</div><p>Change your password (do this on day one), and <strong>Connect Telegram</strong> to get approval alerts on your phone.</p></div>
     </div>
@@ -420,6 +426,28 @@
       <span class="lbl">Something look wrong?</span>
       <p>Your profile, bank details, government IDs, benefits, and assigned assets are maintained by HR — you view them here but can't edit them yourself. If anything is out of date or incorrect, contact HR and they'll update it for you.</p>
     </div>
+  </section>
+
+  <section id="staff-service-desk">
+    <div class="eyebrow">For staff</div>
+    <h2>Using the Service Desk</h2>
+    <p>Use <strong>My Self-Service → Service Desk</strong> when you need help from HR about payroll, benefits, leave, access, documents, or another employment concern.</p>
+    <ol class="steps">
+      <li><span class="st-title">Open a ticket.</span><p>Enter a clear subject, choose the category and priority, describe what you need, and click <strong>Submit ticket</strong>.</p></li>
+      <li><span class="st-title">Follow its progress.</span><p>Your ticket moves through <strong>Open</strong>, <strong>In Progress</strong>, <strong>Waiting Employee</strong>, <strong>Resolved</strong>, and <strong>Closed</strong>. HR updates and the final resolution appear on the ticket.</p></li>
+      <li><span class="st-title">Reply when needed.</span><p>Type your response below the conversation and click <strong>Reply</strong>. Internal HR notes are never shown to employees.</p></li>
+    </ol>
+  </section>
+
+  <section id="staff-performance">
+    <div class="eyebrow">For staff</div>
+    <h2>Completing a performance review</h2>
+    <ol class="steps">
+      <li><span class="st-title">Open Performance.</span><p>Go to <strong>My Self-Service → Performance</strong>. A review appears after HR assigns you to an open review cycle.</p></li>
+      <li><span class="st-title">Submit your self-assessment.</span><p>Give yourself a score from <strong>1 to 5</strong>, describe your achievements and goals, then click <strong>Submit self-assessment</strong>.</p></li>
+      <li><span class="st-title">Review the result.</span><p>After your supervisor scores it and the required approver approves it, you can see the final rating and comments. Click <strong>Acknowledge review</strong> to confirm that you received it.</p></li>
+    </ol>
+    <div class="note"><span class="lbl">Acknowledgement</span><p>Acknowledging confirms receipt of the review. It does not change the score or remove the review history.</p></div>
   </section>
 
   <section id="requests">
@@ -672,10 +700,29 @@
     <p>Under <strong>Reports</strong> pick a dataset — employees, payroll (by period or project), statutory contributions, leave, attendance, benefits, assets, 13th month, or the BIR period totals — filter and sort it, then <strong>export</strong> to <strong>Excel (.xlsx)</strong>, CSV, or a print-ready PDF.</p>
   </section>
 
+  <section id="hr-service-desk">
+    <div class="eyebrow">For HR &amp; administrators</div>
+    <h2>Managing the Service Desk</h2>
+    <p>Open <strong>Service Desk</strong> from the organization menu. Select a ticket from the queue to read its full conversation, add an employee-facing reply, or mark a note as <strong>Internal HR note</strong>.</p>
+    <p>Update the status as work progresses. Use <strong>Waiting Employee</strong> when HR needs information from the employee, add a clear resolution before selecting <strong>Resolved</strong>, and use <strong>Closed</strong> when no further replies should be accepted.</p>
+  </section>
+
+  <section id="hr-performance">
+    <div class="eyebrow">For supervisors, HR &amp; administrators</div>
+    <h2>Managing performance reviews</h2>
+    <ol class="steps">
+      <li><span class="st-title">Create a cycle.</span><p>Open <strong>Performance Reviews</strong>, enter the cycle name, type, and covered dates, then create it.</p></li>
+      <li><span class="st-title">Assign employees.</span><p>Choose an open cycle and an employee. The employee is notified and can complete the self-assessment in My Self-Service.</p></li>
+      <li><span class="st-title">Complete the supervisor review.</span><p>Enter a supervisor score from 1 to 5 and comments. HR can also save private HR notes. Click <strong>Save</strong>, then <strong>Send for approval</strong>.</p></li>
+      <li><span class="st-title">Approve and acknowledge.</span><p>The review appears under <strong>Approvals</strong>. After approval, the employee is notified and can acknowledge the completed review.</p></li>
+    </ol>
+  </section>
+
   <section id="hr-approvals">
     <div class="eyebrow">For HR &amp; administrators</div>
     <h2>Approvals &amp; the daily digest</h2>
     <p>When staff file leave, overtime, or loan requests, approvers are alerted right away by email, the in-app <strong>🔔 bell</strong>, and Telegram (if connected). A single approval by <strong>either the Department Head or HR</strong> decides a request, and the employee is notified of the outcome.</p>
+    <p>The organization menu's <strong>Approvals</strong> page also shows workflow-based approval instances such as submitted performance reviews. Each card shows the current step and required role. Only a user holding that exact role can click <strong>Approve</strong> or <strong>Reject</strong>; superadmins can act across all steps. Rejections should include a reason so the originating team can correct and resubmit the item.</p>
     <div class="note tip">
       <span class="lbl">Daily digest</span>
       <p>In <strong>Administration → Notifications</strong>, superadmins can switch on a <strong>daily digest</strong> — once a day each organization's approvers get one email/Telegram summary of everything still pending, only when there's something to act on. Set the time and toggle it on or off there.</p>
