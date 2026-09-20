@@ -104,6 +104,7 @@ class EssController
         $r=$engs?Database::one("SELECT * FROM performance_reviews WHERE id=? AND engagement_id IN ($in)",array_merge([(int)$p['id']],$engs)):null;
         if(!$r) throw new HttpError('Review not found',404); if($r['status']!=='APPROVED') throw new HttpError('Only approved reviews can be acknowledged',409);
         Database::update('performance_reviews',(int)$r['id'],['status'=>'ACKNOWLEDGED','acknowledged_at'=>date('Y-m-d H:i:s')]);
+        Notify::toApprovers((int)$r['organization_id'],'performance.manage','performance.acknowledged','Performance review acknowledged',self::myName($u).' acknowledged the completed performance review.','/o/'.(int)$r['organization_id'].'/hr?tab=performance');
         Audit::record('performance.acknowledge',$u,['organization_id'=>$r['organization_id'],'entity'=>'performance_review','entity_id'=>(int)$r['id']]);
         Http::json(['id'=>(int)$r['id'],'status'=>'ACKNOWLEDGED']);
     }

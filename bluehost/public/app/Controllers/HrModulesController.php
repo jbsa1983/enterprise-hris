@@ -478,6 +478,7 @@ class HrModulesController
         $id = Database::insert('approval_instances', ['uuid' => Util::uuid(), 'organization_id' => $o, 'workflow_id' => $wf['id'] ?? null,
             'transaction_type' => $b['transaction_type'], 'entity' => $b['entity'] ?? '', 'entity_id' => (int) ($b['entity_id'] ?? 0), 'amount' => $amount, 'current_step' => 1, 'status' => 'PENDING', 'requested_by_user_id' => $u['id']]);
         $total = $wf ? (int) Database::scalar('SELECT COUNT(*) FROM approval_workflow_steps WHERE workflow_id = ?', [$wf['id']]) : 1;
+        Notify::toApprovers($o, 'approval.act', 'approval.raised', 'New approval request', ($b['transaction_type'] ?? 'Request') . ' is awaiting approval.', '/o/' . $o . '/hr?tab=approvals');
         Audit::record('approval.raise', $u, ['organization_id' => $o, 'entity' => 'approval_instance', 'entity_id' => $id]);
         Http::json(['id' => $id, 'status' => 'PENDING', 'current_step' => 1, 'total_steps' => $total]);
     }
@@ -508,6 +509,14 @@ class HrModulesController
             } elseif ($review && $status === 'REJECTED') {
                 Database::update('performance_reviews', (int) $review['id'], ['status' => 'REJECTED']);
             }
+        }
+        if ($status !== 'PENDING') {
+            $decision = $status === 'APPROVED' ? 'approved' : 'rejected';
+            $isReview = $inst['entity'] === 'performance_review';
+            Notify::toApprovers($o, $isReview ? 'performance.manage' : 'approval.manage', 'approval.decision',
+                ($isReview ? 'Performance review ' : ucwords(strtolower(str_replace('_',' ',$inst['transaction_type']))) . ' ') . $decision,
+                'The approval request has been ' . $decision . (!empty($b['remarks']) ? ': ' . $b['remarks'] : '.'),
+                '/o/' . $o . '/hr?tab=' . ($isReview ? 'performance' : 'approvals'));
         }
         Audit::record('approval.' . strtolower($action), $u, ['organization_id' => $o, 'entity' => 'approval_instance', 'entity_id' => (int) $inst['id'], 'after' => ['status' => $status, 'step' => $step, 'remarks' => $b['remarks'] ?? null]]);
         Http::json(['id' => (int) $inst['id'], 'status' => $status, 'current_step' => $step, 'total_steps' => $total]);

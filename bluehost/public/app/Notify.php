@@ -10,11 +10,12 @@ class Notify
         return Database::all(
             "SELECT DISTINCT u.id, u.email, u.full_name
                FROM users u
-               JOIN organization_users ou ON ou.user_id = u.id AND ou.organization_id = ?
-               JOIN user_roles ur ON ur.user_id = u.id
-               JOIN role_permissions rp ON rp.role_id = ur.role_id
-               JOIN permissions p ON p.id = rp.permission_id
-              WHERE p.code = ? AND u.is_active = 1", [$orgId, $permCode]);
+               LEFT JOIN organization_users ou ON ou.user_id = u.id AND ou.organization_id = ?
+               LEFT JOIN user_roles ur ON ur.user_id = u.id
+               LEFT JOIN role_permissions rp ON rp.role_id = ur.role_id
+               LEFT JOIN permissions p ON p.id = rp.permission_id AND p.code = ?
+              WHERE u.is_active = 1
+                AND (u.is_superadmin = 1 OR (ou.organization_id IS NOT NULL AND p.id IS NOT NULL))", [$orgId, $permCode]);
     }
 
     public static function userForPerson(int $personId): ?array
@@ -29,6 +30,16 @@ class Notify
                 'title' => mb_substr($title, 0, 200), 'body' => mb_substr($body, 0, 500), 'link' => $link, 'is_read' => 0]);
         } catch (\Throwable $e) {
         }
+    }
+
+    /** In-app + e-mail + Telegram to one active user. */
+    public static function toUser(int $userId, string $type, string $title, string $body, string $link): void
+    {
+        $u = Database::one('SELECT id,email,full_name FROM users WHERE id=? AND is_active=1', [$userId]);
+        if (!$u) return;
+        self::record((int) $u['id'], $type, $title, $body, $link);
+        Mailer::send($u['email'], $title, $body . "\n\nOpen the HRIS:\n" . self::url($link));
+        Telegram::notifyUser((int) $u['id'], "🔔 {$title}\n{$body}\n" . self::url($link));
     }
 
     private static function url(string $path): string
